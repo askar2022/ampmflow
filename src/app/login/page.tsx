@@ -15,6 +15,12 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
+  const message =
+    error === "db"
+      ? "The app is not connected to the database yet. In Vercel, set DATABASE_URL to the Supabase Postgres URI (it starts with postgresql://), not the website URL or anon key."
+      : error
+        ? "That email or password is not recognized."
+        : "";
 
   return (
     <div className="flex min-h-full items-center justify-center px-6 py-16">
@@ -43,9 +49,9 @@ export default async function LoginPage({
             Demo password for every account:{" "}
             <span className="font-semibold text-ink">Riverside!2026</span>
           </p>
-          {error ? (
+          {message ? (
             <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red">
-              That email or password is not recognized.
+              {message}
             </p>
           ) : null}
           <form action={loginAction} className="mt-6 space-y-4">
