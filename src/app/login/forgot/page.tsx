@@ -9,18 +9,15 @@ export default async function ForgotPasswordPage() {
 
   return (
     <LoginFrame school={school}>
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-navy">
-          Forgot password
-        </h2>
+      <div className="text-left">
+        <h2 className="text-xl font-semibold text-navy">Forgot password</h2>
         <p className="mt-3 text-sm leading-6 text-ink">
-          Ask your transportation coordinator or administrator to reset your
-          staff password in Users. AMPM Flow does not email a reset link from
-          this screen.
+          Ask your transportation coordinator to reset your staff password in
+          Users.
         </p>
         <Link
           href="/login"
-          className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-teal px-4 py-2.5 text-[16px] font-semibold text-white hover:bg-teal-deep"
+          className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-[16px] font-semibold text-white hover:bg-navy-deep"
         >
           Back to Sign in
         </Link>

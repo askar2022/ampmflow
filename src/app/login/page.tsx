@@ -38,67 +38,53 @@ export default async function LoginPage({
 
   return (
     <LoginFrame school={school}>
-      <>
-        {!db.ok ? (
-          <>
-            <h2 className="text-2xl font-semibold tracking-tight text-navy">
-              Connect the database
-            </h2>
-            <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red">
-              {dbMessage}
-            </p>
-            <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
-              <li>Open Supabase → Connect at the top of the project.</li>
-              <li>
-                Copy the <strong>Transaction pooler</strong> URI (port{" "}
-                <code>6543</code>).
-              </li>
-              <li>Replace the password placeholder with your database password.</li>
-              <li>
-                In Vercel, set <strong>DATABASE_URL</strong> for Production.
-              </li>
-              <li>Redeploy, then refresh this page.</li>
-            </ol>
-          </>
-        ) : needsSetup ? (
-          <>
-            <h2 className="text-2xl font-semibold tracking-tight text-navy">
-              Create the first account
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              Create your school and transportation coordinator. Add staff after
-              you sign in.
-            </p>
-            <div className="mt-4">
-              <SetupForm
-                error={
-                  error === "setup"
-                    ? "School name, your name, email, and password are required."
-                    : undefined
-                }
-              />
-            </div>
-          </>
-        ) : (
-          <>
-            <h2 className="text-2xl font-semibold tracking-tight text-navy">
-              Sign in
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              Use your staff email and password.
-            </p>
-            <div className="mt-4">
-              <SignInForm
-                authError={
-                  error === "1"
-                    ? "That email or password is not recognized."
-                    : undefined
-                }
-              />
-            </div>
-          </>
-        )}
-      </>
+      {!db.ok ? (
+        <div className="text-left">
+          <h2 className="text-xl font-semibold text-navy">Connect the database</h2>
+          <p className="mt-3 text-sm text-red">{dbMessage}</p>
+          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
+            <li>Open Supabase → Connect at the top of the project.</li>
+            <li>
+              Copy the <strong>Transaction pooler</strong> URI (port{" "}
+              <code>6543</code>).
+            </li>
+            <li>Replace the password placeholder with your database password.</li>
+            <li>
+              In Vercel, set <strong>DATABASE_URL</strong> for Production.
+            </li>
+            <li>Redeploy, then refresh this page.</li>
+          </ol>
+        </div>
+      ) : needsSetup ? (
+        <div>
+          <h2 className="text-xl font-semibold text-navy">Create the first account</h2>
+          <p className="mt-1 text-sm text-muted">
+            Create your school and transportation coordinator.
+          </p>
+          <div className="mt-6">
+            <SetupForm
+              error={
+                error === "setup"
+                  ? "School name, your name, email, and password are required."
+                  : undefined
+              }
+            />
+          </div>
+        </div>
+      ) : (
+        <div>
+          <h2 className="text-xl font-semibold text-navy">Welcome back</h2>
+          <div className="mt-6">
+            <SignInForm
+              authError={
+                error === "1"
+                  ? "That email or password is not recognized."
+                  : undefined
+              }
+            />
+          </div>
+        </div>
+      )}
     </LoginFrame>
   );
 }
