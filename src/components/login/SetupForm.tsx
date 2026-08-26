@@ -15,7 +15,7 @@ export function SetupForm({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form action={createAccount} className="space-y-5">
+    <form action={createAccount} className="space-y-3 short-h:space-y-2.5">
       {showSchoolName ? (
         <label className="block text-left text-sm font-medium text-navy">
           School name
@@ -32,7 +32,7 @@ export function SetupForm({
       </label>
       <label className="block text-left text-sm font-medium text-navy">
         Password
-        <span className="relative mt-1.5 block">
+        <span className="relative mt-1 block">
           <input
             name="password"
             type={showPassword ? "text" : "password"}
@@ -54,12 +54,15 @@ export function SetupForm({
           </button>
         </span>
       </label>
-      {error ? (
-        <p role="alert" className="text-sm text-red">
-          {error}
-        </p>
-      ) : null}
-      <SubmitButton>Create account</SubmitButton>
+      <p
+        role="alert"
+        aria-live="polite"
+        aria-atomic="true"
+        className="min-h-5 text-sm text-red"
+      >
+        {error || "\u00a0"}
+      </p>
+      <SubmitButton pendingLabel="Creating account…">Create account</SubmitButton>
     </form>
   );
 }

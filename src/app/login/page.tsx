@@ -35,11 +35,13 @@ export default async function LoginPage({
             : "";
 
   return (
-    <LoginFrame>
+    <LoginFrame variant={needsSetup ? "signup" : "signin"}>
       {!db.ok ? (
         <div className="text-left">
-          <h2 className="text-xl font-semibold text-navy">Connect the database</h2>
-          <p className="mt-3 text-sm text-red">{dbMessage}</p>
+          <h2 className="text-lg font-semibold text-navy short-h:text-base">
+            Connect the database
+          </h2>
+          <p className="mt-2 text-sm text-red">{dbMessage}</p>
           <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
             <li>Open Supabase → Connect at the top of the project.</li>
             <li>
@@ -55,11 +57,13 @@ export default async function LoginPage({
         </div>
       ) : needsSetup ? (
         <div>
-          <h2 className="text-xl font-semibold text-navy">Create the first account</h2>
-          <p className="mt-1 text-sm text-muted">
-            Create your school and transportation coordinator.
+          <h2 className="text-lg font-semibold text-navy short-h:text-base">
+            Create account
+          </h2>
+          <p className="mt-0.5 text-sm text-[#7b8490]">
+            Create your AMPM Flow administrator account.
           </p>
-          <div className="mt-6">
+          <div className="mt-3 short-h:mt-2.5">
             <SetupForm
               error={
                 error === "setup"
@@ -71,11 +75,13 @@ export default async function LoginPage({
         </div>
       ) : (
         <div>
-          <h2 className="text-xl font-semibold text-navy">Welcome back</h2>
-          <p className="mt-1 text-sm text-[#7b8490]">
+          <h2 id="login-heading" className="text-lg font-semibold text-navy short-h:text-base">
+            Welcome back
+          </h2>
+          <p className="mt-0.5 text-sm text-[#7b8490]">
             Sign in to manage today’s transportation.
           </p>
-          <div className="mt-6">
+          <div className="mt-3 short-h:mt-2.5">
             <SignInForm
               authError={
                 error === "1"
