@@ -1,0 +1,3 @@
+student_id,first_name,last_name,grade,teacher,classroom,parent_name,parent_phone,home_address,home_city,home_state,home_zip,daycare_name,daycare_address,am_type,am_destination,am_bus,pm_type,pm_destination,pm_bus,notes
+RIV-9001,Yusuf,Hassan,3,Elena Vasquez,Room 202,Amina Hassan,217-555-0166,12 Cedar Lane,Springfield,IL,62701,Sunshine Kids Academy,410 Daycare Way,Bus,HOME,3,Bus,DAYCARE,4,New enrollment
+RIV-9002,Leah,Nguyen,1,James Porter,Room 102,Mai Nguyen,217-555-0177,88 Maple Avenue,Springfield,IL,62702,,,Parent,HOME,,Parent,HOME,,

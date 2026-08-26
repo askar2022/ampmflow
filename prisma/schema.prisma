@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  timezone  String   @default("America/Chicago")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  students      Student[]
+  classrooms    Classroom[]
+  teachers      Teacher[]
+  busRoutes     BusRoute[]
+  addresses     Address[]
+  daycares      Daycare[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  changeRequests ChangeRequest[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  schoolId     String
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         String
+  teacherId    String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  school              School           @relation(fields: [schoolId], references: [id])
+  teacher             Teacher?         @relation(fields: [teacherId], references: [id])
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  approvedAudits      AuditLog[]       @relation("AuditApprover")
+  assignmentsUpdated  TransportationAssignment[]
+  temporaryChanges    TemporaryChange[] @relation("TempCreatedBy")
+  temporaryApprovals  TemporaryChange[] @relation("TempApprovedBy")
+  changeRequests      ChangeRequest[]   @relation("RequestCreatedBy")
+  reviewedRequests    ChangeRequest[]   @relation("RequestReviewedBy")
+}
+
+model Classroom {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  grade     String
+  createdAt DateTime @default(now())
+
+  school   School    @relation(fields: [schoolId], references: [id])
+  teachers Teacher[]
+  students Student[]
+}
+
+model Teacher {
+  id           String   @id @default(cuid())
+  schoolId     String
+  classroomId  String
+  name         String
+  email        String
+  createdAt    DateTime @default(now())
+
+  school     School    @relation(fields: [schoolId], references: [id])
+  classroom  Classroom @relation(fields: [classroomId], references: [id])
+  users      User[]
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  schoolId  String
+  line1     String
+  city      String
+  state     String
+  zip       String
+  label     String   @default("home")
+  createdAt DateTime @default(now())
+
+  school              School                     @relation(fields: [schoolId], references: [id])
+  homeStudents        Student[]                  @relation("HomeAddress")
+  daycares            Daycare[]
+  customAssignments   TransportationAssignment[] @relation("CustomAddress")
+  customTempChanges   TemporaryChange[]          @relation("TempCustomAddress")
+}
+
+model Daycare {
+  id        String   @id @default(cuid())
+  schoolId  String
+  addressId String
+  name      String
+  createdAt DateTime @default(now())
+
+  school      School                     @relation(fields: [schoolId], references: [id])
+  address     Address                    @relation(fields: [addressId], references: [id])
+  students    Student[]
+  assignments TransportationAssignment[]
+  tempChanges TemporaryChange[]
+}
+
+model Student {
+  id            String   @id @default(cuid())
+  schoolId      String
+  studentId     String
+  firstName     String
+  lastName      String
+  grade         String
+  classroomId   String
+  parentName    String
+  parentPhone   String
+  homeAddressId String
+  daycareId     String?
+  notes         String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  school      School    @relation(fields: [schoolId], references: [id])
+  classroom   Classroom @relation(fields: [classroomId], references: [id])
+  homeAddress Address   @relation("HomeAddress", fields: [homeAddressId], references: [id])
+  daycare     Daycare?  @relation(fields: [daycareId], references: [id])
+
+  assignments    TransportationAssignment[]
+  tempChanges    TemporaryChange[]
+  changeRequests ChangeRequest[]
+  auditLogs      AuditLog[]
+
+  @@unique([schoolId, studentId])
+}
+
+model BusRoute {
+  id              String   @id @default(cuid())
+  schoolId        String
+  number          String
+  name            String   @default("")
+  trip            String
+  loadingLocation String   @default("Bus loading area")
+  notes           String   @default("")
+  createdAt       DateTime @default(now())
+
+  school      School                     @relation(fields: [schoolId], references: [id])
+  assignments TransportationAssignment[]
+  tempChanges TemporaryChange[]
+
+  @@unique([schoolId, number, trip])
+}
+
+model TransportationAssignment {
+  id                   String    @id @default(cuid())
+  studentId            String
+  trip                 String
+  type                 String
+  destination          String
+  busRouteId           String?
+  daycareId            String?
+  customAddressId      String?
+  waitingForAssignment Boolean   @default(false)
+  notes                String    @default("")
+  effectiveStart       DateTime?
+  effectiveEnd         DateTime?
+  updatedById          String
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  student       Student  @relation(fields: [studentId], references: [id])
+  busRoute      BusRoute? @relation(fields: [busRouteId], references: [id])
+  daycare       Daycare?  @relation(fields: [daycareId], references: [id])
+  customAddress Address?  @relation("CustomAddress", fields: [customAddressId], references: [id])
+  updatedBy     User      @relation(fields: [updatedById], references: [id])
+
+  @@unique([studentId, trip])
+}
+
+model TemporaryChange {
+  id                   String    @id @default(cuid())
+  studentId            String
+  trip                 String
+  type                 String
+  destination          String
+  busRouteId           String?
+  daycareId            String?
+  customAddressId      String?
+  waitingForAssignment Boolean   @default(false)
+  durationType         String
+  startDate            String
+  endDate              String
+  reason               String    @default("")
+  status               String    @default("APPROVED")
+  undone               Boolean   @default(false)
+  createdById          String
+  approvedById         String?
+  approvedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  student       Student   @relation(fields: [studentId], references: [id])
+  busRoute      BusRoute? @relation(fields: [busRouteId], references: [id])
+  daycare       Daycare?  @relation(fields: [daycareId], references: [id])
+  customAddress Address?  @relation("TempCustomAddress", fields: [customAddressId], references: [id])
+  createdBy     User      @relation("TempCreatedBy", fields: [createdById], references: [id])
+  approvedBy    User?     @relation("TempApprovedBy", fields: [approvedById], references: [id])
+}
+
+model ChangeRequest {
+  id          String    @id @default(cuid())
+  schoolId    String
+  studentId   String?
+  trip        String?
+  source      String
+  title       String
+  details     String    @default("")
+  status      String    @default("PENDING")
+  busNumber   String?
+  companyNote String    @default("")
+  payload     String    @default("{}")
+  createdById String
+  reviewedById String?
+  reviewedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  school    School   @relation(fields: [schoolId], references: [id])
+  student   Student? @relation(fields: [studentId], references: [id])
+  createdBy User     @relation("RequestCreatedBy", fields: [createdById], references: [id])
+  reviewedBy User?   @relation("RequestReviewedBy", fields: [reviewedById], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  schoolId  String
+  userId    String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  schoolId     String
+  studentId    String?
+  actorId      String
+  approvedById String?
+  action       String
+  trip         String?
+  durationType String?
+  oldPlan      String   @default("{}")
+  newPlan      String   @default("{}")
+  createdAt    DateTime @default(now())
+
+  school     School   @relation(fields: [schoolId], references: [id])
+  student    Student? @relation(fields: [studentId], references: [id])
+  actor      User     @relation(fields: [actorId], references: [id])
+  approvedBy User?    @relation("AuditApprover", fields: [approvedById], references: [id])
+}

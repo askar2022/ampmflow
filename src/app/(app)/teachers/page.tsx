@@ -1,0 +1,34 @@
+import Link from "next/link";
+import { getSession } from "@/lib/auth";
+import { loadStudents } from "@/lib/transportation";
+import { groupByTeacher } from "@/lib/reports";
+
+export default async function TeachersPage() {
+  const session = await getSession();
+  if (!session) return null;
+  const groups = groupByTeacher(await loadStudents(session.schoolId));
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-serif text-4xl">Teacher Lists</h1>
+        <p className="mt-1 text-muted">
+          Each classroom has a read-only dismissal page. Teachers cannot edit
+          transportation.
+        </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        {groups.map(([name, students]) => (
+          <Link
+            key={name}
+            href={`/print?kind=teacher&group=${encodeURIComponent(name)}`}
+            className="rounded-2xl border border-line bg-card p-5 hover:border-gold"
+          >
+            <h2 className="font-serif text-2xl">{name}</h2>
+            <p className="mt-1 text-sm text-muted">{students.length} students</p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
