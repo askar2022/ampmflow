@@ -50,7 +50,7 @@ export function SignInForm({ authError }: { authError?: string }) {
           </button>
         </span>
       </label>
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex flex-nowrap items-center justify-between gap-3 text-sm">
         <label className="inline-flex items-center gap-2 text-navy">
           <input
             name="remember"
