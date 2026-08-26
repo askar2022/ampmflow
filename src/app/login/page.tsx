@@ -6,9 +6,9 @@ import { SetupForm } from "@/components/login/SetupForm";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; requested?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, requested } = await searchParams;
   const db = await checkDatabase();
   let userCount = 0;
   if (db.ok) {
@@ -84,8 +84,15 @@ export default async function LoginPage({
           <div className="mt-3 short-h:mt-2.5">
             <SignInForm
               authError={
-                error === "1"
-                  ? "That email or password is not recognized."
+                error === "pending"
+                  ? "Your account is waiting for an administrator to approve it."
+                  : error === "1"
+                    ? "That email or password is not recognized."
+                    : undefined
+              }
+              notice={
+                requested === "1"
+                  ? "Your request was sent. An administrator must approve it before you can sign in."
                   : undefined
               }
             />

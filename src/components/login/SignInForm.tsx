@@ -9,7 +9,13 @@ import { loginAction } from "@/app/actions/auth";
 export const fieldClass =
   "mt-1 min-h-11 w-full rounded-[8px] border border-[#d8dce2] bg-white px-3.5 py-2.5 text-[16px] text-navy outline-none transition placeholder:text-[#b0b6be] focus:border-navy focus:ring-2 focus:ring-navy/10 disabled:cursor-not-allowed disabled:opacity-60";
 
-export function SignInForm({ authError }: { authError?: string }) {
+export function SignInForm({
+  authError,
+  notice,
+}: {
+  authError?: string;
+  notice?: string;
+}) {
   const [showPassword, setShowPassword] = useState(false);
   const invalid = Boolean(authError);
 
@@ -79,13 +85,16 @@ export function SignInForm({ authError }: { authError?: string }) {
         role="alert"
         aria-live="polite"
         aria-atomic="true"
-        className="min-h-5 text-sm text-red"
+        className={`min-h-5 text-sm ${notice && !authError ? "text-teal-deep" : "text-red"}`}
       >
-        {authError || "\u00a0"}
+        {authError || notice || "\u00a0"}
       </p>
       <SubmitButton>Sign in</SubmitButton>
-      <p className="text-center text-sm text-[#7b8490]">
-        Need an account? Ask an administrator to create it.
+      <p className="text-center text-sm text-navy">
+        Need an account?{" "}
+        <Link href="/login/create" className="font-medium text-teal hover:text-teal-deep">
+          Request an account
+        </Link>
       </p>
     </form>
   );

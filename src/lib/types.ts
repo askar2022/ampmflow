@@ -9,6 +9,8 @@ export const ROLES = [
 
 export type Role = (typeof ROLES)[number];
 
+export const PENDING_ROLE = "PENDING";
+
 export const TRIPS = ["AM", "PM"] as const;
 export type Trip = (typeof TRIPS)[number];
 

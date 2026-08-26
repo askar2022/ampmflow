@@ -8,9 +8,11 @@ import { fieldClass, SubmitButton } from "@/components/login/SignInForm";
 export function SetupForm({
   error,
   showSchoolName = true,
+  mode = "first-admin",
 }: {
   error?: string;
   showSchoolName?: boolean;
+  mode?: "first-admin" | "request";
 }) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -62,7 +64,11 @@ export function SetupForm({
       >
         {error || "\u00a0"}
       </p>
-      <SubmitButton pendingLabel="Creating account…">Create account</SubmitButton>
+      <SubmitButton
+        pendingLabel={mode === "request" ? "Sending request…" : "Creating account…"}
+      >
+        {mode === "request" ? "Request account" : "Create account"}
+      </SubmitButton>
     </form>
   );
 }

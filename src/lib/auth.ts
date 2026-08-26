@@ -2,7 +2,13 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
-import type { Role, SessionUser } from "./types";
+import { PENDING_ROLE, type Role, type SessionUser } from "./types";
+
+export type AuthResult =
+  | { status: "ok"; user: SessionUser }
+  | { status: "invalid" }
+  | { status: "pending" }
+  | { status: "disabled" };
 
 const COOKIE = "bdt_session";
 const secret = new TextEncoder().encode(
@@ -104,7 +110,10 @@ export function homePath(role: Role) {
   return "/dashboard";
 }
 
-export async function authenticate(email: string, password: string) {
+export async function authenticate(
+  email: string,
+  password: string,
+): Promise<AuthResult> {
   const user = await prisma.user.findUnique({
     where: { email: email.trim().toLowerCase() },
     select: {
@@ -118,16 +127,21 @@ export async function authenticate(email: string, password: string) {
       passwordHash: true,
     },
   });
-  if (!user || !user.active) return null;
+  if (!user) return { status: "invalid" };
   const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) return null;
+  if (!ok) return { status: "invalid" };
+  if (user.role === PENDING_ROLE) return { status: "pending" };
+  if (!user.active) return { status: "disabled" };
   return {
-    id: user.id,
-    schoolId: user.schoolId,
-    email: user.email,
-    name: user.name,
-    role: user.role as Role,
-    teacherId: user.teacherId,
-    assignedBus: null,
-  } satisfies SessionUser;
+    status: "ok",
+    user: {
+      id: user.id,
+      schoolId: user.schoolId,
+      email: user.email,
+      name: user.name,
+      role: user.role as Role,
+      teacherId: user.teacherId,
+      assignedBus: null,
+    },
+  };
 }

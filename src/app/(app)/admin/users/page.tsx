@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { canManageUsers, getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createUser, toggleUser } from "@/app/actions/users";
+import { approveUser, createUser, rejectUser, toggleUser } from "@/app/actions/users";
 import { updateSchoolIdentity } from "@/app/actions/school";
 import { roleLabel } from "@/lib/format";
+import { PENDING_ROLE } from "@/lib/types";
 
 export default async function UsersPage() {
   const session = await getSession();
@@ -17,6 +18,8 @@ export default async function UsersPage() {
     where: { schoolId: session.schoolId },
     orderBy: { name: "asc" },
   });
+  const pending = users.filter((user) => user.role === PENDING_ROLE);
+  const staff = users.filter((user) => user.role !== PENDING_ROLE);
   const school = await prisma.school
     .findUnique({
       where: { id: session.schoolId },
@@ -63,6 +66,62 @@ export default async function UsersPage() {
           Save school identity
         </button>
       </form>
+      {pending.length ? (
+        <section className="lg:col-span-2">
+          <h2 className="text-2xl font-semibold tracking-tight text-navy">
+            Waiting for approval
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            These people requested an account. They cannot sign in until you
+            approve them and choose a role.
+          </p>
+          <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
+            <ul className="divide-y divide-line">
+              {pending.map((user) => (
+                <li
+                  key={user.id}
+                  className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-end sm:justify-between"
+                >
+                  <div>
+                    <div className="font-medium">{user.name}</div>
+                    <div className="text-sm text-muted">{user.email}</div>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <form action={approveUser} className="flex flex-wrap items-end gap-2">
+                      <input type="hidden" name="id" value={user.id} />
+                      <label className="text-sm">
+                        <span className="sr-only">Role for {user.name}</span>
+                        <select
+                          name="role"
+                          required
+                          className="rounded-xl border border-line px-3 py-2"
+                          defaultValue="TEACHER"
+                        >
+                          <option value="TEACHER">Teacher</option>
+                          <option value="FRONT_DESK">Reception</option>
+                          <option value="COORDINATOR">Bus Coordinator</option>
+                          <option value="ADMINISTRATOR">Admin</option>
+                          <option value="BUS_COMPANY">Bus Company</option>
+                          <option value="BUS_ASSISTANT">Bus Assistant</option>
+                        </select>
+                      </label>
+                      <button className="rounded-xl bg-navy px-4 py-2 font-semibold text-white">
+                        Approve
+                      </button>
+                    </form>
+                    <form action={rejectUser}>
+                      <input type="hidden" name="id" value={user.id} />
+                      <button className="rounded-xl px-4 py-2 text-sm font-semibold text-red">
+                        Reject
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
       <section>
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
@@ -80,7 +139,7 @@ export default async function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {staff.map((user) => (
                 <tr key={user.id} className="border-t border-line">
                   <td className="px-4 py-3">
                     <div className="font-medium">{user.name}</div>
@@ -115,9 +174,9 @@ export default async function UsersPage() {
           <input name="email" type="email" required placeholder="Email" className="w-full rounded-xl border border-line px-3 py-2" />
           <select name="role" className="w-full rounded-xl border border-line px-3 py-2">
             <option value="TEACHER">Teacher</option>
-            <option value="FRONT_DESK">Front Desk</option>
-            <option value="COORDINATOR">Transportation Coordinator</option>
-            <option value="ADMINISTRATOR">School Administrator</option>
+            <option value="FRONT_DESK">Reception</option>
+            <option value="COORDINATOR">Bus Coordinator</option>
+            <option value="ADMINISTRATOR">Admin</option>
             <option value="BUS_COMPANY">Bus Company</option>
             <option value="BUS_ASSISTANT">Bus Assistant</option>
           </select>

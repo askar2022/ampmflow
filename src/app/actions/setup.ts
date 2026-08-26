@@ -4,8 +4,19 @@ import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { prisma, isDatabaseConfigured } from "@/lib/prisma";
 import { createSession, hashPassword } from "@/lib/auth";
+import { notifyCoordinators } from "@/lib/audit";
+import { PENDING_ROLE } from "@/lib/types";
 
 const FIRST_ADMIN_ROLE = "ADMINISTRATOR" as const;
+
+function isNextRedirect(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "digest" in error &&
+    String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT")
+  );
+}
 
 async function ensureOptionalColumns() {
   await prisma.$executeRawUnsafe(
@@ -32,14 +43,14 @@ export async function createAccount(formData: FormData) {
 
   await ensureOptionalColumns();
 
-  let already: { id: string } | null = null;
+  let already: { id: string; role: string } | null = null;
   let school: { id: string; name: string } | null = null;
   let existingUsers = 0;
   try {
     existingUsers = await prisma.user.count();
     already = await prisma.user.findUnique({
       where: { email },
-      select: { id: true },
+      select: { id: true, role: true },
     });
     school = await prisma.school.findFirst({
       orderBy: { createdAt: "asc" },
@@ -49,17 +60,90 @@ export async function createAccount(formData: FormData) {
     redirect("/login/create?error=db");
   }
 
-  if (existingUsers > 0) {
-    redirect("/login");
-  }
   if (already) {
-    redirect("/login/create?error=exists");
-  }
-  if (!school && !schoolName) {
-    redirect("/login/create?error=setup");
+    redirect(
+      already.role === PENDING_ROLE
+        ? "/login/create?error=pending"
+        : "/login/create?error=exists",
+    );
   }
 
   const passwordHash = await hashPassword(password);
+
+  if (existingUsers === 0) {
+    await createFirstAdministrator({
+      school,
+      schoolName,
+      name,
+      email,
+      passwordHash,
+    });
+    redirect("/admin/users");
+  }
+
+  if (!school) {
+    redirect("/login/create?error=db");
+  }
+
+  try {
+    await prisma.user.create({
+      data: {
+        schoolId: school.id,
+        name,
+        email,
+        role: PENDING_ROLE,
+        passwordHash,
+        active: false,
+      },
+      select: { id: true },
+    });
+  } catch (error) {
+    if (isNextRedirect(error)) {
+      throw error;
+    }
+    const code =
+      typeof error === "object" && error && "code" in error
+        ? String((error as { code?: string }).code)
+        : "";
+    if (code === "P2002") {
+      redirect("/login/create?error=exists");
+    }
+    try {
+      const userId = randomUUID().replace(/-/g, "").slice(0, 24);
+      await prisma.$executeRaw`
+        INSERT INTO "User" ("id", "schoolId", "email", "name", "passwordHash", "role", "active", "createdAt", "updatedAt")
+        VALUES (${userId}, ${school.id}, ${email}, ${name}, ${passwordHash}, ${PENDING_ROLE}, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `;
+    } catch {
+      redirect("/login/create?error=db");
+    }
+  }
+
+  await notifyCoordinators(
+    school.id,
+    "Account request",
+    `${name} requested a staff account and is waiting for approval.`,
+  ).catch(() => undefined);
+
+  redirect("/login?requested=1");
+}
+
+async function createFirstAdministrator({
+  school,
+  schoolName,
+  name,
+  email,
+  passwordHash,
+}: {
+  school: { id: string; name: string } | null;
+  schoolName: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+}) {
+  if (!school && !schoolName) {
+    redirect("/login/create?error=setup");
+  }
 
   try {
     const stillEmpty = await prisma.user.count();
@@ -86,6 +170,7 @@ export async function createAccount(formData: FormData) {
         email,
         role: FIRST_ADMIN_ROLE,
         passwordHash,
+        active: true,
       },
       select: {
         id: true,
@@ -106,11 +191,7 @@ export async function createAccount(formData: FormData) {
       assignedBus: null,
     });
   } catch (error) {
-    const digest =
-      typeof error === "object" && error && "digest" in error
-        ? String((error as { digest?: string }).digest)
-        : "";
-    if (digest.startsWith("NEXT_REDIRECT")) {
+    if (isNextRedirect(error)) {
       throw error;
     }
 
@@ -146,20 +227,12 @@ export async function createAccount(formData: FormData) {
         assignedBus: null,
       });
     } catch (fallbackError) {
-      const fallbackDigest =
-        typeof fallbackError === "object" &&
-        fallbackError &&
-        "digest" in fallbackError
-          ? String((fallbackError as { digest?: string }).digest)
-          : "";
-      if (fallbackDigest.startsWith("NEXT_REDIRECT")) {
+      if (isNextRedirect(fallbackError)) {
         throw fallbackError;
       }
       redirect("/login/create?error=db");
     }
   }
-
-  redirect("/admin/users");
 }
 
 export async function createFirstAccount(formData: FormData) {

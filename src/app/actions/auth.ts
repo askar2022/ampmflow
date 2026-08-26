@@ -12,21 +12,24 @@ export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") || "");
   const password = String(formData.get("password") || "");
 
-  let user;
+  let result;
   try {
-    user = await authenticate(email, password);
+    result = await authenticate(email, password);
   } catch {
     redirect("/login?error=db");
   }
 
-  if (!user) {
+  if (result.status === "pending") {
+    redirect("/login?error=pending");
+  }
+  if (result.status !== "ok") {
     redirect("/login?error=1");
   }
 
-  await createSession(user, {
+  await createSession(result.user, {
     remember: formData.get("remember") === "1",
   });
-  redirect(homePath(user.role));
+  redirect(homePath(result.user.role));
 }
 
 export async function logoutAction() {

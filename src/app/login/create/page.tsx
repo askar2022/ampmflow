@@ -24,30 +24,35 @@ export default async function CreateAccountPage({
     redirect("/login");
   }
 
-  if (userCount > 0) {
-    redirect("/login");
-  }
-
+  const firstAdmin = userCount === 0;
   const message =
     error === "exists"
       ? "That email already has an account. Sign in instead."
-      : error === "setup"
-        ? "Name, email, and a password of at least 8 characters are required."
-        : error === "db"
-          ? "The account could not be saved. Check the database connection and try again."
-          : undefined;
+      : error === "pending"
+        ? "That email already has a request waiting for approval."
+        : error === "setup"
+          ? "Name, email, and a password of at least 8 characters are required."
+          : error === "db"
+            ? "The account could not be saved. Check the database connection and try again."
+            : undefined;
 
   return (
     <LoginFrame variant="signup">
       <div>
         <h2 className="text-lg font-semibold text-navy short-h:text-base">
-          Create account
+          {firstAdmin ? "Create account" : "Request account"}
         </h2>
         <p className="mt-0.5 text-sm text-[#7b8490]">
-          Create your AMPM Flow administrator account.
+          {firstAdmin
+            ? "Create your AMPM Flow administrator account."
+            : "An administrator must approve your account before you can sign in."}
         </p>
         <div className="mt-3 short-h:mt-2.5">
-          <SetupForm error={message} showSchoolName={needsSchool} />
+          <SetupForm
+            error={message}
+            showSchoolName={firstAdmin && needsSchool}
+            mode={firstAdmin ? "first-admin" : "request"}
+          />
         </div>
         <p className="mt-3 text-center text-sm text-navy">
           Already have an account?{" "}

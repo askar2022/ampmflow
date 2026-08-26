@@ -3,6 +3,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { roleLabel } from "@/lib/format";
 import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
 import { BrandMark } from "@/components/BrandMark";
+import { AppNav } from "@/components/AppNav";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
@@ -68,19 +69,7 @@ export function AppShell({
         </div>
         <nav className="border-t border-white/10 bg-navy-deep">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-3 py-2 sm:px-4">
-            {links.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`rounded-full px-3 py-1.5 text-sm hover:bg-white/10 ${
-                  item.label === "Today’s Changes"
-                    ? "bg-gold text-navy-deep font-semibold hover:bg-gold/90"
-                    : "text-white/90"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            <AppNav links={links} />
             <form action={logoutAction} className="ml-auto">
               <button className="rounded-full px-3 py-1.5 text-sm text-white/70 hover:bg-white/10 hover:text-white">
                 Sign out

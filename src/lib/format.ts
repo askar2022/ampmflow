@@ -32,17 +32,19 @@ export function durationLabel(duration: DurationType) {
 export function roleLabel(role: string) {
   switch (role) {
     case "COORDINATOR":
-      return "Transportation Coordinator";
+      return "Bus Coordinator";
     case "ADMINISTRATOR":
-      return "School Administrator";
+      return "Admin";
     case "TEACHER":
       return "Teacher";
     case "FRONT_DESK":
-      return "Receptionist";
+      return "Reception";
     case "BUS_COMPANY":
       return "Bus Company";
     case "BUS_ASSISTANT":
       return "Bus Assistant";
+    case "PENDING":
+      return "Waiting for approval";
     default:
       return role;
   }
