@@ -14,6 +14,18 @@ export function isDatabaseConfigured() {
   return Boolean(databaseUrl());
 }
 
+export async function checkDatabase() {
+  if (!databaseUrl()) {
+    return { ok: false as const, reason: "missing" as const };
+  }
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return { ok: true as const, reason: "ok" as const };
+  } catch {
+    return { ok: false as const, reason: "unreachable" as const };
+  }
+}
+
 const FALLBACK_URL = "postgresql://unused:unused@127.0.0.1:5432/unused";
 
 export const prisma =

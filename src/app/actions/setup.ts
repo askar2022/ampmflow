@@ -23,33 +23,37 @@ export async function createFirstAccount(formData: FormData) {
     redirect("/login?error=setup");
   }
 
-  const school = await prisma.school.create({
-    data: { name: schoolName, timezone: "America/Chicago" },
-  });
+  try {
+    const school = await prisma.school.create({
+      data: { name: schoolName, timezone: "America/Chicago" },
+    });
 
-  await prisma.schoolSettings.create({
-    data: { schoolId: school.id },
-  }).catch(() => undefined);
+    await prisma.schoolSettings.create({
+      data: { schoolId: school.id },
+    }).catch(() => undefined);
 
-  const user = await prisma.user.create({
-    data: {
-      schoolId: school.id,
-      name,
-      email,
+    const user = await prisma.user.create({
+      data: {
+        schoolId: school.id,
+        name,
+        email,
+        role: "COORDINATOR",
+        passwordHash: await hashPassword(password),
+      },
+    });
+
+    await createSession({
+      id: user.id,
+      schoolId: user.schoolId,
+      email: user.email,
+      name: user.name,
       role: "COORDINATOR",
-      passwordHash: await hashPassword(password),
-    },
-  });
-
-  await createSession({
-    id: user.id,
-    schoolId: user.schoolId,
-    email: user.email,
-    name: user.name,
-    role: "COORDINATOR",
-    teacherId: null,
-    assignedBus: null,
-  });
+      teacherId: null,
+      assignedBus: null,
+    });
+  } catch {
+    redirect("/login?error=db");
+  }
 
   redirect("/admin/users");
 }

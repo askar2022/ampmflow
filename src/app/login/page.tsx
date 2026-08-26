@@ -1,7 +1,7 @@
 import { loginAction } from "@/app/actions/auth";
 import { createFirstAccount } from "@/app/actions/setup";
 import { BrandMark, SCHOOL_NAME } from "@/components/BrandMark";
-import { isDatabaseConfigured, prisma } from "@/lib/prisma";
+import { checkDatabase, prisma } from "@/lib/prisma";
 
 export default async function LoginPage({
   searchParams,
@@ -9,30 +9,27 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-  let needsSetup = false;
-  let schoolName = SCHOOL_NAME;
-
-  if (isDatabaseConfigured()) {
+  const db = await checkDatabase();
+  let userCount = 0;
+  if (db.ok) {
     try {
-      const [users, school] = await Promise.all([
-        prisma.user.count(),
-        prisma.school.findFirst({ select: { name: true } }),
-      ]);
-      needsSetup = users === 0;
-      if (school?.name) schoolName = school.name;
+      userCount = await prisma.user.count();
     } catch {
-      needsSetup = true;
+      userCount = 0;
     }
   }
+  const needsSetup = db.ok && userCount === 0;
 
   const message =
-    error === "db"
-      ? "The app is not connected to the database yet. In Vercel, set DATABASE_URL to the Supabase Postgres URI (it starts with postgresql://)."
-      : error === "setup"
-        ? "School name, your name, email, and password are required."
-        : error
-          ? "That email or password is not recognized."
-          : "";
+    db.reason === "missing" || error === "db"
+      ? "Vercel still does not have a working DATABASE_URL. Add the Supabase Postgres URI (it must start with postgresql://), then redeploy. The Project URL and anon key are not enough."
+      : db.reason === "unreachable"
+        ? "DATABASE_URL is set, but the app cannot reach Supabase. Use the Database connection string, include the database password, and set the variable for Production."
+        : error === "setup"
+          ? "School name, your name, email, and password are required."
+          : error
+            ? "That email or password is not recognized."
+            : "";
 
   return (
     <div className="flex min-h-full items-center justify-center px-6 py-16">
@@ -46,17 +43,39 @@ export default async function LoginPage({
           </p>
         </div>
         <div className="p-10">
-          {needsSetup ? (
+          {!db.ok ? (
+            <>
+              <h2 className="font-serif text-2xl">Connect the database</h2>
+              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red">
+                {message}
+              </p>
+              <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
+                <li>Open Supabase → Project Settings → Database.</li>
+                <li>Copy <strong>Connection string → URI</strong>.</li>
+                <li>Replace the password placeholder with your database password.</li>
+                <li>
+                  In Vercel → Settings → Environment Variables, add{" "}
+                  <strong>DATABASE_URL</strong> for Production. The value must
+                  start with <code>postgresql://</code>.
+                </li>
+                <li>Also add <strong>SESSION_SECRET</strong> (any long secret).</li>
+                <li>Redeploy, then refresh this page.</li>
+              </ol>
+              <p className="mt-4 text-sm text-muted">
+                Do not use https://iardxvlhuapmlmqqrtgr.supabase.co or the anon
+                key as DATABASE_URL.
+              </p>
+            </>
+          ) : needsSetup ? (
             <>
               <h2 className="font-serif text-2xl">Create the first account</h2>
               <p className="mt-1 text-sm text-muted">
-                No users are in the database yet. Create your school and the
-                transportation coordinator. You can add teachers, reception, and
+                Create the Sankofa Prep coordinator account. Add teachers and
                 other staff after you sign in.
               </p>
-              {message ? (
+              {error === "setup" ? (
                 <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red">
-                  {message}
+                  School name, your name, email, and password are required.
                 </p>
               ) : null}
               <form action={createFirstAccount} className="mt-6 space-y-4">
@@ -105,11 +124,11 @@ export default async function LoginPage({
             <>
               <h2 className="font-serif text-2xl">Sign in</h2>
               <p className="mt-1 text-sm text-muted">
-                Use the email and password created for your staff account.
+                Use the email and password for your staff account.
               </p>
-              {message ? (
+              {error && error !== "db" ? (
                 <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red">
-                  {message}
+                  That email or password is not recognized.
                 </p>
               ) : null}
               <form action={loginAction} className="mt-6 space-y-4">
