@@ -23,7 +23,9 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=1");
   }
 
-  await createSession(user);
+  await createSession(user, {
+    remember: formData.get("remember") === "1",
+  });
   redirect(homePath(user.role));
 }
 

@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (PUBLIC.includes(pathname)) {
+  if (PUBLIC.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     if (role) {
       const url = request.nextUrl.clone();
       url.pathname =

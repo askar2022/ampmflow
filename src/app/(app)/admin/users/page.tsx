@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { canManageUsers, getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createUser, toggleUser } from "@/app/actions/users";
+import { updateSchoolIdentity } from "@/app/actions/school";
 import { roleLabel } from "@/lib/format";
 
 export default async function UsersPage() {
@@ -16,9 +17,52 @@ export default async function UsersPage() {
     where: { schoolId: session.schoolId },
     orderBy: { name: "asc" },
   });
+  const school = await prisma.school
+    .findUnique({
+      where: { id: session.schoolId },
+      select: { name: true, logoUrl: true },
+    })
+    .catch(async () =>
+      prisma.school.findUnique({
+        where: { id: session.schoolId },
+        select: { name: true },
+      }),
+    );
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      <form
+        action={updateSchoolIdentity}
+        className="rounded-2xl border border-line bg-card p-6 lg:col-span-2"
+      >
+        <h2 className="text-2xl font-semibold tracking-tight text-navy">
+          School identity
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          This name and logo appear on sign-in and in the header. Do not use a
+          logo from another school.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <input
+            name="schoolName"
+            required
+            defaultValue={school?.name ?? ""}
+            placeholder="School name"
+            className="w-full rounded-xl border border-line px-3 py-2"
+          />
+          <input
+            name="logoUrl"
+            defaultValue={
+              school && "logoUrl" in school ? String(school.logoUrl ?? "") : ""
+            }
+            placeholder="Logo URL (optional)"
+            className="w-full rounded-xl border border-line px-3 py-2"
+          />
+        </div>
+        <button className="mt-3 rounded-xl bg-teal px-4 py-2 font-semibold text-white hover:bg-teal-deep">
+          Save school identity
+        </button>
+      </form>
       <section>
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">

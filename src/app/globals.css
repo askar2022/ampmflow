@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --navy: #10263f;
-  --navy-deep: #0b1b2e;
-  --ink: #1c2430;
-  --muted: #5c6b7a;
-  --paper: #f4efe6;
-  --card: #fffcf7;
-  --line: #ddd4c5;
-  --gold: #b8892c;
+  --navy: #0e2438;
+  --navy-deep: #081623;
+  --ink: #17212b;
+  --muted: #5b6b78;
+  --paper: #f6f3ee;
+  --card: #fffcf8;
+  --line: #e2dbd0;
+  --gold: #c4a056;
+  --teal: #1f8a80;
+  --teal-deep: #14665e;
   --green: #2f7d5b;
   --blue: #2b6aa3;
   --red: #b43b32;
@@ -24,6 +26,8 @@
   --color-card: var(--card);
   --color-line: var(--line);
   --color-gold: var(--gold);
+  --color-teal: var(--teal);
+  --color-teal-deep: var(--teal-deep);
   --color-green: var(--green);
   --color-blue: var(--blue);
   --color-red: var(--red);

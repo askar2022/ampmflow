@@ -98,7 +98,7 @@ export function companyReportText(students: EffectiveStudent[]) {
   );
 
   const lines = [
-    "ampmflow",
+    "AMPM Flow",
     "Transportation change report",
     header.generated,
     header.version,

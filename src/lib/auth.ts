@@ -17,11 +17,15 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
-export async function createSession(user: SessionUser) {
+export async function createSession(
+  user: SessionUser,
+  options?: { remember?: boolean },
+) {
+  const remember = Boolean(options?.remember);
   const token = await new SignJWT({ ...user })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("12h")
+    .setExpirationTime(remember ? "30d" : "12h")
     .sign(secret);
 
   const jar = await cookies();
@@ -30,7 +34,7 @@ export async function createSession(user: SessionUser) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 12,
+    maxAge: remember ? 60 * 60 * 24 * 30 : 60 * 60 * 12,
   });
 }
 
@@ -103,6 +107,16 @@ export function homePath(role: Role) {
 export async function authenticate(email: string, password: string) {
   const user = await prisma.user.findUnique({
     where: { email: email.trim().toLowerCase() },
+    select: {
+      id: true,
+      schoolId: true,
+      email: true,
+      name: true,
+      role: true,
+      teacherId: true,
+      active: true,
+      passwordHash: true,
+    },
   });
   if (!user || !user.active) return null;
   const ok = await verifyPassword(password, user.passwordHash);
@@ -114,6 +128,6 @@ export async function authenticate(email: string, password: string) {
     name: user.name,
     role: user.role as Role,
     teacherId: user.teacherId,
-    assignedBus: user.assignedBus ?? null,
+    assignedBus: null,
   } satisfies SessionUser;
 }

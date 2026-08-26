@@ -42,7 +42,7 @@ export async function emailTeacherLists() {
     const teacher = teachers.find((t) => t.name === teacherName);
     if (!teacher?.email) continue;
     const body = [
-      "ampmflow",
+      "AMPM Flow",
       `Classroom dismissal list — ${name}`,
       header.generated,
       header.version,

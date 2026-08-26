@@ -2,7 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
 import { roleLabel } from "@/lib/format";
 import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
-import { BrandMark, SCHOOL_NAME } from "@/components/BrandMark";
+import { BrandMark } from "@/components/BrandMark";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
@@ -24,11 +24,13 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
 
 export function AppShell({
   user,
-  schoolName = SCHOOL_NAME,
+  schoolName,
+  schoolLogoUrl,
   children,
 }: {
   user: SessionUser;
-  schoolName?: string;
+  schoolName?: string | null;
+  schoolLogoUrl?: string | null;
   children: React.ReactNode;
 }) {
   const now = schoolNow();
@@ -37,7 +39,7 @@ export function AppShell({
   return (
     <div className="min-h-full">
       <header className="no-print bg-navy text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link
             href={
               user.role === "TEACHER"
@@ -49,8 +51,12 @@ export function AppShell({
                     : "/dashboard"
             }
           >
-            <BrandMark light size={56} />
-            <span className="sr-only">{schoolName}</span>
+            <BrandMark
+              light
+              compact
+              schoolName={schoolName}
+              schoolLogoUrl={schoolLogoUrl}
+            />
           </Link>
           <div className="text-right text-sm text-white/80">
             <div className="font-medium text-white">{user.name}</div>

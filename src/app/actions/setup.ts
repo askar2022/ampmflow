@@ -14,7 +14,7 @@ export async function createFirstAccount(formData: FormData) {
     redirect("/login");
   }
 
-  const schoolName = String(formData.get("schoolName") || "Sankofa Prep").trim();
+  const schoolName = String(formData.get("schoolName") || "").trim();
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");

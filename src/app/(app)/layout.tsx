@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSchoolIdentityById } from "@/lib/school";
 import { AppShell } from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
@@ -12,14 +12,14 @@ export default async function AppLayout({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  const school = await prisma.school
-    .findUnique({
-      where: { id: session.schoolId },
-      select: { name: true },
-    })
-    .catch(() => null);
+  const school = await getSchoolIdentityById(session.schoolId);
+
   return (
-    <AppShell user={session} schoolName={school?.name || "Sankofa Prep"}>
+    <AppShell
+      user={session}
+      schoolName={school?.name ?? null}
+      schoolLogoUrl={school?.logoUrl ?? null}
+    >
       {children}
     </AppShell>
   );
