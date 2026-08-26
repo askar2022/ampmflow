@@ -12,8 +12,9 @@ export default async function ImportPage() {
       <div>
         <h1 className="font-serif text-4xl">Upload students</h1>
         <p className="mt-2 text-muted">
-          Choose an Excel or CSV file. Required columns: student_id, first_name,
-          last_name. Add am_bus and pm_bus to create bus routes.
+          Click <strong>Choose file</strong>, pick your Excel or CSV, then click{" "}
+          <strong>Upload file</strong>. Columns can be ID, Student, Grade,
+          Teacher, Room, AM, and PM.
         </p>
       </div>
       <ImportForm />

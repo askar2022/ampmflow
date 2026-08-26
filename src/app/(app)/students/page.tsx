@@ -20,7 +20,7 @@ export default async function StudentsPage({
   const uploadButton = canImport ? (
     <Link
       href="/students/import"
-      className="inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-[#c4a056] bg-[#0e2438] px-5 text-base font-semibold text-[#ffffff]"
+      className="action-button inline-flex min-h-12 items-center justify-center rounded-xl px-6 text-lg font-bold"
     >
       Upload students
     </Link>
@@ -35,7 +35,7 @@ export default async function StudentsPage({
             Search by name, student ID, grade, teacher, bus, or parent phone.
           </p>
         </div>
-        {uploadButton}
+        {!empty ? uploadButton : null}
       </div>
 
       <form className="flex gap-2">
@@ -54,12 +54,26 @@ export default async function StudentsPage({
         <div className="rounded-2xl border border-line bg-card px-6 py-10 text-center">
           <h2 className="text-2xl font-semibold text-navy">No students yet</h2>
           <p className="mx-auto mt-2 max-w-lg text-muted">
-            Upload an Excel or CSV file here. Put bus numbers in{" "}
-            <span className="font-medium text-navy">am_bus</span> and{" "}
-            <span className="font-medium text-navy">pm_bus</span> to create the
-            routes.
+            Use the two buttons below. First download the sample, then upload
+            that file or your own Excel or CSV.
           </p>
-          {uploadButton ? <div className="mt-5">{uploadButton}</div> : null}
+          {canImport ? (
+            <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <a
+                href="/sample-import.csv"
+                download
+                className="action-button-secondary inline-flex min-h-12 items-center justify-center rounded-xl px-6 text-lg font-bold"
+              >
+                1. Download sample
+              </a>
+              <Link
+                href="/students/import"
+                className="action-button inline-flex min-h-12 items-center justify-center rounded-xl px-6 text-lg font-bold"
+              >
+                2. Upload students
+              </Link>
+            </div>
+          ) : null}
         </div>
       ) : (
         <>

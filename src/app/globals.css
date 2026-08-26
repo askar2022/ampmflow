@@ -48,6 +48,19 @@ a {
   color: inherit;
 }
 
+a.action-button,
+.action-button {
+  color: #0e2438 !important;
+  background: #c4a056 !important;
+}
+
+a.action-button-secondary,
+.action-button-secondary {
+  color: #0e2438 !important;
+  background: #ffffff !important;
+  border: 2px solid #0e2438 !important;
+}
+
 button,
 input,
 select,

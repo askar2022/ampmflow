@@ -30,6 +30,78 @@ function parseType(value: string): "BUS" | "PARENT" | null {
   return null;
 }
 
+function splitName(fullName: string) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { first: "", last: "" };
+  if (parts.length === 1) return { first: parts[0], last: "—" };
+  return { first: parts[0], last: parts.slice(1).join(" ") };
+}
+
+const HEADER_ALIASES = new Set([
+  "student_id",
+  "id",
+  "student id",
+  "student",
+  "name",
+  "full name",
+  "first_name",
+  "first name",
+  "last_name",
+  "last name",
+  "grade",
+  "teacher",
+  "classroom",
+  "room",
+  "am",
+  "pm",
+  "am_type",
+  "pm_type",
+  "am_bus",
+  "pm_bus",
+]);
+
+const POSITIONAL_KEYS = ["id", "student", "grade", "teacher", "room", "am", "pm"];
+
+function rowsFromSheet(sheet: XLSX.WorkSheet): Row[] {
+  const matrix = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
+    header: 1,
+    defval: "",
+    raw: false,
+  });
+  const lines = matrix
+    .map((line) => line.map((value) => String(value ?? "").trim()))
+    .filter((line) => line.some(Boolean));
+  if (!lines.length) return [];
+
+  const first = lines[0].map((value) => value.toLowerCase());
+  if (first.some((value) => HEADER_ALIASES.has(value))) {
+    return XLSX.utils.sheet_to_json<Row>(sheet, { defval: "", raw: false });
+  }
+
+  return lines.map((line) => {
+    const row: Row = {};
+    POSITIONAL_KEYS.forEach((key, index) => {
+      row[key] = line[index] || "";
+    });
+    return row;
+  });
+}
+
+function parsePlan(value: string) {
+  const raw = value.trim();
+  const v = raw.toLowerCase();
+  const dest = v.includes("daycare") ? "DAYCARE" : "HOME";
+  if (!v) return { type: null as "BUS" | "PARENT" | null, bus: "", dest };
+  if (v.includes("parent") || v.includes("pickup") || v.includes("drop-off")) {
+    return { type: "PARENT" as const, bus: "", dest };
+  }
+  const busMatch = raw.match(/(\d+)/);
+  if (v.includes("bus") || busMatch) {
+    return { type: "BUS" as const, bus: busMatch?.[1] || "", dest };
+  }
+  return { type: parseType(raw), bus: "", dest };
+}
+
 export async function importStudents(formData: FormData) {
   const user = await getSession();
   if (!user || (user.role !== "COORDINATOR" && user.role !== "ADMINISTRATOR")) {
@@ -44,7 +116,7 @@ export async function importStudents(formData: FormData) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<Row>(sheet, { defval: "" });
+  const rows = rowsFromSheet(sheet);
   if (!rows.length) return { ok: false, error: "The file has no data rows." };
 
   let created = 0;
@@ -53,15 +125,22 @@ export async function importStudents(formData: FormData) {
 
   for (const [index, row] of rows.entries()) {
     const studentId = cell(row, "student_id", "id", "student id");
-    const firstName = cell(row, "first_name", "first name");
-    const lastName = cell(row, "last_name", "last name");
+    const fullName = cell(row, "student", "name", "full name");
+    const names = splitName(fullName);
+    const firstName = cell(row, "first_name", "first name") || names.first;
+    const lastName = cell(row, "last_name", "last name") || names.last;
     if (!studentId || !firstName || !lastName) {
-      errors.push(`Row ${index + 2}: student_id, first_name, and last_name are required.`);
+      errors.push(`Row ${index + 2}: ID and Student name are required.`);
       continue;
     }
 
     const grade = cell(row, "grade") || "—";
-    const classroomName = cell(row, "classroom", "room") || `${grade} classroom`;
+    const room = cell(row, "classroom", "room");
+    const classroomName = room
+      ? /^\d+$/.test(room)
+        ? `Room ${room}`
+        : room
+      : `${grade} classroom`;
     const teacherName = cell(row, "teacher") || "Unassigned";
     const parentName = cell(row, "parent_name", "parent") || "—";
     const parentPhone = cell(row, "parent_phone", "phone") || "—";
@@ -69,10 +148,16 @@ export async function importStudents(formData: FormData) {
     const city = cell(row, "home_city", "city") || "Springfield";
     const state = cell(row, "home_state", "state") || "IL";
     const zip = cell(row, "home_zip", "zip") || "62701";
-    const daycareName = cell(row, "daycare_name", "daycare");
+    const amPlan = parsePlan(cell(row, "am_type", "am"));
+    const pmPlan = parsePlan(cell(row, "pm_type", "pm"));
+    let daycareName = cell(row, "daycare_name", "daycare");
+    if (!daycareName && (amPlan.dest === "DAYCARE" || pmPlan.dest === "DAYCARE")) {
+      daycareName = "Daycare";
+    }
     const daycareAddress = cell(row, "daycare_address");
     const notes = cell(row, "notes");
 
+    try {
     let classroom = await prisma.classroom.findFirst({
       where: { schoolId: user.schoolId, name: classroomName },
     });
@@ -173,12 +258,14 @@ export async function importStudents(formData: FormData) {
     if (existing) updated += 1;
     else created += 1;
 
-    const amType = parseType(cell(row, "am_type", "am"));
-    const pmType = parseType(cell(row, "pm_type", "pm"));
-    const amBus = cell(row, "am_bus", "am bus");
-    const pmBus = cell(row, "pm_bus", "pm bus");
-    const amDest = cell(row, "am_destination").toUpperCase() || "HOME";
-    const pmDest = cell(row, "pm_destination").toUpperCase() || "HOME";
+    const amType = parseType(cell(row, "am_type")) || amPlan.type;
+    const pmType = parseType(cell(row, "pm_type")) || pmPlan.type;
+    const amBus = cell(row, "am_bus", "am bus") || amPlan.bus;
+    const pmBus = cell(row, "pm_bus", "pm bus") || pmPlan.bus;
+    const amDest =
+      cell(row, "am_destination").toUpperCase() || amPlan.dest || "HOME";
+    const pmDest =
+      cell(row, "pm_destination").toUpperCase() || pmPlan.dest || "HOME";
 
     for (const [trip, type, busNo, dest] of [
       ["AM", amType, amBus, amDest],
@@ -224,6 +311,13 @@ export async function importStudents(formData: FormData) {
           updatedById: user.id,
         },
       });
+    }
+    } catch (error) {
+      errors.push(
+        `Row ${index + 2}: ${
+          error instanceof Error ? error.message : "could not save this student."
+        }`,
+      );
     }
   }
 
