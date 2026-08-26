@@ -275,8 +275,8 @@ export async function updateTransportation(
 
 export async function undoLastChange(studentId: string): Promise<UpdateResult> {
   const user = await getSession();
-  if (!user || user.role !== "COORDINATOR") {
-    return { ok: false, error: "Only the coordinator can undo a change." };
+  if (!user || (user.role !== "COORDINATOR" && user.role !== "ADMINISTRATOR")) {
+    return { ok: false, error: "Only an admin or bus coordinator can undo a change." };
   }
 
   const last = await prisma.auditLog.findFirst({

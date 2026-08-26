@@ -11,10 +11,10 @@ export default async function TeachersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-4xl">Teacher Lists</h1>
+        <h1 className="font-serif text-4xl">Teachers and classes</h1>
         <p className="mt-1 text-muted">
-          Each classroom has a read-only dismissal page. Teachers cannot edit
-          transportation.
+          Each teacher and classroom from your student upload. Open a card to
+          print that class list.
         </p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">

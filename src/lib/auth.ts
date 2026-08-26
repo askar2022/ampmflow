@@ -77,12 +77,21 @@ export async function requireSession(): Promise<SessionUser> {
   return session;
 }
 
+export function isSchoolOperator(role: Role) {
+  return role === "ADMINISTRATOR" || role === "COORDINATOR";
+}
+
 export function canManageTransportation(role: Role) {
-  return role === "COORDINATOR" || role === "FRONT_DESK";
+  return (
+    role === "ADMINISTRATOR" ||
+    role === "COORDINATOR" ||
+    role === "FRONT_DESK"
+  );
 }
 
 export function canCreateRequest(role: Role) {
   return (
+    role === "ADMINISTRATOR" ||
     role === "COORDINATOR" ||
     role === "FRONT_DESK" ||
     role === "BUS_COMPANY" ||

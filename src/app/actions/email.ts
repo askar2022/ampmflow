@@ -71,8 +71,8 @@ export async function emailTeacherLists() {
 
 export async function emailCompanyReport() {
   const user = await getSession();
-  if (!user || user.role !== "COORDINATOR") {
-    return { ok: false, error: "Only the coordinator can email the company." };
+  if (!user || (user.role !== "COORDINATOR" && user.role !== "ADMINISTRATOR")) {
+    return { ok: false, error: "Only an admin or bus coordinator can email the company." };
   }
   const to = process.env.BUS_COMPANY_EMAIL;
   if (!to) {
@@ -99,7 +99,7 @@ export async function emailCompanyReport() {
 
 export async function emailPickupList() {
   const user = await getSession();
-  if (!user || user.role !== "COORDINATOR") {
+  if (!user || (user.role !== "COORDINATOR" && user.role !== "ADMINISTRATOR")) {
     return { ok: false, error: "Not authorized." };
   }
   const students = pickupList(await loadStudents(user.schoolId));

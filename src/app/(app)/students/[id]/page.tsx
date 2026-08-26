@@ -43,7 +43,7 @@ export default async function StudentPage({
           </p>
         </div>
         <div className="flex gap-2">
-          {session.role === "COORDINATOR" ? (
+          {session.role === "COORDINATOR" || session.role === "ADMINISTRATOR" ? (
             <>
               <Link
                 href={`/students/${id}/update`}

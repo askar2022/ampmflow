@@ -22,13 +22,17 @@ export function isAfterSnapshot(date = schoolNow()) {
 }
 
 export function canRecordChange(role: Role, duration: DurationType) {
-  if (role === "COORDINATOR") return true;
+  if (role === "COORDINATOR" || role === "ADMINISTRATOR") return true;
   if (role === "FRONT_DESK") return duration === "TODAY" || duration === "DATE_RANGE";
   return false;
 }
 
 export function canChangeAssignment(role: Role) {
-  return role === "COORDINATOR" || role === "FRONT_DESK";
+  return (
+    role === "COORDINATOR" ||
+    role === "ADMINISTRATOR" ||
+    role === "FRONT_DESK"
+  );
 }
 
 export function lateLabel(late: boolean, urgent: boolean) {

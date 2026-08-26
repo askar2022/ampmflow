@@ -32,10 +32,19 @@ export async function createChangeRequest(formData: FormData): Promise<void> {
       source,
       title,
       details,
-      status: user.role === "COORDINATOR" ? "APPROVED" : "PENDING",
+      status:
+        user.role === "COORDINATOR" || user.role === "ADMINISTRATOR"
+          ? "APPROVED"
+          : "PENDING",
       createdById: user.id,
-      reviewedById: user.role === "COORDINATOR" ? user.id : null,
-      reviewedAt: user.role === "COORDINATOR" ? new Date() : null,
+      reviewedById:
+        user.role === "COORDINATOR" || user.role === "ADMINISTRATOR"
+          ? user.id
+          : null,
+      reviewedAt:
+        user.role === "COORDINATOR" || user.role === "ADMINISTRATOR"
+          ? new Date()
+          : null,
     },
   });
 
@@ -105,7 +114,12 @@ export async function reviewRequest(
 
 export async function assignBusFromCompany(formData: FormData): Promise<void> {
   const user = await getSession();
-  if (!user || user.role !== "BUS_COMPANY") {
+  if (
+    !user ||
+    (user.role !== "BUS_COMPANY" &&
+      user.role !== "COORDINATOR" &&
+      user.role !== "ADMINISTRATOR")
+  ) {
     return;
   }
 

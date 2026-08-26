@@ -7,16 +7,18 @@ import { AppNav } from "@/components/AppNav";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
-  { href: "/dashboard", label: "Dashboard", roles: ["COORDINATOR", "FRONT_DESK"] },
+  { href: "/dashboard", label: "Dashboard", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/leadership", label: "Leadership", roles: ["ADMINISTRATOR", "COORDINATOR"] },
   { href: "/changes", label: "Today’s Changes", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/requests", label: "Requests", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/activity", label: "Today’s Activity", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/buses", label: "Buses", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/pickup", label: "Parent Pickup", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/waiting", label: "Waiting for Route", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/acknowledgments", label: "Teacher Acknowledgments", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/checkin", label: "Bus Check-In", roles: ["COORDINATOR", "BUS_ASSISTANT"] },
+  { href: "/checkin", label: "Bus Check-In", roles: ["COORDINATOR", "ADMINISTRATOR", "BUS_ASSISTANT"] },
   { href: "/students", label: "Students", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/teachers", label: "Teachers", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "TEACHER"] },
   { href: "/teacher", label: "My Classroom", roles: ["TEACHER"] },
   { href: "/company", label: "Bus Company", roles: ["COORDINATOR", "ADMINISTRATOR", "BUS_COMPANY"] },

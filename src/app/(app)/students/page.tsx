@@ -112,10 +112,12 @@ export default async function StudentsPage({
                       </StatusBadge>
                     </td>
                     <td className="px-4">
-                      {session.role === "COORDINATOR" || session.role === "FRONT_DESK" ? (
+                      {session.role === "COORDINATOR" ||
+                      session.role === "ADMINISTRATOR" ||
+                      session.role === "FRONT_DESK" ? (
                         <Link
                           href={`/students/${student.id}/update`}
-                          className="font-semibold text-blue"
+                          className="font-semibold text-navy underline"
                         >
                           Record change
                         </Link>

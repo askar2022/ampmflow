@@ -72,7 +72,9 @@ export default async function RequestsPage({
             />
           </label>
           <button className="rounded-xl bg-navy px-4 py-2 font-semibold text-white">
-            {session.role === "COORDINATOR" ? "Save request" : "Submit for approval"}
+            {session.role === "COORDINATOR" || session.role === "ADMINISTRATOR"
+              ? "Save request"
+              : "Submit for approval"}
           </button>
         </form>
       </section>
@@ -98,7 +100,8 @@ export default async function RequestsPage({
                 {request.student.firstName} {request.student.lastName} · {request.trip}
               </p>
             ) : null}
-            {session.role === "COORDINATOR" && request.status === "PENDING" ? (
+            {(session.role === "COORDINATOR" || session.role === "ADMINISTRATOR") &&
+            request.status === "PENDING" ? (
               <div className="mt-3 flex gap-2">
                 <form
                   action={async () => {

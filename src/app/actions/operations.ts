@@ -59,7 +59,12 @@ export async function setBusCheckIn(
   note = "",
 ) {
   const user = await getSession();
-  if (!user || (user.role !== "BUS_ASSISTANT" && user.role !== "COORDINATOR")) {
+  if (
+    !user ||
+    (user.role !== "BUS_ASSISTANT" &&
+      user.role !== "COORDINATOR" &&
+      user.role !== "ADMINISTRATOR")
+  ) {
     return { ok: false, error: "Not authorized to check students in." };
   }
   const day = todayKey();

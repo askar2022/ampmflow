@@ -12,7 +12,11 @@ export default async function UpdatePage({
 }) {
   const session = await getSession();
   if (!session) return null;
-  if (session.role !== "COORDINATOR" && session.role !== "FRONT_DESK") {
+  if (
+    session.role !== "COORDINATOR" &&
+    session.role !== "ADMINISTRATOR" &&
+    session.role !== "FRONT_DESK"
+  ) {
     redirect("/students");
   }
   const { id } = await params;
@@ -45,7 +49,9 @@ export default async function UpdatePage({
         am={loaded.effective.am}
         pm={loaded.effective.pm}
         routes={routes.map((r) => ({ id: r.id, number: r.number, trip: r.trip }))}
-        allowPermanent={session.role === "COORDINATOR"}
+        allowPermanent={
+          session.role === "COORDINATOR" || session.role === "ADMINISTRATOR"
+        }
       />
     </div>
   );
