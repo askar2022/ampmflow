@@ -1,0 +1,17 @@
+DELETE FROM "TeacherAcknowledgment";
+DELETE FROM "BusCheckIn";
+DELETE FROM "ChangeEvent";
+DELETE FROM "AuditLog";
+DELETE FROM "Notification";
+DELETE FROM "ChangeRequest";
+DELETE FROM "TemporaryChange";
+DELETE FROM "TransportationAssignment";
+DELETE FROM "Student";
+DELETE FROM "User";
+DELETE FROM "Teacher";
+DELETE FROM "Classroom";
+DELETE FROM "BusRoute";
+DELETE FROM "Daycare";
+DELETE FROM "Address";
+DELETE FROM "SchoolSettings";
+DELETE FROM "School";

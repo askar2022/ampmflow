@@ -75,6 +75,7 @@ export default async function UsersPage() {
             <option value="COORDINATOR">Transportation Coordinator</option>
             <option value="ADMINISTRATOR">School Administrator</option>
             <option value="BUS_COMPANY">Bus Company</option>
+            <option value="BUS_ASSISTANT">Bus Assistant</option>
           </select>
           <select name="teacherId" className="w-full rounded-xl border border-line px-3 py-2">
             <option value="">Classroom (teachers only)</option>
@@ -84,6 +85,11 @@ export default async function UsersPage() {
               </option>
             ))}
           </select>
+          <input
+            name="assignedBus"
+            placeholder="Bus number (bus assistants only)"
+            className="w-full rounded-xl border border-line px-3 py-2"
+          />
           <input name="password" type="password" required placeholder="Temporary password" className="w-full rounded-xl border border-line px-3 py-2" />
           <button className="rounded-xl bg-navy px-4 py-2 font-semibold text-white">
             Create account

@@ -23,9 +23,11 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
 
 export function AppShell({
   user,
+  schoolName = "School",
   children,
 }: {
   user: SessionUser;
+  schoolName?: string;
   children: React.ReactNode;
 }) {
   const now = schoolNow();
@@ -37,7 +39,7 @@ export function AppShell({
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
             <p className="text-[11px] uppercase tracking-[0.22em] text-gold">
-              Riverside Elementary
+              {schoolName}
             </p>
             <Link
               href={

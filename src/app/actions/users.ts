@@ -17,6 +17,7 @@ export async function createUser(formData: FormData): Promise<void> {
   const role = String(formData.get("role") || "") as Role;
   const password = String(formData.get("password") || "");
   const teacherId = String(formData.get("teacherId") || "") || null;
+  const assignedBus = String(formData.get("assignedBus") || "").trim() || null;
 
   if (!name || !email || !role || !password) {
     return;
@@ -29,6 +30,7 @@ export async function createUser(formData: FormData): Promise<void> {
       email,
       role,
       teacherId: role === "TEACHER" ? teacherId : null,
+      assignedBus: role === "BUS_ASSISTANT" ? assignedBus : null,
       passwordHash: await hashPassword(password),
     },
   });
