@@ -23,7 +23,7 @@ export default async function StudentsPage({
             Search by name, student ID, grade, teacher, bus, or parent phone.
           </p>
         </div>
-        {session.role === "COORDINATOR" ? (
+        {session.role === "COORDINATOR" || session.role === "ADMINISTRATOR" ? (
           <Link
             href="/students/import"
             className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"

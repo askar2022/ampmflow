@@ -91,7 +91,7 @@ export function canCreateRequest(role: Role) {
 }
 
 export function canManageUsers(role: Role) {
-  return role === "ADMINISTRATOR" || role === "COORDINATOR";
+  return role === "ADMINISTRATOR";
 }
 
 export function canViewAll(role: Role) {

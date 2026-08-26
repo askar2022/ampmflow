@@ -4,7 +4,9 @@ import { ImportForm } from "./ImportForm";
 
 export default async function ImportPage() {
   const session = await getSession();
-  if (!session || session.role !== "COORDINATOR") redirect("/students");
+  if (!session || (session.role !== "COORDINATOR" && session.role !== "ADMINISTRATOR")) {
+    redirect("/students");
+  }
   return (
     <div className="max-w-3xl space-y-6">
       <div>

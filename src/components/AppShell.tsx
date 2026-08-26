@@ -20,7 +20,7 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
   { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "TEACHER"] },
   { href: "/teacher", label: "My Classroom", roles: ["TEACHER"] },
   { href: "/company", label: "Bus Company", roles: ["COORDINATOR", "ADMINISTRATOR", "BUS_COMPANY"] },
-  { href: "/admin/users", label: "Users", roles: ["ADMINISTRATOR", "COORDINATOR"] },
+  { href: "/admin/users", label: "Users", roles: ["ADMINISTRATOR"] },
 ];
 
 export function AppShell({

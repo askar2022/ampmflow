@@ -32,8 +32,8 @@ function parseType(value: string): "BUS" | "PARENT" | null {
 
 export async function importStudents(formData: FormData) {
   const user = await getSession();
-  if (!user || user.role !== "COORDINATOR") {
-    return { ok: false, error: "Only the coordinator can import students." };
+  if (!user || (user.role !== "COORDINATOR" && user.role !== "ADMINISTRATOR")) {
+    return { ok: false, error: "Only an admin or bus coordinator can import students." };
   }
 
   const file = formData.get("file");
