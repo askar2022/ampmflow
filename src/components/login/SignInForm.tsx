@@ -73,6 +73,12 @@ export function SignInForm({ authError }: { authError?: string }) {
         </p>
       ) : null}
       <SubmitButton>Sign in</SubmitButton>
+      <p className="text-center text-sm text-navy">
+        Don&apos;t have an account?{" "}
+        <Link href="/login/create" className="font-medium text-teal hover:text-teal-deep">
+          Create account
+        </Link>
+      </p>
     </form>
   );
 }

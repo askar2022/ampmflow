@@ -2,18 +2,26 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import { createFirstAccount } from "@/app/actions/setup";
+import { createAccount } from "@/app/actions/setup";
 import { fieldClass, SubmitButton } from "@/components/login/SignInForm";
 
-export function SetupForm({ error }: { error?: string }) {
+export function SetupForm({
+  error,
+  showSchoolName = true,
+}: {
+  error?: string;
+  showSchoolName?: boolean;
+}) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form action={createFirstAccount} className="space-y-5">
-      <label className="block text-left text-sm font-medium text-navy">
-        School name
-        <input name="schoolName" required className={fieldClass} />
-      </label>
+    <form action={createAccount} className="space-y-5">
+      {showSchoolName ? (
+        <label className="block text-left text-sm font-medium text-navy">
+          School name
+          <input name="schoolName" required className={fieldClass} />
+        </label>
+      ) : null}
       <label className="block text-left text-sm font-medium text-navy">
         Your name
         <input name="name" required className={fieldClass} />
@@ -51,7 +59,7 @@ export function SetupForm({ error }: { error?: string }) {
           {error}
         </p>
       ) : null}
-      <SubmitButton>Create account and continue</SubmitButton>
+      <SubmitButton>Create account</SubmitButton>
     </form>
   );
 }
