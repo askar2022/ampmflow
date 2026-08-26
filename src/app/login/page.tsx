@@ -74,6 +74,9 @@ export default async function LoginPage({
       ) : (
         <div>
           <h2 className="text-xl font-semibold text-navy">Welcome back</h2>
+          <p className="mt-1 text-sm text-[#7b8490]">
+            Sign in to manage today’s transportation.
+          </p>
           <div className="mt-6">
             <SignInForm
               authError={

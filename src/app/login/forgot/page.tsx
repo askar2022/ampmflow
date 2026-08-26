@@ -17,7 +17,7 @@ export default async function ForgotPasswordPage() {
         </p>
         <Link
           href="/login"
-          className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-navy px-4 py-2.5 text-[16px] font-semibold text-white hover:bg-navy-deep"
+          className="mt-6 inline-flex w-full items-center justify-center rounded-[8px] bg-navy px-4 py-2.5 text-[16px] font-semibold text-white hover:bg-navy-deep"
         >
           Back to Sign in
         </Link>
