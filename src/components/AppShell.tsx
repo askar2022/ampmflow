@@ -2,6 +2,7 @@ import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
 import { roleLabel } from "@/lib/format";
 import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
+import { BrandMark, SCHOOL_NAME } from "@/components/BrandMark";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
@@ -23,7 +24,7 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
 
 export function AppShell({
   user,
-  schoolName = "School",
+  schoolName = SCHOOL_NAME,
   children,
 }: {
   user: SessionUser;
@@ -37,25 +38,20 @@ export function AppShell({
     <div className="min-h-full">
       <header className="no-print bg-navy text-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-gold">
-              {schoolName}
-            </p>
-            <Link
-              href={
-                user.role === "TEACHER"
-                  ? "/teacher"
-                  : user.role === "BUS_ASSISTANT"
-                    ? "/checkin"
-                    : user.role === "ADMINISTRATOR"
-                      ? "/leadership"
-                      : "/dashboard"
-              }
-              className="font-serif text-2xl"
-            >
-              Bus & Dismissal Tracker
-            </Link>
-          </div>
+          <Link
+            href={
+              user.role === "TEACHER"
+                ? "/teacher"
+                : user.role === "BUS_ASSISTANT"
+                  ? "/checkin"
+                  : user.role === "ADMINISTRATOR"
+                    ? "/leadership"
+                    : "/dashboard"
+            }
+          >
+            <BrandMark light />
+            <span className="sr-only">{schoolName}</span>
+          </Link>
           <div className="text-right text-sm text-white/80">
             <div className="font-medium text-white">{user.name}</div>
             <div>{roleLabel(user.role)}</div>

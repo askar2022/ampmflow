@@ -1,5 +1,6 @@
 import { loginAction } from "@/app/actions/auth";
 import { createFirstAccount } from "@/app/actions/setup";
+import { BrandMark, SCHOOL_NAME } from "@/components/BrandMark";
 import { isDatabaseConfigured, prisma } from "@/lib/prisma";
 
 export default async function LoginPage({
@@ -9,7 +10,7 @@ export default async function LoginPage({
 }) {
   const { error } = await searchParams;
   let needsSetup = false;
-  let schoolName = "Your school";
+  let schoolName = SCHOOL_NAME;
 
   if (isDatabaseConfigured()) {
     try {
@@ -37,13 +38,8 @@ export default async function LoginPage({
     <div className="flex min-h-full items-center justify-center px-6 py-16">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-line bg-card shadow-xl md:grid-cols-2">
         <div className="bg-navy p-10 text-white">
-          <p className="text-xs uppercase tracking-[0.24em] text-gold">
-            {schoolName}
-          </p>
-          <h1 className="mt-3 font-serif text-4xl leading-tight">
-            Bus & Dismissal Tracker
-          </h1>
-          <p className="mt-4 text-white/80">
+          <BrandMark light size={72} />
+          <p className="mt-6 text-white/80">
             One place for every student’s AM plan and PM dismissal plan. Today’s
             exceptions expire automatically, so tomorrow’s list returns to the
             permanent assignment.
@@ -69,6 +65,7 @@ export default async function LoginPage({
                   <input
                     name="schoolName"
                     required
+                    defaultValue={SCHOOL_NAME}
                     className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2"
                   />
                 </label>

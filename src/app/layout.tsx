@@ -15,9 +15,9 @@ const serif = Fraunces({
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Bus & Dismissal Tracker",
+  title: "Sankofa Prep · Bus & Dismissal Tracker",
   description:
-    "Unified AM and PM student transportation and dismissal management.",
+    "Sankofa Prep student transportation and dismissal management.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

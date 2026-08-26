@@ -19,7 +19,7 @@ export default async function AppLayout({
     })
     .catch(() => null);
   return (
-    <AppShell user={session} schoolName={school?.name || "School"}>
+    <AppShell user={session} schoolName={school?.name || "Sankofa Prep"}>
       {children}
     </AppShell>
   );
