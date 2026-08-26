@@ -38,7 +38,7 @@ export function ImportForm() {
         disabled={pending}
         className="mt-4 rounded-xl bg-navy px-4 py-2 font-semibold text-white disabled:opacity-60"
       >
-        {pending ? "Importing…" : "Import students"}
+        {pending ? "Uploading…" : "Upload file"}
       </button>
       {message ? <p className="mt-3 text-sm">{message}</p> : null}
     </form>

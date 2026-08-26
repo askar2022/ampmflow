@@ -10,13 +10,10 @@ export default async function ImportPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="font-serif text-4xl">Student import</h1>
+        <h1 className="font-serif text-4xl">Upload students</h1>
         <p className="mt-2 text-muted">
-          Upload an Excel or CSV file. Required columns:{" "}
-          <code>student_id</code>, <code>first_name</code>, <code>last_name</code>.
-          Optional columns include grade, teacher, classroom, parent_name,
-          parent_phone, home_address, daycare_name, am_type, am_bus, pm_type,
-          and pm_bus.
+          Choose an Excel or CSV file. Required columns: student_id, first_name,
+          last_name. Add am_bus and pm_bus to create bus routes.
         </p>
       </div>
       <ImportForm />
