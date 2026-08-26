@@ -1,5 +1,4 @@
 import { checkDatabase, prisma } from "@/lib/prisma";
-import { getSchoolIdentity } from "@/lib/school";
 import { LoginFrame } from "@/components/login/LoginFrame";
 import { SignInForm } from "@/components/login/SignInForm";
 import { SetupForm } from "@/components/login/SetupForm";
@@ -20,7 +19,6 @@ export default async function LoginPage({
     }
   }
   const needsSetup = db.ok && userCount === 0;
-  const school = db.ok ? await getSchoolIdentity() : null;
 
   const usedDirectHost = db.host.startsWith("db.") || db.port === "5432";
   const dbMessage =
@@ -37,7 +35,7 @@ export default async function LoginPage({
             : "";
 
   return (
-    <LoginFrame school={school}>
+    <LoginFrame>
       {!db.ok ? (
         <div className="text-left">
           <h2 className="text-xl font-semibold text-navy">Connect the database</h2>

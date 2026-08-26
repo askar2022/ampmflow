@@ -1,14 +1,9 @@
 import Link from "next/link";
-import { getSchoolIdentity } from "@/lib/school";
-import { checkDatabase } from "@/lib/prisma";
 import { LoginFrame } from "@/components/login/LoginFrame";
 
-export default async function ForgotPasswordPage() {
-  const db = await checkDatabase();
-  const school = db.ok ? await getSchoolIdentity() : null;
-
+export default function ForgotPasswordPage() {
   return (
-    <LoginFrame school={school}>
+    <LoginFrame>
       <div className="text-left">
         <h2 className="text-xl font-semibold text-navy">Forgot password</h2>
         <p className="mt-3 text-sm leading-6 text-ink">
