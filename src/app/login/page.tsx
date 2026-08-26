@@ -20,22 +20,29 @@ export default async function LoginPage({
   }
   const needsSetup = db.ok && userCount === 0;
 
+  const usedDirectHost = db.host.startsWith("db.") || db.port === "5432";
   const message =
-    db.reason === "missing" || error === "db"
-      ? "Vercel still does not have a working DATABASE_URL. Add the Supabase Postgres URI (it must start with postgresql://), then redeploy. The Project URL and anon key are not enough."
-      : db.reason === "unreachable"
-        ? "DATABASE_URL is set, but the app cannot reach Supabase. Use the Database connection string, include the database password, and set the variable for Production."
-        : error === "setup"
-          ? "School name, your name, email, and password are required."
-          : error
-            ? "That email or password is not recognized."
-            : "";
+    db.reason === "http"
+      ? "DATABASE_URL is the website URL (https://…). Replace it with the Postgres URI that starts with postgresql://."
+      : db.reason === "placeholder"
+        ? "DATABASE_URL still contains [YOUR-PASSWORD]. Put your real database password in that spot, with no brackets."
+        : db.reason === "missing" || error === "db"
+          ? "Vercel still does not have a working DATABASE_URL. Add the Supabase Postgres URI (it must start with postgresql://), then redeploy. The Project URL and anon key are not enough."
+          : db.reason === "unreachable"
+            ? usedDirectHost
+              ? `Vercel has DATABASE_URL, but it cannot reach ${db.host}:${db.port}. That is the direct database host. Vercel needs the pooler URI on port 6543.`
+              : `Vercel has DATABASE_URL (${db.host || "unknown host"}${db.port ? `:${db.port}` : ""}), but login to Postgres failed. The password is usually wrong, or a special character in the password is not URL-encoded.`
+            : error === "setup"
+              ? "School name, your name, email, and password are required."
+              : error
+                ? "That email or password is not recognized."
+                : "";
 
   return (
     <div className="flex min-h-full items-center justify-center px-6 py-16">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-line bg-card shadow-xl md:grid-cols-2">
-        <div className="bg-navy p-10 text-white">
-          <BrandMark light size={72} />
+        <div className="flex flex-col items-center bg-navy p-10 text-center text-white">
+          <BrandMark light size={96} />
           <p className="mt-6 text-white/80">
             One place for every student’s AM plan and PM dismissal plan. Today’s
             exceptions expire automatically, so tomorrow’s list returns to the
@@ -50,20 +57,35 @@ export default async function LoginPage({
                 {message}
               </p>
               <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
-                <li>Open Supabase → Project Settings → Database.</li>
-                <li>Copy <strong>Connection string → URI</strong>.</li>
-                <li>Replace the password placeholder with your database password.</li>
                 <li>
-                  In Vercel → Settings → Environment Variables, add{" "}
-                  <strong>DATABASE_URL</strong> for Production. The value must
-                  start with <code>postgresql://</code>.
+                  In Supabase open <strong>Project Settings → Database</strong>.
                 </li>
-                <li>Also add <strong>SESSION_SECRET</strong> (any long secret).</li>
-                <li>Redeploy, then refresh this page.</li>
+                <li>
+                  Under Connection string, choose <strong>URI</strong> and{" "}
+                  <strong>Transaction pooler</strong> (port{" "}
+                  <code>6543</code>), not the direct connection (port{" "}
+                  <code>5432</code>).
+                </li>
+                <li>
+                  Replace <code>[YOUR-PASSWORD]</code> with the database
+                  password. If the password has <code>@</code>, <code>#</code>,
+                  or <code>%</code>, encode it (<code>@</code> becomes{" "}
+                  <code>%40</code>).
+                </li>
+                <li>
+                  In Vercel, edit <strong>DATABASE_URL</strong> for Production
+                  to that one line. It must start with{" "}
+                  <code>postgresql://</code> and include{" "}
+                  <code>pooler.supabase.com:6543</code>.
+                </li>
+                <li>Save, Redeploy, then refresh this page.</li>
               </ol>
               <p className="mt-4 text-sm text-muted">
-                Do not use https://iardxvlhuapmlmqqrtgr.supabase.co or the anon
-                key as DATABASE_URL.
+                Example shape (your real password in the middle, no brackets):
+                <br />
+                <code className="break-all text-xs">
+                  postgresql://postgres.iardxvlhuapmlmqqrtgr:PASSWORD@aws-0-us-east-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require
+                </code>
               </p>
             </>
           ) : needsSetup ? (

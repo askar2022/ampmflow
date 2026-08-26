@@ -37,7 +37,7 @@ async function check(path: string, cookie: string) {
       res.status === 200 &&
       !text.includes("Application error") &&
       !text.includes("Something went wrong"),
-    hasName: text.includes("Bus &amp; Dismissal Tracker") || text.includes("Bus & Dismissal Tracker"),
+    hasName: text.includes("ampmflow") || text.includes("Sankofa Prep"),
   };
 }
 

@@ -37,7 +37,7 @@ export function AppShell({
   return (
     <div className="min-h-full">
       <header className="no-print bg-navy text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <Link
             href={
               user.role === "TEACHER"
@@ -49,7 +49,7 @@ export function AppShell({
                     : "/dashboard"
             }
           >
-            <BrandMark light />
+            <BrandMark light size={56} />
             <span className="sr-only">{schoolName}</span>
           </Link>
           <div className="text-right text-sm text-white/80">

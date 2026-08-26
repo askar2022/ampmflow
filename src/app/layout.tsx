@@ -15,7 +15,7 @@ const serif = Fraunces({
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Sankofa Prep · Bus & Dismissal Tracker",
+  title: "Sankofa Prep · ampmflow",
   description:
     "Sankofa Prep student transportation and dismissal management.",
 };

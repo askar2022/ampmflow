@@ -102,15 +102,16 @@ function PrintHeader({
 }) {
   return (
     <div className="mb-3 border-b border-line pb-2">
-      <div className="mb-2 flex items-center gap-3">
+      <div className="mb-2 flex flex-col items-center text-center">
+        <div className="text-xs uppercase tracking-[0.2em] text-muted">
+          Sankofa Prep
+        </div>
+        <div className="font-serif text-lg">ampmflow</div>
         <img
           src="/sankofa-logo.jpg"
           alt="Sankofa Prep"
-          className="h-10 w-10 rounded-full object-cover"
+          className="mt-2 h-12 w-12 rounded-full object-cover"
         />
-        <div className="text-xs uppercase tracking-[0.2em] text-muted">
-          Sankofa Prep · Bus & Dismissal Tracker
-        </div>
       </div>
       <h2 className="font-serif text-2xl">{title}</h2>
       <p className="text-sm">
