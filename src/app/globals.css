@@ -74,6 +74,12 @@ textarea {
   color: #4a5560;
   border: 1px solid #cfd6dc;
 }
+.badge-orange {
+  background: #ffe6d1;
+  color: #8a3b00;
+  border: 1px solid #f0a05a;
+}
+.row-orange { background: #fff1e4; }
 
 .row-yellow { background: #fff8dc; }
 .row-green { background: #f3faf6; }

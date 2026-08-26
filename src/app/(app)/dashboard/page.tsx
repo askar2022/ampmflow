@@ -1,18 +1,20 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { dashboardSummary, loadStudents, studentsOnBothLists } from "@/lib/transportation";
+import { loadChangeEvents, unacknowledgedUrgent } from "@/lib/operations";
 import { formatLongDate, schoolNow } from "@/lib/dates";
-import { planSummary, planTone } from "@/lib/format";
-import { StatusBadge } from "@/components/StatusBadge";
+import { CHANGE_DEADLINE, SNAPSHOT_TIME } from "@/lib/policy";
+import { eventPlanLabel } from "@/lib/operations";
 
 const tiles = [
-  { href: "/buses", title: "Buses", copy: "Today’s riders grouped by bus number." },
+  { href: "/changes", title: "Today’s Changes", copy: "Live exceptions teachers must see first." },
+  { href: "/buses", title: "Buses", copy: "Today’s riders by bus number." },
   { href: "/pickup", title: "Parent Pickup", copy: "Students going home with a parent." },
-  { href: "/changes", title: "Today’s Changes", copy: "The first list teachers should check." },
-  { href: "/students", title: "Students", copy: "Search and update AM or PM plans." },
-  { href: "/teachers", title: "Teacher Lists", copy: "Read-only classroom dismissal pages." },
-  { href: "/company", title: "Bus Company Updates", copy: "Requests waiting for a route number." },
-  { href: "/print", title: "Print / Email", copy: "Dated lists so staff never use yesterday’s copy." },
+  { href: "/waiting", title: "Waiting for Route", copy: "New address or daycare — not final until assigned." },
+  { href: "/acknowledgments", title: "Teacher Acknowledgments", copy: "Evidence the teacher saw a last-minute change." },
+  { href: "/checkin", title: "Bus Check-In", copy: "Assistants mark On Bus, Missing, or Wrong Assignment." },
+  { href: "/students", title: "Students", copy: "Search and record a parent request." },
+  { href: "/print", title: "Reports", copy: "2:45 snapshot, print, and weekly leadership report." },
 ];
 
 export default async function DashboardPage() {
@@ -21,43 +23,51 @@ export default async function DashboardPage() {
   const students = await loadStudents(session.schoolId);
   const summary = dashboardSummary(students);
   const conflicts = studentsOnBothLists(students);
-  const changes = students.filter(
-    (s) =>
-      s.pm.source === "TODAY" ||
-      s.pm.source === "DATE_RANGE" ||
-      s.am.source === "TODAY" ||
-      s.am.source === "DATE_RANGE",
-  );
+  const events = await loadChangeEvents(session.schoolId);
+  const urgentOpen = await unacknowledgedUrgent(session.schoolId);
+  const waiting = students.filter(
+    (s) => s.am.waitingForAssignment || s.pm.waitingForAssignment,
+  ).length;
 
   return (
     <div className="space-y-8">
       <div>
         <p className="text-sm text-muted">{formatLongDate(schoolNow())}</p>
-        <h1 className="font-serif text-4xl">Coordinator dashboard</h1>
+        <h1 className="font-serif text-4xl">
+          {session.role === "FRONT_DESK" ? "Reception desk" : "Live dismissal board"}
+        </h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Every student has an AM plan and a PM plan. Temporary changes are layered
-          on top of the permanent assignment and expire on their own.
+          The 2:45 PM email is a snapshot. This board stays live because a parent
+          can still call after {SNAPSHOT_TIME.replace("14:", "2:")}. Normal cutoff is{" "}
+          {CHANGE_DEADLINE.replace("14:15", "2:15 PM")}; later requests are labeled
+          Late/Emergency.
         </p>
       </div>
 
+      {urgentOpen.length ? (
+        <p className="rounded-xl bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-900">
+          ⚠️ Last-minute change not yet acknowledged ({urgentOpen.length})
+        </p>
+      ) : null}
+
       {conflicts.length ? (
         <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red">
-          Safety warning: {conflicts.length} student
-          {conflicts.length === 1 ? "" : "s"} currently appear on both the bus
-          and parent-pickup lists. Review their PM plans before dismissal.
+          Safety warning: {conflicts.length} student(s) appear on both the bus and
+          parent-pickup lists.
         </p>
       ) : null}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted">
-          Today’s transportation
+          Today
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {[
-            ["Bus riders", summary.busRiders, "/buses"],
+            ["Bus students", summary.busRiders, "/buses"],
             ["Parent pickup", summary.parentPickup, "/pickup"],
-            ["Temporary changes", summary.temporaryChanges, "/changes"],
-            ["Missing assignments", summary.missingAssignments, "/print?kind=missing"],
+            ["Changes today", events.length || summary.temporaryChanges, "/activity"],
+            ["Waiting for bus assignment", waiting, "/waiting"],
+            ["Unacknowledged urgent changes", urgentOpen.length, "/acknowledgments"],
           ].map(([label, count, href]) => (
             <Link
               key={String(label)}
@@ -71,7 +81,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <section className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         {tiles.map((tile) => (
           <Link
             key={tile.href}
@@ -87,50 +97,47 @@ export default async function DashboardPage() {
       </section>
 
       <section className="rounded-2xl border border-line bg-card p-6">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="font-serif text-2xl">Today’s Changes</h2>
-          <Link href="/changes" className="text-sm font-semibold text-blue">
-            Open full list
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-2xl">Today’s Activity</h2>
+          <Link href="/activity" className="text-sm font-semibold text-blue">
+            Full log
           </Link>
         </div>
-        <p className="mt-1 text-sm text-muted">
-          Teachers need this information before dismissal. Tomorrow these students
-          return to their permanent plan unless another date range still applies.
-        </p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-muted">
-              <tr>
-                <th className="py-2">Student</th>
-                <th>AM plan</th>
-                <th>PM plan</th>
-                <th>Teacher</th>
+        <table className="mt-4 w-full text-left text-sm">
+          <thead className="text-muted">
+            <tr>
+              <th className="py-2">Time</th>
+              <th>Student</th>
+              <th>Previous plan</th>
+              <th>New plan</th>
+              <th>Updated by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {events.slice(0, 8).map((event) => (
+              <tr key={event.id} className="border-t border-line">
+                <td className="py-2 whitespace-nowrap">
+                  {event.createdAt.toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </td>
+                <td className="font-medium">
+                  {event.student.firstName} {event.student.lastName}
+                </td>
+                <td>{eventPlanLabel(event.previousPlan)}</td>
+                <td>{eventPlanLabel(event.newPlan)}</td>
+                <td>{event.createdBy.name}</td>
               </tr>
-            </thead>
-            <tbody>
-              {changes.slice(0, 8).map((student) => (
-                <tr key={student.id} className="border-t border-line">
-                  <td className="py-2 font-medium">
-                    <Link href={`/students/${student.id}`} className="hover:underline">
-                      {student.fullName}
-                    </Link>
-                  </td>
-                  <td>
-                    <StatusBadge tone={planTone(student.am)}>
-                      {planSummary(student.am, "AM")}
-                    </StatusBadge>
-                  </td>
-                  <td>
-                    <StatusBadge tone={planTone(student.pm)}>
-                      {planSummary(student.pm, "PM")}
-                    </StatusBadge>
-                  </td>
-                  <td>{student.teacherName}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
+        {!events.length ? (
+          <p className="mt-3 text-sm text-muted">
+            No recorded activity yet. Run the live-ops SQL if this table is empty
+            after a change.
+          </p>
+        ) : null}
       </section>
     </div>
   );

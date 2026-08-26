@@ -16,7 +16,7 @@ async function main() {
       pm: student ? `${student.pm.source} ${student.pm.type} ${student.pm.busNumber ?? ""}`.trim() : "missing",
     };
   });
-  console.log({ total: students.length, ...summary, featured });
+  console.log({ ...summary, featured });
 }
 
 main().finally(() => prisma.$disconnect());

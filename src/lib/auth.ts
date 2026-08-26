@@ -52,6 +52,7 @@ export async function getSession(): Promise<SessionUser | null> {
       name: String(payload.name),
       role: payload.role as Role,
       teacherId: (payload.teacherId as string | null) ?? null,
+      assignedBus: (payload.assignedBus as string | null) ?? null,
     };
   } catch {
     return null;
@@ -67,7 +68,7 @@ export async function requireSession(): Promise<SessionUser> {
 }
 
 export function canManageTransportation(role: Role) {
-  return role === "COORDINATOR";
+  return role === "COORDINATOR" || role === "FRONT_DESK";
 }
 
 export function canCreateRequest(role: Role) {
@@ -94,6 +95,8 @@ export function canViewAll(role: Role) {
 export function homePath(role: Role) {
   if (role === "TEACHER") return "/teacher";
   if (role === "BUS_COMPANY") return "/company";
+  if (role === "BUS_ASSISTANT") return "/checkin";
+  if (role === "ADMINISTRATOR") return "/leadership";
   return "/dashboard";
 }
 
@@ -111,5 +114,6 @@ export async function authenticate(email: string, password: string) {
     name: user.name,
     role: user.role as Role,
     teacherId: user.teacherId,
+    assignedBus: user.assignedBus ?? null,
   } satisfies SessionUser;
 }

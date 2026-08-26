@@ -5,18 +5,20 @@ import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
-  { href: "/dashboard", label: "Dashboard", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/dashboard", label: "Dashboard", roles: ["COORDINATOR", "FRONT_DESK"] },
+  { href: "/leadership", label: "Leadership", roles: ["ADMINISTRATOR", "COORDINATOR"] },
+  { href: "/changes", label: "Today’s Changes", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/activity", label: "Today’s Activity", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/buses", label: "Buses", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/pickup", label: "Parent Pickup", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/changes", label: "Today’s Changes", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/waiting", label: "Waiting for Route", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/acknowledgments", label: "Teacher Acknowledgments", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/checkin", label: "Bus Check-In", roles: ["COORDINATOR", "BUS_ASSISTANT"] },
   { href: "/students", label: "Students", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/teachers", label: "Teacher Lists", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/company", label: "Bus Company Updates", roles: ["COORDINATOR", "ADMINISTRATOR", "BUS_COMPANY"] },
-  { href: "/print", label: "Print / Email", roles: ["COORDINATOR", "ADMINISTRATOR", "TEACHER"] },
+  { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "TEACHER"] },
   { href: "/teacher", label: "My Classroom", roles: ["TEACHER"] },
-  { href: "/requests", label: "Requests", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/company", label: "Bus Company", roles: ["COORDINATOR", "ADMINISTRATOR", "BUS_COMPANY"] },
   { href: "/admin/users", label: "Users", roles: ["ADMINISTRATOR", "COORDINATOR"] },
-  { href: "/audit", label: "Audit History", roles: ["COORDINATOR", "ADMINISTRATOR"] },
 ];
 
 export function AppShell({
@@ -32,12 +34,23 @@ export function AppShell({
   return (
     <div className="min-h-full">
       <header className="no-print bg-navy text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <div>
             <p className="text-[11px] uppercase tracking-[0.22em] text-gold">
               Riverside Elementary
             </p>
-            <Link href={user.role === "TEACHER" ? "/teacher" : "/dashboard"} className="font-serif text-2xl">
+            <Link
+              href={
+                user.role === "TEACHER"
+                  ? "/teacher"
+                  : user.role === "BUS_ASSISTANT"
+                    ? "/checkin"
+                    : user.role === "ADMINISTRATOR"
+                      ? "/leadership"
+                      : "/dashboard"
+              }
+              className="font-serif text-2xl"
+            >
               Bus & Dismissal Tracker
             </Link>
           </div>
@@ -50,7 +63,7 @@ export function AppShell({
           </div>
         </div>
         <nav className="border-t border-white/10 bg-navy-deep">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-4 py-2">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-3 py-2 sm:px-4">
             {links.map((item) => (
               <Link
                 key={item.href}
@@ -72,7 +85,7 @@ export function AppShell({
           </div>
         </nav>
       </header>
-      <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
   );
 }

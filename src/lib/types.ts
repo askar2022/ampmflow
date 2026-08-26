@@ -4,6 +4,7 @@ export const ROLES = [
   "TEACHER",
   "FRONT_DESK",
   "BUS_COMPANY",
+  "BUS_ASSISTANT",
 ] as const;
 
 export type Role = (typeof ROLES)[number];
@@ -35,6 +36,7 @@ export type SessionUser = {
   name: string;
   role: Role;
   teacherId: string | null;
+  assignedBus: string | null;
 };
 
 export type PlanSnapshot = {

@@ -3,9 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model School {
@@ -25,6 +24,9 @@ model School {
   notifications Notification[]
   auditLogs     AuditLog[]
   changeRequests ChangeRequest[]
+  settings       SchoolSettings?
+  changeEvents   ChangeEvent[]
+  busCheckIns    BusCheckIn[]
 }
 
 model User {
@@ -35,6 +37,7 @@ model User {
   passwordHash String
   role         String
   teacherId    String?
+  assignedBus  String?
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -49,6 +52,9 @@ model User {
   temporaryApprovals  TemporaryChange[] @relation("TempApprovedBy")
   changeRequests      ChangeRequest[]   @relation("RequestCreatedBy")
   reviewedRequests    ChangeRequest[]   @relation("RequestReviewedBy")
+  changeEvents        ChangeEvent[]
+  acknowledgments     TeacherAcknowledgment[]
+  busCheckIns         BusCheckIn[]
 }
 
 model Classroom {
@@ -132,6 +138,8 @@ model Student {
   tempChanges    TemporaryChange[]
   changeRequests ChangeRequest[]
   auditLogs      AuditLog[]
+  changeEvents   ChangeEvent[]
+  busCheckIns    BusCheckIn[]
 
   @@unique([schoolId, studentId])
 }
@@ -263,4 +271,64 @@ model AuditLog {
   student    Student? @relation(fields: [studentId], references: [id])
   actor      User     @relation(fields: [actorId], references: [id])
   approvedBy User?    @relation("AuditApprover", fields: [approvedById], references: [id])
+}
+
+model SchoolSettings {
+  id                String @id @default(cuid())
+  schoolId          String @unique
+  changeDeadline    String @default("14:15")
+  snapshotTime      String @default("14:45")
+  weeklyReportTime  String @default("12:00")
+  school            School @relation(fields: [schoolId], references: [id])
+}
+
+model ChangeEvent {
+  id               String   @id @default(cuid())
+  schoolId         String
+  studentId        String
+  trip             String
+  previousPlan     String
+  newPlan          String
+  durationType     String
+  late             Boolean  @default(false)
+  urgent           Boolean  @default(false)
+  waitingForRoute  Boolean  @default(false)
+  createdById      String
+  createdAt        DateTime @default(now())
+
+  school           School @relation(fields: [schoolId], references: [id])
+  student          Student @relation(fields: [studentId], references: [id])
+  createdBy        User @relation(fields: [createdById], references: [id])
+  acknowledgments  TeacherAcknowledgment[]
+}
+
+model TeacherAcknowledgment {
+  id             String    @id @default(cuid())
+  changeEventId  String
+  userId         String
+  acknowledgedAt DateTime?
+
+  changeEvent ChangeEvent @relation(fields: [changeEventId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@unique([changeEventId, userId])
+}
+
+model BusCheckIn {
+  id          String   @id @default(cuid())
+  schoolId    String
+  studentId   String
+  trip        String   @default("PM")
+  date        String
+  status      String
+  note        String   @default("")
+  checkedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school    School  @relation(fields: [schoolId], references: [id])
+  student   Student @relation(fields: [studentId], references: [id])
+  checkedBy User    @relation(fields: [checkedById], references: [id])
+
+  @@unique([studentId, trip, date])
 }

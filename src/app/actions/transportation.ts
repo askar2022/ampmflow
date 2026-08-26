@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
-import { writeAudit } from "@/lib/audit";
+import { notifyCoordinators, writeAudit } from "@/lib/audit";
 import { todayKey } from "@/lib/dates";
 import { loadStudent, resolveTrip, addressHasNoRoute } from "@/lib/transportation";
+import { canRecordChange, isAfterDeadline, isAfterSnapshot } from "@/lib/policy";
+import { planSummary } from "@/lib/format";
 import type { Destination, DurationType, TransportType, Trip } from "@/lib/types";
 
 export type UpdateInput = {
@@ -31,12 +33,15 @@ export type UpdateResult =
       warnings?: string[];
     };
 
-async function requireCoordinator() {
+async function requireRecorder(duration: DurationType) {
   const user = await getSession();
   if (!user) return { error: "Please sign in." as const, user: null };
-  if (user.role !== "COORDINATOR") {
+  if (!canRecordChange(user.role, duration)) {
     return {
-      error: "Only the transportation coordinator can change assignments." as const,
+      error:
+        user.role === "FRONT_DESK"
+          ? "Reception can record today-only or date-range changes. A coordinator must complete a permanent bus-route change."
+          : "You cannot change a transportation assignment.",
       user: null,
     };
   }
@@ -46,7 +51,7 @@ async function requireCoordinator() {
 export async function updateTransportation(
   input: UpdateInput,
 ): Promise<UpdateResult> {
-  const { user, error } = await requireCoordinator();
+  const { user, error } = await requireRecorder(input.duration);
   if (!user || error) return { ok: false, error: error || "Unauthorized" };
 
   const loaded = await loadStudent(input.studentId);
@@ -88,6 +93,19 @@ export async function updateTransportation(
       ok: false,
       error: "This student does not have a daycare on file. Add a daycare first or choose another destination.",
     };
+  }
+
+  const needsRoute =
+    input.type === "BUS" &&
+    (input.waitingForAssignment ||
+      !input.busRouteId ||
+      input.destination === "CUSTOM" ||
+      (input.destination === "DAYCARE" && !input.busRouteId));
+  if (needsRoute) {
+    input.waitingForAssignment = true;
+    warnings.push(
+      "This is waiting for bus-company assignment. The child is not silently moved to a new route.",
+    );
   }
 
   if (input.destination === "CUSTOM" && input.customAddress?.trim()) {
@@ -179,6 +197,7 @@ export async function updateTransportation(
     }
 
     const refreshed = await loadStudent(input.studentId, day);
+    const newPlan = refreshed ? resolveTrip(refreshed.record, trip, day) : null;
     await writeAudit({
       user,
       studentId: input.studentId,
@@ -189,9 +208,55 @@ export async function updateTransportation(
       trip,
       durationType: input.duration,
       oldPlan,
-      newPlan: refreshed ? resolveTrip(refreshed.record, trip, day) : null,
+      newPlan,
       approvedById: user.id,
     });
+
+    const late = isAfterDeadline();
+    const urgent = isAfterSnapshot();
+    try {
+      const event = await prisma.changeEvent.create({
+        data: {
+          schoolId: user.schoolId,
+          studentId: input.studentId,
+          trip,
+          previousPlan: JSON.stringify(oldPlan),
+          newPlan: JSON.stringify(newPlan),
+          durationType: input.duration,
+          late,
+          urgent,
+          waitingForRoute: Boolean(input.waitingForAssignment),
+          createdById: user.id,
+        },
+      });
+      const teacherUser = loaded.record.classroom.teachers[0]
+        ? await prisma.user.findFirst({
+            where: { teacherId: loaded.record.classroom.teachers[0].id },
+          })
+        : null;
+      if (teacherUser) {
+        await prisma.teacherAcknowledgment.create({
+          data: { changeEventId: event.id, userId: teacherUser.id },
+        });
+        await prisma.notification.create({
+          data: {
+            schoolId: user.schoolId,
+            userId: teacherUser.id,
+            title: urgent
+              ? "Urgent last-minute transportation change"
+              : "Transportation change",
+            body: `${loaded.effective.fullName}: ${planSummary(oldPlan, trip)} → ${newPlan ? planSummary(newPlan, trip) : "updated"} by ${user.name} at ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.`,
+          },
+        });
+      }
+      await notifyCoordinators(
+        user.schoolId,
+        urgent ? "Last-minute change needs acknowledgment" : "Transportation change recorded",
+        `${user.name} updated ${loaded.effective.fullName}.`,
+      );
+    } catch {
+      // Tables may not exist until live-ops.sql is run.
+    }
   }
 
   revalidatePath("/dashboard");
@@ -201,12 +266,18 @@ export async function updateTransportation(
   revalidatePath("/teacher");
   revalidatePath("/buses");
   revalidatePath("/pickup");
+  revalidatePath("/activity");
+  revalidatePath("/acknowledgments");
+  revalidatePath("/waiting");
+  revalidatePath("/leadership");
   return { ok: true, ...(warnings.length ? { warnings } : {}) } as UpdateResult;
 }
 
 export async function undoLastChange(studentId: string): Promise<UpdateResult> {
-  const { user, error } = await requireCoordinator();
-  if (!user || error) return { ok: false, error: error || "Unauthorized" };
+  const user = await getSession();
+  if (!user || user.role !== "COORDINATOR") {
+    return { ok: false, error: "Only the coordinator can undo a change." };
+  }
 
   const last = await prisma.auditLog.findFirst({
     where: { studentId, action: { in: ["UPDATE_PERMANENT", "CREATE_TEMPORARY"] } },

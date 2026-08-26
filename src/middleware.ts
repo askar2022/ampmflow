@@ -33,7 +33,15 @@ export async function middleware(request: NextRequest) {
     if (role) {
       const url = request.nextUrl.clone();
       url.pathname =
-        role === "TEACHER" ? "/teacher" : role === "BUS_COMPANY" ? "/company" : "/dashboard";
+        role === "TEACHER"
+          ? "/teacher"
+          : role === "BUS_COMPANY"
+            ? "/company"
+            : role === "BUS_ASSISTANT"
+              ? "/checkin"
+              : role === "ADMINISTRATOR"
+                ? "/leadership"
+                : "/dashboard";
       return NextResponse.redirect(url);
     }
     return NextResponse.next();
@@ -49,6 +57,12 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith("/api")) return NextResponse.next();
     const url = request.nextUrl.clone();
     url.pathname = "/teacher";
+    return NextResponse.redirect(url);
+  }
+
+  if (role === "BUS_ASSISTANT" && !pathname.startsWith("/checkin")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/checkin";
     return NextResponse.redirect(url);
   }
 

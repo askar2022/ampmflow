@@ -4,8 +4,9 @@ const accounts = [
   ["Transportation Coordinator", "coordinator@riverside.edu"],
   ["School Administrator", "admin@riverside.edu"],
   ["Teacher (Room 202)", "evasquez@riverside.edu"],
-  ["Front Desk", "frontdesk@riverside.edu"],
+  ["Receptionist", "frontdesk@riverside.edu"],
   ["Bus Company", "dispatch@citytransit.example"],
+  ["Bus 4 Assistant", "bus4@riverside.edu"],
 ];
 
 export default async function LoginPage({

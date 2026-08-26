@@ -38,9 +38,11 @@ export function roleLabel(role: string) {
     case "TEACHER":
       return "Teacher";
     case "FRONT_DESK":
-      return "Front Desk";
+      return "Receptionist";
     case "BUS_COMPANY":
       return "Bus Company";
+    case "BUS_ASSISTANT":
+      return "Bus Assistant";
     default:
       return role;
   }
@@ -82,7 +84,7 @@ export function locationFor(plan: PlanSnapshot) {
   return "See coordinator";
 }
 
-export type StatusTone = "yellow" | "green" | "red" | "blue" | "gray";
+export type StatusTone = "yellow" | "green" | "red" | "blue" | "gray" | "orange";
 
 export function planTone(plan: PlanSnapshot): StatusTone {
   if (plan.source === "MISSING" || !plan.type) return "red";
@@ -104,6 +106,8 @@ export function toneLabel(tone: StatusTone) {
       return "Missing bus assignment";
     case "blue":
       return "Parent pickup";
+    case "orange":
+      return "Last-minute change";
     default:
       return "Unknown";
   }

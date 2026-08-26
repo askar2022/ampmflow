@@ -15,6 +15,7 @@ export function UpdateForm({
   am,
   pm,
   routes,
+  allowPermanent = true,
 }: {
   studentId: string;
   studentName: string;
@@ -22,6 +23,7 @@ export function UpdateForm({
   am: PlanSnapshot;
   pm: PlanSnapshot;
   routes: RouteOption[];
+  allowPermanent?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -135,7 +137,9 @@ export function UpdateForm({
           <div className="mt-2 flex flex-wrap gap-2">
             <Choice active={duration === "TODAY"} onClick={() => setDuration("TODAY")} label="Today only" />
             <Choice active={duration === "DATE_RANGE"} onClick={() => setDuration("DATE_RANGE")} label="Date range" />
-            <Choice active={duration === "PERMANENT"} onClick={() => setDuration("PERMANENT")} label="Permanent" />
+            {allowPermanent ? (
+              <Choice active={duration === "PERMANENT"} onClick={() => setDuration("PERMANENT")} label="Permanent" />
+            ) : null}
           </div>
           {duration === "DATE_RANGE" ? (
             <div className="mt-3 grid grid-cols-2 gap-3">

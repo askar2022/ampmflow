@@ -39,7 +39,9 @@ Example: Mohammed Khalid permanently rides Bus 3 in the morning and Bus 4 to day
 - App repository: [github.com/askar2022/ampmflow](https://github.com/askar2022/ampmflow)
 - Database: [Supabase project iardxvlhuapmlmqqrtgr](https://iardxvlhuapmlmqqrtgr.supabase.co)
 
-Copy `.env.example` to `.env` and paste the Postgres connection strings from **Supabase → Project Settings → Database**. Use the pooled URI for `DATABASE_URL` and the session/direct URI for `DIRECT_URL`.
+Copy `.env.example` to `.env` and paste the Postgres URI from **Supabase → Project Settings → Database** into `DATABASE_URL`.
+
+On Vercel, add the same `DATABASE_URL` and a long `SESSION_SECRET`. Then redeploy.
 
 ## Run locally
 

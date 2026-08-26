@@ -12,6 +12,8 @@ const serif = Fraunces({
   subsets: ["latin"],
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Bus & Dismissal Tracker",
   description:

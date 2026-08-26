@@ -80,19 +80,12 @@ export default async function StudentsPage({
                   </StatusBadge>
                 </td>
                 <td className="px-4">
-                  {session.role === "COORDINATOR" ? (
+                  {session.role === "COORDINATOR" || session.role === "FRONT_DESK" ? (
                     <Link
                       href={`/students/${student.id}/update`}
                       className="font-semibold text-blue"
                     >
-                      Update
-                    </Link>
-                  ) : session.role === "FRONT_DESK" ? (
-                    <Link
-                      href={`/requests?studentId=${student.id}`}
-                      className="font-semibold text-blue"
-                    >
-                      Request
+                      Record change
                     </Link>
                   ) : null}
                 </td>
