@@ -76,20 +76,12 @@ export default async function RequestsPage({
           }
           const companyReport =
             kind === "COMPANY_REPORT" || kind === "PM_COMPANY";
-          const alreadyRecorded = Boolean(request.reviewedAt);
           const needsApprove =
             request.status === "PENDING" &&
             !companyReport &&
             (session.role === "COORDINATOR" || session.role === "ADMINISTRATOR");
-          const needsApplyCompany =
-            request.status === "PENDING" &&
-            companyReport &&
-            !alreadyRecorded &&
-            (session.role === "COORDINATOR" || session.role === "ADMINISTRATOR");
           const statusLabel = companyReport
-            ? alreadyRecorded
-              ? "Waiting for company"
-              : "Needs apply"
+            ? "Waiting for company"
             : request.status;
 
           return (
@@ -112,25 +104,15 @@ export default async function RequestsPage({
                 {request.student.firstName} {request.student.lastName} · {request.trip}
               </p>
             ) : null}
-            {companyReport && alreadyRecorded ? (
+            {companyReport ? (
               <p className="mt-2 text-sm text-muted">
-                Already recorded. The student stays on Waiting for Route until
-                the bus company proposes a number.
+                Already recorded. Open Bus Company to print the report. The
+                student stays on Waiting for Route until the company proposes a
+                number. No school approve step.
               </p>
             ) : null}
-            {request.status === "PENDING" &&
-            (session.role === "COORDINATOR" ||
-              session.role === "ADMINISTRATOR") ? (
-              <RequestReviewButtons
-                requestId={request.id}
-                approveLabel={
-                  needsApplyCompany
-                    ? "Apply to waiting list"
-                    : needsApprove
-                      ? "Approve"
-                      : "Approve"
-                }
-              />
+            {needsApprove ? (
+              <RequestReviewButtons requestId={request.id} />
             ) : null}
           </article>
           );

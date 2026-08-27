@@ -354,11 +354,13 @@ export async function createChangeRequest(
     newPlan: { title, details, source, status: request.status, caller, changeTo },
   });
 
-  const staffCanApply =
+  const canApplyTodayRide =
     user.role === "COORDINATOR" || user.role === "ADMINISTRATOR";
+  const canRecordCompanyReport =
+    canApplyTodayRide || user.role === "FRONT_DESK";
 
   try {
-    if (isTodayChange && staffCanApply && studentId) {
+    if (isTodayChange && canApplyTodayRide && studentId) {
       await applyTodayPlan({
         studentId,
         trip,
@@ -369,7 +371,7 @@ export async function createChangeRequest(
       });
     }
 
-    if (isCompanyReport && staffCanApply && studentId) {
+    if (isCompanyReport && canRecordCompanyReport && studentId) {
       await applyCompanyReport({
         studentId,
         companyNeed,
