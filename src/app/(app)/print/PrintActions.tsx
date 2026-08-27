@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { emailTeacherLists } from "@/app/actions/email";
 
 const kinds = [
@@ -14,7 +15,15 @@ const kinds = [
   ["checkin", "Bus check-in"],
 ];
 
-export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
+export function PrintActions({
+  isTeacher,
+  ready = [],
+  missing = [],
+}: {
+  isTeacher: boolean;
+  ready?: { name: string; email: string }[];
+  missing?: { name: string }[];
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, start] = useTransition();
@@ -46,6 +55,39 @@ export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
           ))}
         </div>
       </div>
+      {!isTeacher ? (
+        <div className="rounded-2xl border border-line bg-card p-5 text-sm">
+          <p className="font-semibold text-navy">Teacher emails</p>
+          <p className="mt-1 text-muted">
+            Save emails once on Teachers. After that, Vercel sends the list
+            every school day by itself. Use Email teachers only when you want
+            to send it now.
+          </p>
+          {ready.length ? (
+            <ul className="mt-3 space-y-1">
+              {ready.map((row) => (
+                <li key={row.name}>
+                  {row.name} → {row.email}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-red">
+              No teacher emails saved yet. The daily send and this button will
+              wait until you add them.
+            </p>
+          )}
+          {missing.length ? (
+            <p className="mt-3">
+              Still need an email for:{" "}
+              {missing.map((row) => row.name).join(", ")}.
+            </p>
+          ) : null}
+          <Link href="/teachers" className="mt-3 inline-block font-semibold text-navy">
+            Add teacher emails
+          </Link>
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -63,22 +105,26 @@ export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
         {!isTeacher ? (
           <button
             type="button"
-            disabled={pending}
+            disabled={pending || ready.length === 0}
             onClick={() =>
               start(async () => {
                 const result = await emailTeacherLists();
+                if (!result.ok) {
+                  setMessage(result.error || "Could not send.");
+                  return;
+                }
+                const sentTo = result.recipients
+                  ?.map((row) => `${row.name} (${row.email})`)
+                  .join(", ");
+                const stillNeed = result.missing?.map((row) => row.name).join(", ");
                 setMessage(
-                  result.ok
-                    ? `Emailed ${result.sent} classroom list${result.sent === 1 ? "" : "s"}.${
-                        result.skipped
-                          ? ` ${result.skipped} classroom${result.skipped === 1 ? "" : "s"} had no teacher email.`
-                          : ""
-                      }`
-                    : result.error || "Could not send.",
+                  `Sent from dismissal@ampmflow.com to ${sentTo || "no one"}.${
+                    stillNeed ? ` Still need emails for ${stillNeed}.` : ""
+                  }`,
                 );
               })
             }
-            className="rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-semibold"
+            className="rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
           >
             {pending ? "Emailing…" : "Email teachers"}
           </button>

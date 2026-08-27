@@ -24,12 +24,20 @@ export async function emailTeacherLists() {
     return {
       ok: false,
       error: result.error,
+      recipients: result.recipients,
+      missing: result.missing,
       preview: groupByTeacher(students)
         .map(([name, rows]) => `${name}: ${rows.length} students`)
         .join("\n"),
     };
   }
-  return { ok: true, sent: result.sent, skipped: result.skipped };
+  return {
+    ok: true,
+    sent: result.sent,
+    skipped: result.skipped,
+    recipients: result.recipients,
+    missing: result.missing,
+  };
 }
 
 export async function emailCompanyReport() {

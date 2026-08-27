@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
+import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 
 export async function updateTeacherEmail(formData: FormData) {
   const session = await getSession();
@@ -17,8 +18,8 @@ export async function updateTeacherEmail(formData: FormData) {
   }
 
   const teacherId = String(formData.get("teacherId") || "");
-  const email = String(formData.get("email") || "").trim().toLowerCase();
-  if (!teacherId || !email.includes("@")) return;
+  const email = usableTeacherEmail(String(formData.get("email") || ""));
+  if (!teacherId || !email) return;
 
   const teacher = await prisma.teacher.findFirst({
     where: { id: teacherId, schoolId: session.schoolId },

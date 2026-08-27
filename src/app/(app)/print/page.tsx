@@ -14,7 +14,7 @@ import {
 import { planSummary, planTone, rosterChangeLabel } from "@/lib/format";
 import { loadCheckInSummary, loadCompanyApprovedBuses } from "@/lib/operations";
 import type { CheckInBusSummary } from "@/lib/operations";
-import { lastTeacherEmail } from "@/lib/teacher-snapshot";
+import { lastTeacherEmail, teacherEmailPlan } from "@/lib/teacher-snapshot";
 import { formatDateTime } from "@/lib/dates";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Suspense } from "react";
@@ -45,16 +45,17 @@ export default async function PrintPage({
   const companyApproved = await loadCompanyApprovedBuses(session.schoolId);
   const checkIns = await loadCheckInSummary(session.schoolId);
   const lastEmail = session.role === "TEACHER" ? null : await lastTeacherEmail(session.schoolId);
+  const emailPlan = session.role === "TEACHER" ? { ready: [], missing: [] } : await teacherEmailPlan(session.schoolId);
 
   return (
     <div className="space-y-6">
       <div className="no-print">
         <h1 className="font-serif text-4xl">Reports</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Choose a list, then print it or download Excel. Teachers get their
-          classroom list by email every school day at 2:45, or 11:45 on Friday
-          when school closes at 12. Use Email teachers if a parent calls late
-          and you need to send the list again.
+          Choose a list, then print or download Excel. Teacher lists have two
+          sends: Email teachers anytime you tap the button, and an automatic
+          send every school day at 2:45, or 11:45 on Friday, with no click.
+          Both go from dismissal@ampmflow.com to the emails saved on Teachers.
         </p>
         {lastEmail ? (
           <p className="mt-2 text-sm text-muted">
@@ -62,7 +63,11 @@ export default async function PrintPage({
           </p>
         ) : null}
         <Suspense>
-          <PrintActions isTeacher={session.role === "TEACHER"} />
+          <PrintActions
+            isTeacher={session.role === "TEACHER"}
+            ready={emailPlan.ready}
+            missing={emailPlan.missing}
+          />
         </Suspense>
       </div>
 

@@ -148,14 +148,36 @@ type TeacherContact = {
   name: string;
   email: string;
   classroomName: string;
-  userEmail: string;
 };
 
 export function usableTeacherEmail(email: string) {
   const value = email.trim();
   if (!value || !value.includes("@")) return "";
-  if (value.toLowerCase().endsWith("@riverside.edu")) return "";
+  const lower = value.toLowerCase();
+  if (
+    lower.endsWith("@riverside.edu") ||
+    lower.endsWith("@example.com") ||
+    lower.endsWith("@school.edu")
+  ) {
+    return "";
+  }
   return value;
+}
+
+export async function clearPlaceholderTeacherEmails(schoolId: string) {
+  const teachers = await prisma.teacher.findMany({
+    where: { schoolId },
+    select: { id: true, email: true },
+  });
+  const fakeIds = teachers
+    .filter((teacher) => teacher.email && !usableTeacherEmail(teacher.email))
+    .map((teacher) => teacher.id);
+  if (!fakeIds.length) return 0;
+  await prisma.teacher.updateMany({
+    where: { id: { in: fakeIds } },
+    data: { email: "" },
+  });
+  return fakeIds.length;
 }
 
 function teacherEmailForGroup(teachers: TeacherContact[], groupName: string) {
@@ -166,10 +188,38 @@ function teacherEmailForGroup(teachers: TeacherContact[], groupName: string) {
         teacher.name === teacherName &&
         (!classroomName || teacher.classroomName === classroomName),
     ) ?? teachers.find((teacher) => teacher.name === teacherName);
-  return (
-    usableTeacherEmail(match?.email || "") ||
-    usableTeacherEmail(match?.userEmail || "")
-  );
+  return {
+    name: match?.name || teacherName,
+    email: usableTeacherEmail(match?.email || ""),
+  };
+}
+
+async function loadTeacherContacts(schoolId: string) {
+  await clearPlaceholderTeacherEmails(schoolId);
+  const rows = await prisma.teacher.findMany({
+    where: { schoolId },
+    include: { classroom: true },
+  });
+  return rows.map((teacher) => ({
+    name: teacher.name,
+    email: teacher.email,
+    classroomName: teacher.classroom.name,
+  }));
+}
+
+export async function teacherEmailPlan(schoolId: string) {
+  const [students, teachers] = await Promise.all([
+    loadStudents(schoolId),
+    loadTeacherContacts(schoolId),
+  ]);
+  const ready: { name: string; email: string }[] = [];
+  const missing: { name: string }[] = [];
+  for (const [name] of groupByTeacher(students)) {
+    const contact = teacherEmailForGroup(teachers, name);
+    if (contact.email) ready.push({ name, email: contact.email });
+    else missing.push({ name });
+  }
+  return { ready, missing };
 }
 
 async function snapshotAlreadySent(schoolId: string, dateKey: string) {
@@ -222,7 +272,14 @@ export async function sendTeacherClassroomLists(args: {
 }) {
   const dateKey = schoolLocalTime().dateKey;
   if (args.automatic && (await snapshotAlreadySent(args.schoolId, dateKey))) {
-    return { ok: true, sent: 0, skipped: 0, alreadySent: true as const };
+    return {
+      ok: true,
+      sent: 0,
+      skipped: 0,
+      alreadySent: true as const,
+      recipients: [],
+      missing: [],
+    };
   }
 
   if (!smtpConfigured()) {
@@ -232,34 +289,28 @@ export async function sendTeacherClassroomLists(args: {
       skipped: 0,
       error:
         "Email is not configured yet. Add RESEND_API_KEY, or use Print / Download Excel.",
+      recipients: [],
+      missing: [],
     };
   }
 
-  const [students, teacherRows] = await Promise.all([
+  const [students, teachers] = await Promise.all([
     loadStudents(args.schoolId),
-    prisma.teacher.findMany({
-      where: { schoolId: args.schoolId },
-      include: {
-        classroom: true,
-        users: { where: { active: true, role: "TEACHER" } },
-      },
-    }),
+    loadTeacherContacts(args.schoolId),
   ]);
-  const teachers: TeacherContact[] = teacherRows.map((teacher) => ({
-    name: teacher.name,
-    email: teacher.email,
-    classroomName: teacher.classroom.name,
-    userEmail: teacher.users[0]?.email || "",
-  }));
   const groups = groupByTeacher(students);
   const header = stamp();
+  const recipients: { name: string; email: string }[] = [];
+  const missing: { name: string }[] = [];
   let sent = 0;
   let skipped = 0;
 
   for (const [name, rows] of groups) {
-    const to = teacherEmailForGroup(teachers, name);
+    const contact = teacherEmailForGroup(teachers, name);
+    const to = contact.email;
     if (!to) {
       skipped += 1;
+      missing.push({ name });
       continue;
     }
     const text = teacherSnapshotText({
@@ -280,8 +331,25 @@ export async function sendTeacherClassroomLists(args: {
       text,
       html,
     });
-    if (result.sent) sent += 1;
-    else skipped += 1;
+    if (result.sent) {
+      sent += 1;
+      recipients.push({ name, email: to });
+    } else {
+      skipped += 1;
+      missing.push({ name });
+    }
+  }
+
+  if (sent === 0) {
+    return {
+      ok: false,
+      sent: 0,
+      skipped,
+      recipients,
+      missing,
+      error:
+        "Add teacher emails on the Teachers page first. Nothing was sent.",
+    };
   }
 
   await prisma.auditLog.create({
@@ -308,7 +376,7 @@ export async function sendTeacherClassroomLists(args: {
     );
   }
 
-  return { ok: true, sent, skipped };
+  return { ok: true, sent, skipped, recipients, missing };
 }
 
 export async function runScheduledTeacherSnapshots() {

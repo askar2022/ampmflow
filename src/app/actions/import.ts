@@ -175,7 +175,7 @@ export async function importStudents(formData: FormData) {
           schoolId: user.schoolId,
           classroomId: classroom.id,
           name: teacherName,
-          email: `${teacherName.toLowerCase().replace(/[^a-z]+/g, ".")}@riverside.edu`,
+          email: "",
         },
       });
     }

@@ -3,20 +3,21 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { groupByTeacher } from "@/lib/reports";
-import { usableTeacherEmail } from "@/lib/teacher-snapshot";
+import {
+  clearPlaceholderTeacherEmails,
+  usableTeacherEmail,
+} from "@/lib/teacher-snapshot";
 import { updateTeacherEmail } from "@/app/actions/teachers";
 
 export default async function TeachersPage() {
   const session = await getSession();
   if (!session) return null;
+  await clearPlaceholderTeacherEmails(session.schoolId);
   const [students, teachers] = await Promise.all([
     loadStudents(session.schoolId),
     prisma.teacher.findMany({
       where: { schoolId: session.schoolId },
-      include: {
-        classroom: true,
-        users: { where: { active: true, role: "TEACHER" } },
-      },
+      include: { classroom: true },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -32,9 +33,10 @@ export default async function TeachersPage() {
       <div>
         <h1 className="font-serif text-4xl">Teachers and classes</h1>
         <p className="mt-1 max-w-2xl text-muted">
-          Type each teacher’s email here. The daily list is sent from
-          dismissal@ampmflow.com to these addresses. Do not put teacher emails
-          in Vercel.
+          Save each teacher’s email here one time. After that, Vercel sends
+          their class list every school day at 2:45, or 11:45 on Friday, with
+          no click. You can also send it anytime from Reports. Mail comes from
+          dismissal@ampmflow.com.
         </p>
         <a
           href="/print/export?kind=teacher"
@@ -46,9 +48,7 @@ export default async function TeachersPage() {
       <div className="grid gap-4 md:grid-cols-2">
         {teachers.map((teacher) => {
           const groupName = `${teacher.name} · ${teacher.classroom.name}`;
-          const saved = usableTeacherEmail(teacher.email);
-          const login = usableTeacherEmail(teacher.users[0]?.email || "");
-          const email = saved || login;
+          const email = usableTeacherEmail(teacher.email);
           return (
             <section
               key={teacher.id}

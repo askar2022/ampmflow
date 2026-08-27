@@ -75,14 +75,14 @@ async function main() {
 
   const classrooms = await Promise.all(
     [
-      { name: "Room 101", grade: "K", teacher: "Sarah Bennett", email: "sbennett@riverside.edu" },
-      { name: "Room 102", grade: "1", teacher: "James Porter", email: "jporter@riverside.edu" },
-      { name: "Room 201", grade: "2", teacher: "Priya Shah", email: "pshah@riverside.edu" },
-      { name: "Room 202", grade: "3", teacher: "Elena Vasquez", email: "evasquez@riverside.edu" },
-      { name: "Room 203", grade: "3", teacher: "Michael Brooks", email: "mbrooks@riverside.edu" },
-      { name: "Room 301", grade: "4", teacher: "Hannah Cole", email: "hcole@riverside.edu" },
-      { name: "Room 302", grade: "5", teacher: "David Okonkwo", email: "dokonkwo@riverside.edu" },
-      { name: "Room 303", grade: "5", teacher: "Grace Lin", email: "glin@riverside.edu" },
+      { name: "Room 101", grade: "K", teacher: "Sarah Bennett" },
+      { name: "Room 102", grade: "1", teacher: "James Porter" },
+      { name: "Room 201", grade: "2", teacher: "Priya Shah" },
+      { name: "Room 202", grade: "3", teacher: "Elena Vasquez" },
+      { name: "Room 203", grade: "3", teacher: "Michael Brooks" },
+      { name: "Room 301", grade: "4", teacher: "Hannah Cole" },
+      { name: "Room 302", grade: "5", teacher: "David Okonkwo" },
+      { name: "Room 303", grade: "5", teacher: "Grace Lin" },
     ].map(async (room) => {
       const classroom = await prisma.classroom.create({
         data: { schoolId: school.id, name: room.name, grade: room.grade },
@@ -92,7 +92,7 @@ async function main() {
           schoolId: school.id,
           classroomId: classroom.id,
           name: room.teacher,
-          email: room.email,
+          email: "",
         },
       });
       return { classroom, teacher, grade: room.grade };
