@@ -55,7 +55,7 @@ export async function reportTeacherConcern(formData: FormData): Promise<void> {
 
 export async function setBusCheckIn(
   studentId: string,
-  status: "ON_BUS" | "MISSING" | "WRONG",
+  status: "ON_BUS" | "MISSING" | "WRONG" | "UNASSIGNED",
   note = "",
 ) {
   const user = await getSession();

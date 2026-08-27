@@ -12,7 +12,7 @@ const tiles = [
   { href: "/pickup", title: "Parent Pickup", copy: "Students going home with a parent." },
   { href: "/waiting", title: "Waiting for Route", copy: "New address or daycare — not final until assigned." },
   { href: "/acknowledgments", title: "Teacher Acknowledgments", copy: "Evidence the teacher saw a last-minute change." },
-  { href: "/checkin", title: "Bus Check-In", copy: "Assistants mark On Bus, Missing, or Wrong Assignment." },
+  { href: "/checkin", title: "Bus Check-In", copy: "Same roster as Buses, with On Bus, Missing, and Not assigned." },
   { href: "/students", title: "Students", copy: "Search and record a parent request." },
   { href: "/print", title: "Reports", copy: "2:45 snapshot, print, and weekly leadership report." },
 ];

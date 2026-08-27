@@ -11,7 +11,8 @@ import {
   stamp,
   type ReportKind,
 } from "@/lib/reports";
-import { planSummary, planTone } from "@/lib/format";
+import { planSummary, planTone, rosterChangeLabel } from "@/lib/format";
+import { loadCompanyApprovedBuses } from "@/lib/operations";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Suspense } from "react";
 import { PrintActions } from "./PrintActions";
@@ -38,6 +39,7 @@ export default async function PrintPage({
 
   const header = stamp();
   const selected = (kind || "teacher") as ReportKind;
+  const companyApproved = await loadCompanyApprovedBuses(session.schoolId);
 
   return (
     <div className="space-y-6">
@@ -71,6 +73,7 @@ export default async function PrintPage({
           title="Bus lists"
           header={header}
           groups={groupByBus(students).map(([n, rows]) => [`Bus ${n}`, rows])}
+          companyApproved={companyApproved}
         />
       ) : null}
       {selected === "pickup" ? (
@@ -160,10 +163,12 @@ function PrintGroups({
   title,
   header,
   groups,
+  companyApproved,
 }: {
   title: string;
   header: { generated: string; version: string };
   groups: [string, EffectiveStudent[]][];
+  companyApproved?: Map<string, string>;
 }) {
   return (
     <div className="space-y-6">
@@ -182,17 +187,31 @@ function PrintGroups({
               </tr>
             </thead>
             <tbody>
-              {rows.map((student) => (
-                <tr key={student.id} className="border-t border-line">
-                  <td className="py-1.5">{student.fullName}</td>
-                  <td>
-                    <StatusBadge tone={planTone(student.pm)}>
-                      {planSummary(student.pm, "PM")}
-                    </StatusBadge>
-                  </td>
-                  <td>{student.pm.location}</td>
-                </tr>
-              ))}
+              {rows.map((student) => {
+                const change = rosterChangeLabel(
+                  student,
+                  companyApproved?.get(student.id),
+                );
+                return (
+                  <tr
+                    key={student.id}
+                    className={`border-t border-line ${change ? "row-red" : ""}`}
+                  >
+                    <td className="py-1.5">
+                      {student.fullName}
+                      {change ? (
+                        <div className="text-xs font-medium text-red">{change}</div>
+                      ) : null}
+                    </td>
+                    <td>
+                      <StatusBadge tone={planTone(student.pm)}>
+                        {planSummary(student.pm, "PM")}
+                      </StatusBadge>
+                    </td>
+                    <td>{student.pm.location}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>

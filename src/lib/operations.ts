@@ -35,12 +35,24 @@ export async function unacknowledgedUrgent(schoolId: string) {
   );
 }
 
-export async function loadCheckIns(schoolId: string, busNumber?: string) {
+function isTodayChange(student: Awaited<ReturnType<typeof loadStudents>>[number]) {
+  return (
+    student.am.source === "TODAY" ||
+    student.pm.source === "TODAY" ||
+    student.am.source === "DATE_RANGE" ||
+    student.pm.source === "DATE_RANGE" ||
+    student.am.waitingForAssignment ||
+    student.pm.waitingForAssignment ||
+    (student.am.type === "BUS" && !student.am.busNumber) ||
+    (student.pm.type === "BUS" && !student.pm.busNumber)
+  );
+}
+
+async function attachCheckIns(
+  schoolId: string,
+  students: Awaited<ReturnType<typeof loadStudents>>,
+) {
   const day = todayKey();
-  const students = (await loadStudents(schoolId)).filter((student) => {
-    if (!busNumber) return student.pm.type === "BUS" && student.pm.busNumber;
-    return student.pm.busNumber === busNumber;
-  });
   let rows: Awaited<ReturnType<typeof prisma.busCheckIn.findMany>> = [];
   try {
     rows = await prisma.busCheckIn.findMany({
@@ -54,6 +66,59 @@ export async function loadCheckIns(schoolId: string, busNumber?: string) {
     student,
     checkIn: byStudent.get(student.id) ?? null,
   }));
+}
+
+export async function loadCheckIns(schoolId: string, busNumber?: string) {
+  const students = (await loadStudents(schoolId)).filter((student) => {
+    if (!busNumber) return student.pm.type === "BUS" && student.pm.busNumber;
+    return student.pm.busNumber === busNumber;
+  });
+  return attachCheckIns(schoolId, students);
+}
+
+export async function loadCompanyApprovedBuses(schoolId: string) {
+  const day = todayKey();
+  const start = new Date(`${day}T00:00:00`);
+  const requests = await prisma.changeRequest.findMany({
+    where: {
+      schoolId,
+      status: { in: ["APPROVED", "COMPLETED"] },
+      studentId: { not: null },
+      busNumber: { not: null },
+      OR: [{ reviewedAt: { gte: start } }, { createdAt: { gte: start } }],
+    },
+    select: { studentId: true, busNumber: true },
+  });
+  const map = new Map<string, string>();
+  for (const row of requests) {
+    if (row.studentId && row.busNumber) {
+      map.set(row.studentId, row.busNumber.replace(/^Bus\s+/i, ""));
+    }
+  }
+  return map;
+}
+
+export async function loadChangeCheckIns(schoolId: string) {
+  const day = todayKey();
+  const all = await loadStudents(schoolId);
+  const requestRows = await prisma.changeRequest.findMany({
+    where: {
+      schoolId,
+      studentId: { not: null },
+      createdAt: {
+        gte: new Date(`${day}T00:00:00`),
+        lte: new Date(`${day}T23:59:59`),
+      },
+    },
+    select: { studentId: true },
+  });
+  const requestIds = new Set(
+    requestRows.map((row) => row.studentId).filter(Boolean) as string[],
+  );
+  const students = all.filter(
+    (student) => isTodayChange(student) || requestIds.has(student.id),
+  );
+  return attachCheckIns(schoolId, students);
 }
 
 export async function leadershipStats(schoolId: string) {

@@ -1,4 +1,11 @@
-import type { Destination, DurationType, PlanSnapshot, TransportType, Trip } from "./types";
+import type {
+  Destination,
+  DurationType,
+  EffectiveStudent,
+  PlanSnapshot,
+  TransportType,
+  Trip,
+} from "./types";
 
 export function fullName(first: string, last: string) {
   return `${first} ${last}`;
@@ -96,6 +103,21 @@ export function planTone(plan: PlanSnapshot): StatusTone {
   if (plan.type === "PARENT") return "blue";
   if (plan.source === "TODAY" || plan.source === "DATE_RANGE") return "yellow";
   return "green";
+}
+
+export function rosterChangeLabel(
+  student: EffectiveStudent,
+  companyBus?: string | null,
+): string | null {
+  const plan = student.pm;
+  if (plan.type !== "BUS" || !plan.busNumber) return null;
+  if (companyBus && companyBus === plan.busNumber) {
+    return "Bus company approved — ride this bus. Show this list if the driver did not print a new roster.";
+  }
+  if (plan.source === "TODAY" || plan.source === "DATE_RANGE") {
+    return "Today-only change on the school list. Show this to the driver.";
+  }
+  return null;
 }
 
 export function toneLabel(tone: StatusTone) {
