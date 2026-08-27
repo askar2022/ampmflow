@@ -47,6 +47,7 @@ export default async function CompanyPage() {
 
   return (
     <div className="space-y-6">
+      <div className="no-print">
       <div>
         <h1 className="font-serif text-4xl">
           {limited ? "Transportation queue" : "Bus Company Updates"}
@@ -54,7 +55,7 @@ export default async function CompanyPage() {
         <p className="mt-2 max-w-2xl text-muted">
           {limited
             ? "Record a parent call to the company, or send a today-only change to the school. Proposed bus numbers are not final until Admin or the Bus Coordinator approves them."
-            : "Record a parent or company request. That save does not send email. Print the report at the bottom if you need a copy."}
+            : "Record a parent or company request. That save does not send email. Print the bus-company report at the bottom if you need a copy."}
         </p>
       </div>
 
@@ -161,6 +162,7 @@ export default async function CompanyPage() {
           ))}
         </ul>
       </section>
+      </div>
 
       {!limited ? <CompanyActions preview={report} /> : null}
     </div>
