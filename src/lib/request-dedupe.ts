@@ -1,3 +1,20 @@
+export function requestKind(request: { payload?: string | null; title?: string }) {
+  try {
+    const payload = JSON.parse(request.payload || "{}") as { kind?: string };
+    return String(payload.kind || "");
+  } catch {
+    return "";
+  }
+}
+
+export function isCompanyReport(request: { payload?: string | null; title?: string }) {
+  const kind = requestKind(request);
+  if (kind === "COMPANY_REPORT" || kind === "PM_COMPANY") return true;
+  return /report to bus company|no longer at this school/i.test(
+    request.title || "",
+  );
+}
+
 export function requestDedupeKey(request: {
   studentId?: string | null;
   title: string;

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { collapseDuplicateRequests } from "@/app/actions/requests";
 import { formatDateTime } from "@/lib/dates";
 import { roleLabel } from "@/lib/format";
-import { uniqueChangeRequests } from "@/lib/request-dedupe";
+import { isCompanyReport, uniqueChangeRequests } from "@/lib/request-dedupe";
 import { TodayChangeForm } from "@/components/TodayChangeForm";
 import { RequestReviewButtons } from "./RequestReviewButtons";
 
@@ -22,7 +22,7 @@ export default async function RequestsPage({
       include: { student: true, createdBy: true, reviewedBy: true },
       orderBy: { createdAt: "desc" },
     }),
-  );
+  ).filter((request) => !isCompanyReport(request));
   const students = await prisma.student.findMany({
     where: { schoolId: session.schoolId },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -64,25 +64,19 @@ export default async function RequestsPage({
       </section>
 
       <section className="relative z-20 space-y-3">
+        <p className="text-sm text-muted">
+          Today’s ride cards stay here. A move or new address is saved to Bus
+          Company and Waiting for Route, not this list.
+        </p>
+        {requests.length === 0 ? (
+          <p className="rounded-2xl border border-line bg-card p-5 text-sm text-muted">
+            No today’s-ride requests on this list.
+          </p>
+        ) : null}
         {requests.map((request) => {
-          let kind = "";
-          try {
-            kind = String(
-              (JSON.parse(request.payload || "{}") as { kind?: string }).kind ||
-                "",
-            );
-          } catch {
-            kind = "";
-          }
-          const companyReport =
-            kind === "COMPANY_REPORT" || kind === "PM_COMPANY";
           const needsApprove =
             request.status === "PENDING" &&
-            !companyReport &&
             (session.role === "COORDINATOR" || session.role === "ADMINISTRATOR");
-          const statusLabel = companyReport
-            ? "Waiting for company"
-            : request.status;
 
           return (
           <article key={request.id} className="rounded-2xl border border-line bg-card p-5">
@@ -95,20 +89,13 @@ export default async function RequestsPage({
                 </p>
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">
-                {statusLabel}
+                {request.status}
               </span>
             </div>
             <p className="mt-2 text-sm">{request.details}</p>
             {request.student ? (
               <p className="mt-1 text-sm text-muted">
                 {request.student.firstName} {request.student.lastName} · {request.trip}
-              </p>
-            ) : null}
-            {companyReport ? (
-              <p className="mt-2 text-sm text-muted">
-                Already recorded. Open Bus Company to print the report. The
-                student stays on Waiting for Route until the company proposes a
-                number. No school approve step.
               </p>
             ) : null}
             {needsApprove ? (
