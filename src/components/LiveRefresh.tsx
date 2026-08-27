@@ -1,5 +1,6 @@
 "use client";
 
+import { snapshotClockLabel } from "@/lib/policy";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -11,8 +12,8 @@ export function LiveRefresh({ seconds = 20 }: { seconds?: number }) {
   }, [router, seconds]);
   return (
     <p className="text-xs text-muted">
-      Live board · refreshes every {seconds} seconds so a parent call after 2:45
-      still reaches this screen.
+      Live board · refreshes every {seconds} seconds so a parent call after{" "}
+      {snapshotClockLabel()} still reaches this screen.
     </p>
   );
 }

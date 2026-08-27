@@ -3,13 +3,8 @@
 import { getSession } from "@/lib/auth";
 import { sendMail, smtpConfigured } from "@/lib/email";
 import { loadStudents } from "@/lib/transportation";
-import {
-  companyReportText,
-  groupByTeacher,
-  pickupList,
-  stamp,
-} from "@/lib/reports";
-import { planSummary } from "@/lib/format";
+import { companyReportText, pickupList, stamp } from "@/lib/reports";
+import { sendTeacherClassroomLists } from "@/lib/teacher-snapshot";
 import { writeAudit } from "@/lib/audit";
 
 export async function emailTeacherLists() {
@@ -18,55 +13,23 @@ export async function emailTeacherLists() {
     return { ok: false, error: "Not authorized to email lists." };
   }
 
-  const students = await loadStudents(user.schoolId);
-  const groups = groupByTeacher(students);
-  const header = stamp();
-  const teachers = await import("@/lib/prisma").then(({ prisma }) =>
-    prisma.teacher.findMany({ where: { schoolId: user.schoolId } }),
-  );
-
-  if (!smtpConfigured()) {
+  const result = await sendTeacherClassroomLists({
+    schoolId: user.schoolId,
+    actorId: user.id,
+    automatic: false,
+  });
+  if (!result.ok) {
+    const students = await loadStudents(user.schoolId);
+    const { groupByTeacher } = await import("@/lib/reports");
     return {
       ok: false,
-      error:
-        "Email is not configured yet. Use Print to download lists, or add SMTP settings in .env.",
-      preview: groups
+      error: result.error,
+      preview: groupByTeacher(students)
         .map(([name, rows]) => `${name}: ${rows.length} students`)
         .join("\n"),
     };
   }
-
-  let sent = 0;
-  for (const [name, rows] of groups) {
-    const teacherName = name.split(" · ")[0];
-    const teacher = teachers.find((t) => t.name === teacherName);
-    if (!teacher?.email) continue;
-    const body = [
-      "AMPM Flow",
-      `Classroom dismissal list — ${name}`,
-      header.generated,
-      header.version,
-      "",
-      ...rows.map(
-        (s) =>
-          `${s.fullName.padEnd(24)}  ${planSummary(s.pm, "PM").padEnd(28)}  ${s.pm.location}`,
-      ),
-    ].join("\n");
-    await sendMail({
-      to: teacher.email,
-      subject: `Dismissal list — ${name} — ${header.generated}`,
-      text: body,
-    });
-    sent += 1;
-  }
-
-  await writeAudit({
-    user,
-    action: "EMAIL_TEACHER_LISTS",
-    newPlan: { sent },
-  });
-
-  return { ok: true, sent };
+  return { ok: true, sent: result.sent, skipped: result.skipped };
 }
 
 export async function emailCompanyReport() {
@@ -113,7 +76,7 @@ export async function emailPickupList() {
   ].join("\n");
   return {
     ok: smtpConfigured(),
-    error: smtpConfigured() ? undefined : "SMTP is not configured. Copy the list below.",
+    error: smtpConfigured() ? undefined : "Resend is not configured. Copy the list below.",
     preview: text,
   };
 }

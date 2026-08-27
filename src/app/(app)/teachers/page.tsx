@@ -1,20 +1,40 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { groupByTeacher } from "@/lib/reports";
+import { usableTeacherEmail } from "@/lib/teacher-snapshot";
+import { updateTeacherEmail } from "@/app/actions/teachers";
 
 export default async function TeachersPage() {
   const session = await getSession();
   if (!session) return null;
-  const groups = groupByTeacher(await loadStudents(session.schoolId));
+  const [students, teachers] = await Promise.all([
+    loadStudents(session.schoolId),
+    prisma.teacher.findMany({
+      where: { schoolId: session.schoolId },
+      include: {
+        classroom: true,
+        users: { where: { active: true, role: "TEACHER" } },
+      },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+  const groups = groupByTeacher(students);
+  const counts = new Map(groups.map(([name, rows]) => [name, rows.length]));
+  const canEdit =
+    session.role === "COORDINATOR" ||
+    session.role === "ADMINISTRATOR" ||
+    session.role === "FRONT_DESK";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-4xl">Teachers and classes</h1>
-        <p className="mt-1 text-muted">
-          Each teacher and classroom from your student upload. Open a card to
-          print that class list.
+        <p className="mt-1 max-w-2xl text-muted">
+          Type each teacher’s email here. The daily list is sent from
+          dismissal@ampmflow.com to these addresses. Do not put teacher emails
+          in Vercel.
         </p>
         <a
           href="/print/export?kind=teacher"
@@ -24,16 +44,52 @@ export default async function TeachersPage() {
         </a>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        {groups.map(([name, students]) => (
-          <Link
-            key={name}
-            href={`/print?kind=teacher&group=${encodeURIComponent(name)}`}
-            className="rounded-2xl border border-line bg-card p-5 hover:border-gold"
-          >
-            <h2 className="font-serif text-2xl">{name}</h2>
-            <p className="mt-1 text-sm text-muted">{students.length} students</p>
-          </Link>
-        ))}
+        {teachers.map((teacher) => {
+          const groupName = `${teacher.name} · ${teacher.classroom.name}`;
+          const saved = usableTeacherEmail(teacher.email);
+          const login = usableTeacherEmail(teacher.users[0]?.email || "");
+          const email = saved || login;
+          return (
+            <section
+              key={teacher.id}
+              className="rounded-2xl border border-line bg-card p-5"
+            >
+              <h2 className="font-serif text-2xl">{teacher.name}</h2>
+              <p className="mt-1 text-sm text-muted">
+                {teacher.classroom.name} · {counts.get(groupName) ?? 0} students
+              </p>
+              {email ? (
+                <p className="mt-2 text-sm">List goes to {email}</p>
+              ) : (
+                <p className="mt-2 text-sm font-medium text-red">
+                  No email yet — this class will not get the daily list.
+                </p>
+              )}
+              {canEdit ? (
+                <form action={updateTeacherEmail} className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <input type="hidden" name="teacherId" value={teacher.id} />
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    defaultValue={email}
+                    placeholder="teacher@school.org"
+                    className="w-full rounded-xl border border-line px-3 py-2"
+                  />
+                  <button className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white">
+                    Save email
+                  </button>
+                </form>
+              ) : null}
+              <Link
+                href={`/print?kind=teacher&group=${encodeURIComponent(groupName)}`}
+                className="mt-3 inline-block text-sm font-semibold text-navy"
+              >
+                Open class list
+              </Link>
+            </section>
+          );
+        })}
       </div>
     </div>
   );

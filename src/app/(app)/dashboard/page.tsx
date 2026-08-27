@@ -7,7 +7,10 @@ import {
   uniqueStudentCount,
 } from "@/lib/operations";
 import { formatLongDate, schoolNow } from "@/lib/dates";
-import { CHANGE_DEADLINE, SNAPSHOT_TIME } from "@/lib/policy";
+import {
+  deadlineClockLabel,
+  snapshotClockLabel,
+} from "@/lib/policy";
 import { eventPlanLabel } from "@/lib/operations";
 
 const tiles = [
@@ -18,7 +21,7 @@ const tiles = [
   { href: "/acknowledgments", title: "Teacher Acknowledgments", copy: "Evidence the teacher saw a last-minute change." },
   { href: "/checkin", title: "Bus Check-In", copy: "Tap On Bus, Missing, or Left school. Leadership keeps the daily count." },
   { href: "/students", title: "Students", copy: "Search and record a parent request." },
-  { href: "/print", title: "Reports", copy: "2:45 snapshot, print, and weekly leadership report." },
+  { href: "/print", title: "Reports", copy: "Daily snapshot, print, and weekly leadership report." },
 ];
 
 export default async function DashboardPage() {
@@ -32,6 +35,8 @@ export default async function DashboardPage() {
   const waiting = students.filter(
     (s) => s.am.waitingForAssignment || s.pm.waitingForAssignment,
   ).length;
+  const snapshot = snapshotClockLabel();
+  const deadline = deadlineClockLabel();
 
   return (
     <div className="space-y-8">
@@ -41,10 +46,10 @@ export default async function DashboardPage() {
           {session.role === "FRONT_DESK" ? "Reception desk" : "Live dismissal board"}
         </h1>
         <p className="mt-2 max-w-2xl text-muted">
-          The 2:45 PM email is a snapshot. This board stays live because a parent
-          can still call after {SNAPSHOT_TIME.replace("14:", "2:")}. Normal cutoff is{" "}
-          {CHANGE_DEADLINE.replace("14:15", "2:15 PM")}; later requests are labeled
-          Late/Emergency.
+          The {snapshot} email is a snapshot
+          {snapshot === "11:45 AM" ? " — Friday school closes at 12" : ""}.
+          This board stays live because a parent can still call after that.
+          Normal cutoff is {deadline}; later requests are labeled Late/Emergency.
         </p>
       </div>
 

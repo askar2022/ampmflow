@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
+    pathname.startsWith("/api/cron") ||
     pathname.includes(".")
   ) {
     return NextResponse.next();

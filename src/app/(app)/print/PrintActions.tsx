@@ -69,7 +69,11 @@ export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
                 const result = await emailTeacherLists();
                 setMessage(
                   result.ok
-                    ? `Emailed ${result.sent} classroom lists.`
+                    ? `Emailed ${result.sent} classroom list${result.sent === 1 ? "" : "s"}.${
+                        result.skipped
+                          ? ` ${result.skipped} classroom${result.skipped === 1 ? "" : "s"} had no teacher email.`
+                          : ""
+                      }`
                     : result.error || "Could not send.",
                 );
               })

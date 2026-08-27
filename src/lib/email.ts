@@ -1,7 +1,18 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-export function smtpConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER);
+export function emailConfigured() {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
+export const smtpConfigured = emailConfigured;
+
+function fromAddress() {
+  return (
+    process.env.RESEND_FROM ||
+    process.env.RESEND_FROM_EMAIL ||
+    process.env.EMAIL_FROM ||
+    "AMPM Flow <dismissal@ampmflow.com>"
+  );
 }
 
 export async function sendMail(args: {
@@ -10,27 +21,25 @@ export async function sendMail(args: {
   text: string;
   html?: string;
 }) {
-  if (!smtpConfigured()) {
-    return { sent: false as const, reason: "SMTP is not configured." };
+  if (!emailConfigured()) {
+    return {
+      sent: false as const,
+      reason: "Resend is not configured. Add RESEND_API_KEY on Vercel.",
+    };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_PORT === "465",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to: Array.isArray(args.to) ? args.to.join(", ") : args.to,
+  const resend = new Resend(process.env.RESEND_API_KEY);
+  const { error } = await resend.emails.send({
+    from: fromAddress(),
+    to: args.to,
     subject: args.subject,
     text: args.text,
     html: args.html ?? `<pre>${args.text}</pre>`,
   });
+
+  if (error) {
+    return { sent: false as const, reason: error.message };
+  }
 
   return { sent: true as const };
 }

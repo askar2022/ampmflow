@@ -206,7 +206,7 @@ export default async function LeadershipPage() {
           This week, {stats.weekChangeStudents} student
           {stats.weekChangeStudents === 1 ? "" : "s"} had a transportation
           change. {stats.lateCount}{" "}
-          {stats.lateCount === 1 ? "was" : "were"} received after 2:15 PM
+          {stats.lateCount === 1 ? "was" : "were"} received after the daily cutoff
           {stats.repeated.length
             ? `, and ${stats.repeated.length} student(s) had more than one different change.`
             : "."}

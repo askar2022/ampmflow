@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { eventPlanLabel, loadChangeEvents } from "@/lib/operations";
-import { lateLabel } from "@/lib/policy";
+import { deadlineClockLabel, lateLabel, snapshotClockLabel } from "@/lib/policy";
 
 export default async function ActivityPage() {
   const session = await getSession();
@@ -12,9 +12,9 @@ export default async function ActivityPage() {
       <h1 className="font-serif text-4xl">Today’s Activity</h1>
       <p className="text-muted">
         Each real change is listed once, with who recorded it and the time.
-        Saving the same student again does not add another row. After 2:15 PM
-        the row is Late/Emergency. After 2:45 PM the teacher must acknowledge
-        it.
+        Saving the same student again does not add another row. After{" "}
+        {deadlineClockLabel()} the row is Late/Emergency. After the{" "}
+        {snapshotClockLabel()} email the teacher must acknowledge it.
       </p>
       <div className="overflow-hidden rounded-2xl border border-line bg-card">
         <table className="w-full text-left text-sm">

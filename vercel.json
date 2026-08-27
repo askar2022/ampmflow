@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/teacher-snapshot",
+      "schedule": "45 16,17,19,20 * * 1-5"
+    }
+  ]
+}
