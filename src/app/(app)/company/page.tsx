@@ -5,6 +5,7 @@ import { companyReportText, missingList } from "@/lib/reports";
 import { planSummary } from "@/lib/format";
 import { assignBusFromCompany, reviewRequest } from "@/app/actions/requests";
 import { CompanyActions } from "./CompanyActions";
+import { TodayChangeForm } from "@/components/TodayChangeForm";
 
 export default async function CompanyPage() {
   const session = await getSession();
@@ -28,6 +29,12 @@ export default async function CompanyPage() {
   });
   const report = companyReportText(students);
   const limited = session.role === "BUS_COMPANY";
+  const routes = await prisma.busRoute.findMany({
+    where: { schoolId: session.schoolId },
+    orderBy: { number: "asc" },
+    select: { number: true },
+  });
+  const busNumbers = [...new Set(routes.map((route) => route.number))];
 
   return (
     <div className="space-y-6">
@@ -37,10 +44,31 @@ export default async function CompanyPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-muted">
           {limited
-            ? "You only see students who need a transportation assignment. Proposed bus numbers are not final until the coordinator approves them."
-            : "For the first version, email a clean change report to the company. Direct company login can assign a number, but you still approve it."}
+            ? "Record a parent call to the company, or send a today-only change to the school. Proposed bus numbers are not final until Admin or the Bus Coordinator approves them."
+            : "Record a parent or company request for today, or email a change report. Proposed bus numbers are not final until you approve them."}
         </p>
       </div>
+
+      <section className="rounded-2xl border border-line bg-card p-5">
+        <h2 className="font-serif text-2xl">Change request</h2>
+        <p className="mt-1 text-sm text-muted">
+          Today’s ride can be applied by the school. Moving / new address,
+          daycare change, and parent pickup to bus are reported to the bus
+          company. The school does not assign that new bus.
+        </p>
+        <TodayChangeForm
+          defaultCaller={limited ? "PARENT_TO_COMPANY" : "COMPANY_TO_SCHOOL"}
+          busNumbers={busNumbers}
+          canApplyToday={!limited}
+          students={students.map((student) => ({
+            id: student.id,
+            firstName: student.firstName,
+            lastName: student.lastName,
+            studentId: student.studentId,
+            grade: student.grade,
+          }))}
+        />
+      </section>
 
       {!limited ? <CompanyActions preview={report} /> : null}
 
