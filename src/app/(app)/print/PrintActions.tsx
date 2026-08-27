@@ -55,7 +55,7 @@ export function PrintActions({
           ))}
         </div>
       </div>
-      {!isTeacher ? (
+      {!isTeacher && selected === "teacher" ? (
         <div className="rounded-2xl border border-line bg-card p-5 text-sm">
           <p className="font-semibold text-navy">Teacher emails</p>
           <p className="mt-1 text-muted">
@@ -102,7 +102,7 @@ export function PrintActions({
         >
           Download Excel
         </a>
-        {!isTeacher ? (
+        {!isTeacher && selected === "teacher" ? (
           <button
             type="button"
             disabled={pending || ready.length === 0}
@@ -130,7 +130,9 @@ export function PrintActions({
           </button>
         ) : null}
       </div>
-      {message ? <p className="text-sm text-muted">{message}</p> : null}
+      {message && selected === "teacher" ? (
+        <p className="text-sm text-muted">{message}</p>
+      ) : null}
     </div>
   );
 }

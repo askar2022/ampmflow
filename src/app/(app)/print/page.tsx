@@ -52,12 +52,10 @@ export default async function PrintPage({
       <div className="no-print">
         <h1 className="font-serif text-4xl">Reports</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Choose a list, then print or download Excel. Teacher lists have two
-          sends: Email teachers anytime you tap the button, and an automatic
-          send every school day at 2:45, or 11:45 on Friday, with no click.
-          Both go from dismissal@ampmflow.com to the emails saved on Teachers.
+          Choose a list, then print it or download Excel. The date and time
+          are on every copy so staff do not use an older one.
         </p>
-        {lastEmail ? (
+        {lastEmail && selected === "teacher" ? (
           <p className="mt-2 text-sm text-muted">
             Last emailed {formatDateTime(lastEmail.createdAt)}.
           </p>
