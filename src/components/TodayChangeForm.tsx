@@ -18,7 +18,7 @@ function SubmitButton({
     <button
       type="submit"
       disabled={busy}
-      className="relative z-10 rounded-xl bg-navy px-4 py-2 font-semibold text-white disabled:opacity-70"
+      className="rounded-xl bg-navy px-4 py-2 font-semibold text-white disabled:opacity-70"
     >
       {busy ? "Saving…" : label}
     </button>
@@ -77,7 +77,7 @@ export function TodayChangeForm({
         }
         setSaved(true);
       }}
-      className="relative z-10 mt-4 space-y-3"
+      className="mt-4 space-y-3"
     >
       <input type="hidden" name="kind" value={kind} />
       <div className="text-sm font-medium">

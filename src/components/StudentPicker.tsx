@@ -86,7 +86,7 @@ export function StudentPicker({
           : "Click a student in the list. Typing the name is not enough."}
       </p>
       {open ? (
-        <ul className="relative z-20 mt-2 max-h-48 overflow-auto rounded-xl border border-line bg-white shadow-sm">
+        <ul className="mt-2 max-h-48 overflow-auto rounded-xl border border-line bg-white shadow-sm">
           {matches.length === 0 ? (
             <li className="px-3 py-2 text-sm text-muted">No matching student.</li>
           ) : (

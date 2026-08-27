@@ -1,10 +1,11 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { collapseDuplicateRequests, reviewRequest } from "@/app/actions/requests";
+import { collapseDuplicateRequests } from "@/app/actions/requests";
 import { formatDateTime } from "@/lib/dates";
 import { roleLabel } from "@/lib/format";
 import { uniqueChangeRequests } from "@/lib/request-dedupe";
 import { TodayChangeForm } from "@/components/TodayChangeForm";
+import { RequestReviewButtons } from "./RequestReviewButtons";
 
 export default async function RequestsPage({
   searchParams,
@@ -35,7 +36,7 @@ export default async function RequestsPage({
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <section className="rounded-2xl border border-line bg-card p-6">
+      <section className="overflow-hidden rounded-2xl border border-line bg-card p-6">
         <h1 className="font-serif text-3xl">Change requests</h1>
         <p className="mt-2 text-sm text-muted">
           <strong>Today’s ride</strong> is a same-day switch the school can
@@ -62,8 +63,36 @@ export default async function RequestsPage({
         />
       </section>
 
-      <section className="space-y-3">
-        {requests.map((request) => (
+      <section className="relative z-20 space-y-3">
+        {requests.map((request) => {
+          let kind = "";
+          try {
+            kind = String(
+              (JSON.parse(request.payload || "{}") as { kind?: string }).kind ||
+                "",
+            );
+          } catch {
+            kind = "";
+          }
+          const companyReport =
+            kind === "COMPANY_REPORT" || kind === "PM_COMPANY";
+          const alreadyRecorded = Boolean(request.reviewedAt);
+          const needsApprove =
+            request.status === "PENDING" &&
+            !companyReport &&
+            (session.role === "COORDINATOR" || session.role === "ADMINISTRATOR");
+          const needsApplyCompany =
+            request.status === "PENDING" &&
+            companyReport &&
+            !alreadyRecorded &&
+            (session.role === "COORDINATOR" || session.role === "ADMINISTRATOR");
+          const statusLabel = companyReport
+            ? alreadyRecorded
+              ? "Waiting for company"
+              : "Needs apply"
+            : request.status;
+
+          return (
           <article key={request.id} className="rounded-2xl border border-line bg-card p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -74,7 +103,7 @@ export default async function RequestsPage({
                 </p>
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">
-                {request.status}
+                {statusLabel}
               </span>
             </div>
             <p className="mt-2 text-sm">{request.details}</p>
@@ -83,33 +112,29 @@ export default async function RequestsPage({
                 {request.student.firstName} {request.student.lastName} · {request.trip}
               </p>
             ) : null}
-            {(session.role === "COORDINATOR" || session.role === "ADMINISTRATOR") &&
-            request.status === "PENDING" ? (
-              <div className="mt-3 flex gap-2">
-                <form
-                  action={async () => {
-                    "use server";
-                    await reviewRequest(request.id, "APPROVED");
-                  }}
-                >
-                  <button className="rounded-full bg-green px-3 py-1.5 text-sm text-white">
-                    Approve
-                  </button>
-                </form>
-                <form
-                  action={async () => {
-                    "use server";
-                    await reviewRequest(request.id, "REJECTED");
-                  }}
-                >
-                  <button className="rounded-full border border-line px-3 py-1.5 text-sm">
-                    Reject
-                  </button>
-                </form>
-              </div>
+            {companyReport && alreadyRecorded ? (
+              <p className="mt-2 text-sm text-muted">
+                Already recorded. The student stays on Waiting for Route until
+                the bus company proposes a number.
+              </p>
+            ) : null}
+            {request.status === "PENDING" &&
+            (session.role === "COORDINATOR" ||
+              session.role === "ADMINISTRATOR") ? (
+              <RequestReviewButtons
+                requestId={request.id}
+                approveLabel={
+                  needsApplyCompany
+                    ? "Apply to waiting list"
+                    : needsApprove
+                      ? "Approve"
+                      : "Approve"
+                }
+              />
             ) : null}
           </article>
-        ))}
+          );
+        })}
       </section>
     </div>
   );
