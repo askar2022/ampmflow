@@ -1,4 +1,4 @@
-import { formatTime, isFriday, schoolNow } from "./dates";
+import { formatTime, isFriday, schoolLocalTime, schoolNow } from "./dates";
 import type { DurationType, Role } from "./types";
 
 export const CHANGE_DEADLINE = "14:15";
@@ -15,7 +15,9 @@ function minutes(hhmm: string) {
 }
 
 export function schoolMinutes(date = schoolNow()) {
-  return date.getHours() * 60 + date.getMinutes();
+  const { hhmm } = schoolLocalTime(date);
+  const [hours, mins] = hhmm.split(":").map(Number);
+  return hours * 60 + mins;
 }
 
 export function changeDeadlineForToday() {

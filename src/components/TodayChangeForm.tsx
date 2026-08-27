@@ -39,10 +39,7 @@ export function TodayChangeForm({
   students: StudentOption[];
   busNumbers: string[];
   defaultStudentId?: string;
-  defaultCaller?:
-    | "PARENT_TO_SCHOOL"
-    | "PARENT_TO_COMPANY"
-    | "COMPANY_TO_SCHOOL";
+  defaultCaller?: "PARENT_TO_SCHOOL" | "SCHOOL_TO_COMPANY";
   canApplyToday?: boolean;
 }) {
   const [kind, setKind] = useState<RequestKind>("TODAY_CHANGE");
@@ -114,6 +111,10 @@ export function TodayChangeForm({
       </fieldset>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">Who asked?</legend>
+        <p className="text-sm text-muted">
+          Parents call the school only. Parents do not call the bus company.
+          Only the school can ask the bus company.
+        </p>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="radio"
@@ -127,19 +128,10 @@ export function TodayChangeForm({
           <input
             type="radio"
             name="caller"
-            value="PARENT_TO_COMPANY"
-            defaultChecked={defaultCaller === "PARENT_TO_COMPANY"}
+            value="SCHOOL_TO_COMPANY"
+            defaultChecked={defaultCaller === "SCHOOL_TO_COMPANY"}
           />
-          Parent called the bus company
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="radio"
-            name="caller"
-            value="COMPANY_TO_SCHOOL"
-            defaultChecked={defaultCaller === "COMPANY_TO_SCHOOL"}
-          />
-          Bus company asked the school
+          School asked the bus company
         </label>
       </fieldset>
       {kind === "TODAY_CHANGE" ? (
@@ -312,7 +304,7 @@ export function TodayChangeForm({
           className="mt-1 w-full rounded-xl border border-line px-3 py-2"
           placeholder={
             kind === "COMPANY_REPORT"
-              ? "What the parent asked the bus company to do"
+              ? "What the school is asking the bus company to do"
               : "Example: Friday — no daycare, ride home bus 5"
           }
         />

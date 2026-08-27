@@ -318,14 +318,18 @@ export async function lastOpsChangeEmail(schoolId: string) {
   });
 }
 
+export type OpsDigestResult =
+  | { ok: true; sent: number; recipients: string[]; alreadySent?: boolean }
+  | { ok: false; sent: number; recipients: string[]; error: string };
+
 export async function sendOpsChangeDigest(args: {
   schoolId: string;
   actorId: string;
   automatic?: boolean;
-}) {
+}): Promise<OpsDigestResult> {
   const dateKey = schoolLocalTime().dateKey;
   if (args.automatic && (await alreadySent(args.schoolId, dateKey))) {
-    return { ok: true, sent: 0, alreadySent: true as const, recipients: [] as string[] };
+    return { ok: true, sent: 0, alreadySent: true, recipients: [] };
   }
 
   const recipients = await loadSavedOpsEmails(args.schoolId);
@@ -446,11 +450,11 @@ export async function runScheduledOpsChangeDigests() {
     results.push({
       schoolId: school.id,
       sent: result.sent,
-      skipped: result.alreadySent
-        ? "already-sent"
-        : result.error
-          ? result.error
-          : undefined,
+      skipped: result.ok
+        ? result.alreadySent
+          ? "already-sent"
+          : undefined
+        : result.error,
     });
   }
 

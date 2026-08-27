@@ -6,7 +6,7 @@ import {
   unacknowledgedUrgent,
   uniqueStudentCount,
 } from "@/lib/operations";
-import { formatLongDate, schoolNow } from "@/lib/dates";
+import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
 import {
   deadlineClockLabel,
   snapshotClockLabel,
@@ -130,10 +130,7 @@ export default async function DashboardPage() {
             {events.slice(0, 8).map((event) => (
               <tr key={event.id} className="border-t border-line">
                 <td className="py-2 whitespace-nowrap">
-                  {event.createdAt.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                  {formatTime(event.createdAt)}
                 </td>
                 <td className="font-medium">
                   {event.student.firstName} {event.student.lastName}

@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { todayKey } from "./dates";
+import { formatTime, schoolDayBounds, todayKey } from "./dates";
 import { dashboardSummary, loadStudents } from "./transportation";
 import { planSummary } from "./format";
 import { startOfWeek, subDays, format } from "date-fns";
@@ -29,12 +29,13 @@ export async function collapseDuplicateEvents(
   day = todayKey(),
   endDay = day,
 ) {
+  const { start, end } = schoolDayBounds(day, endDay);
   const events = await prisma.changeEvent.findMany({
     where: {
       schoolId,
       createdAt: {
-        gte: new Date(`${day}T00:00:00`),
-        lte: new Date(`${endDay}T23:59:59`),
+        gte: start,
+        lte: end,
       },
     },
     orderBy: { createdAt: "asc" },
@@ -70,12 +71,13 @@ export async function loadChangeEvents(schoolId: string, day = todayKey()) {
     // Keep the list even if extras cannot be removed yet.
   }
   try {
+    const { start, end } = schoolDayBounds(day);
     return await prisma.changeEvent.findMany({
       where: {
         schoolId,
         createdAt: {
-          gte: new Date(`${day}T00:00:00`),
-          lte: new Date(`${day}T23:59:59`),
+          gte: start,
+          lte: end,
         },
       },
       include: {
@@ -199,7 +201,7 @@ export async function loadCheckIns(schoolId: string, busNumber?: string) {
 
 export async function loadCompanyApprovedBuses(schoolId: string) {
   const day = todayKey();
-  const start = new Date(`${day}T00:00:00`);
+  const { start } = schoolDayBounds(day);
   const requests = await prisma.changeRequest.findMany({
     where: {
       schoolId,
@@ -227,8 +229,8 @@ export async function loadChangeCheckIns(schoolId: string) {
       schoolId,
       studentId: { not: null },
       createdAt: {
-        gte: new Date(`${day}T00:00:00`),
-        lte: new Date(`${day}T23:59:59`),
+        gte: schoolDayBounds(day).start,
+        lte: schoolDayBounds(day).end,
       },
     },
     select: { studentId: true },
@@ -257,7 +259,7 @@ export async function leadershipStats(schoolId: string) {
     weekEvents = await prisma.changeEvent.findMany({
       where: {
         schoolId,
-        createdAt: { gte: new Date(`${weekStart}T00:00:00`) },
+        createdAt: { gte: schoolDayBounds(weekStart).start },
       },
       include: {
         student: { include: { classroom: { include: { teachers: true } } } },
@@ -279,7 +281,7 @@ export async function leadershipStats(schoolId: string) {
   const days = [0, 1, 2, 3, 4].map((offset) => {
     const key = format(subDays(new Date(), 4 - offset), "yyyy-MM-dd");
     const dayEvents = weekEvents.filter(
-      (event) => event.createdAt.toISOString().slice(0, 10) === key,
+      (event) => todayKey(event.createdAt) === key,
     );
     return {
       day: format(new Date(`${key}T12:00:00`), "EEEE"),
@@ -337,6 +339,40 @@ export async function leadershipStats(schoolId: string) {
       (s) => s.am.waitingForAssignment || s.pm.waitingForAssignment,
     ),
   };
+}
+
+export function activityDisplayRows<
+  T extends {
+    id: string;
+    studentId: string;
+    trip: string;
+    previousPlan: string;
+    newPlan: string;
+    createdAt: Date;
+    late: boolean;
+    urgent: boolean;
+  },
+>(events: T[]) {
+  const rows: Array<{ event: T; trips: string[] }> = [];
+  const index = new Map<string, number>();
+  for (const event of events) {
+    const key = [
+      event.studentId,
+      eventPlanLabel(event.previousPlan),
+      eventPlanLabel(event.newPlan),
+      todayKey(event.createdAt),
+      formatTime(event.createdAt),
+    ].join("|");
+    const existing = index.get(key);
+    if (existing !== undefined) {
+      const trips = rows[existing].trips;
+      if (!trips.includes(event.trip)) trips.push(event.trip);
+      continue;
+    }
+    index.set(key, rows.length);
+    rows.push({ event, trips: [event.trip] });
+  }
+  return rows;
 }
 
 export function eventPlanLabel(raw: string) {

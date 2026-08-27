@@ -9,6 +9,7 @@ import type { Destination, TransportType, Trip } from "@/lib/types";
 import { requestDedupeKey } from "@/lib/request-dedupe";
 
 function callerLabel(caller: string) {
+  if (caller === "SCHOOL_TO_COMPANY") return "School to bus company";
   if (caller === "PARENT_TO_COMPANY") return "Parent to bus company";
   if (caller === "COMPANY_TO_SCHOOL" || caller === "BUS_COMPANY") {
     return "Bus company to school";
@@ -61,17 +62,14 @@ function planType(changeTo: string): TransportType {
   return changeTo === "PARENT" ? "PARENT" : "BUS";
 }
 
-function requestSource(caller: string, role: string) {
-  if (
-    caller === "PARENT_TO_COMPANY" ||
-    caller === "COMPANY_TO_SCHOOL" ||
-    caller === "BUS_COMPANY"
-  ) {
-    return "BUS_COMPANY";
-  }
+function requestSource(_caller: string, role: string) {
   if (role === "FRONT_DESK") return "FRONT_DESK";
   if (role === "TEACHER") return "TEACHER";
   return "COORDINATOR";
+}
+
+function allowedCaller(caller: string) {
+  return caller === "PARENT_TO_SCHOOL" || caller === "SCHOOL_TO_COMPANY";
 }
 
 async function applyTodayPlan(args: {
@@ -252,9 +250,23 @@ export async function createChangeRequest(
 ): Promise<{ ok: boolean; error?: string }> {
   const user = await getSession();
   if (!user) return { ok: false, error: "Please sign in." };
+  if (user.role === "BUS_COMPANY") {
+    return {
+      ok: false,
+      error:
+        "The bus company cannot send requests to the school. Wait for the school to ask.",
+    };
+  }
 
   const kind = String(formData.get("kind") || "").trim();
   const caller = String(formData.get("caller") || "PARENT_TO_SCHOOL").trim();
+  if (!allowedCaller(caller)) {
+    return {
+      ok: false,
+      error:
+        "Parents call the school only. Only the school can ask the bus company.",
+    };
+  }
   const changeTo = String(formData.get("changeTo") || "PARENT").trim();
   const details = String(formData.get("details") || "").trim();
   const studentId = String(formData.get("studentId") || "") || null;

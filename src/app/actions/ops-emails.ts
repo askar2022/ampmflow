@@ -35,7 +35,12 @@ export async function removeChangeListEmail(email: string) {
 export async function emailOpsChangeListNow() {
   const user = await getSession();
   if (!user || !isSchoolOperator(user.role)) {
-    return { ok: false, error: "Only a bus coordinator or admin can send this list." };
+    return {
+      ok: false as const,
+      sent: 0,
+      recipients: [] as string[],
+      error: "Only a bus coordinator or admin can send this list.",
+    };
   }
   const result = await sendOpsChangeDigest({
     schoolId: user.schoolId,

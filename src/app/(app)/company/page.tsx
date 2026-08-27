@@ -54,31 +54,33 @@ export default async function CompanyPage() {
         </h1>
         <p className="mt-2 max-w-2xl text-muted">
           {limited
-            ? "Record a parent call to the company, or send a today-only change to the school. Proposed bus numbers are not final until Admin or the Bus Coordinator approves them."
-            : "Record a parent or company request. That save does not send email. Print the bus-company report at the bottom if you need a copy."}
+            ? "Parents call the school, not the bus company. The school asks you for a route. Propose a bus number here. It is not final until Admin or the Bus Coordinator approves it."
+            : "Parents call the school only. Use this page when the school needs to ask the bus company for a route. That save does not send email."}
         </p>
       </div>
 
-      <section className="rounded-2xl border border-line bg-card p-5">
-        <h2 className="font-serif text-2xl">Change request</h2>
-        <p className="mt-1 text-sm text-muted">
-          Today’s ride can be applied by the school. Moving / new address,
-          daycare change, and parent pickup to bus are reported to the bus
-          company. The school does not assign that new bus.
-        </p>
-        <TodayChangeForm
-          defaultCaller={limited ? "PARENT_TO_COMPANY" : "COMPANY_TO_SCHOOL"}
-          busNumbers={busNumbers}
-          canApplyToday={!limited}
-          students={students.map((student) => ({
-            id: student.id,
-            firstName: student.firstName,
-            lastName: student.lastName,
-            studentId: student.studentId,
-            grade: student.grade,
-          }))}
-        />
-      </section>
+      {!limited ? (
+        <section className="rounded-2xl border border-line bg-card p-5">
+          <h2 className="font-serif text-2xl">Ask the bus company</h2>
+          <p className="mt-1 text-sm text-muted">
+            Only the school can start this. Moving / new address, daycare
+            change, and parent pickup to bus wait for the company to assign a
+            bus.
+          </p>
+          <TodayChangeForm
+            defaultCaller="SCHOOL_TO_COMPANY"
+            busNumbers={busNumbers}
+            canApplyToday
+            students={students.map((student) => ({
+              id: student.id,
+              firstName: student.firstName,
+              lastName: student.lastName,
+              studentId: student.studentId,
+              grade: student.grade,
+            }))}
+          />
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-line bg-card p-5">
         <h2 className="font-serif text-2xl">Students waiting for a bus</h2>

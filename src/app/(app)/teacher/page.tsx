@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { loadChangeEvents } from "@/lib/operations";
 import { eventPlanLabel } from "@/lib/operations";
+import { formatTime } from "@/lib/dates";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { TeacherBoard } from "./TeacherBoard";
 
@@ -33,10 +34,7 @@ export default async function TeacherPage() {
     .map((event) => ({
       id: event.id,
       studentName: `${event.student.firstName} ${event.student.lastName}`,
-      at: event.createdAt.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      }),
+      at: formatTime(event.createdAt),
       by: event.createdBy.name,
       from: eventPlanLabel(event.previousPlan),
       to: eventPlanLabel(event.newPlan),

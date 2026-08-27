@@ -94,7 +94,6 @@ export function canCreateRequest(role: Role) {
     role === "ADMINISTRATOR" ||
     role === "COORDINATOR" ||
     role === "FRONT_DESK" ||
-    role === "BUS_COMPANY" ||
     role === "TEACHER"
   );
 }

@@ -103,8 +103,11 @@ export function OpsChangeEmails({
                   setMessage(result.error || "Could not send.");
                   return;
                 }
+                const sentTo = result.recipients.join(", ");
                 setMessage(
-                  `Sent from dismissal@ampmflow.com to ${result.recipients.join(", ")}.`,
+                  sentTo
+                    ? `Sent from dismissal@ampmflow.com to ${sentTo}.`
+                    : "Sent.",
                 );
               })
             }

@@ -53,10 +53,13 @@ export default async function PrintPage({
   return (
     <div className="space-y-6">
       <div className="no-print">
-        <h1 className="font-serif text-4xl">Reports</h1>
+        <h1 className="font-serif text-4xl">
+          {selected === "teacher" && group ? `Class list — ${group}` : "Reports"}
+        </h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Choose a list, then print it or download Excel. The date and time
-          are on every copy so staff do not use an older one.
+          {selected === "teacher" && group
+            ? "This is one class only. Email this teacher here, or go back to Teachers to email everyone."
+            : "Choose a list, then print it or download Excel. The date and time are on every copy so staff do not use an older one."}
         </p>
         {lastEmail && selected === "teacher" ? (
           <p className="mt-2 text-sm text-muted">

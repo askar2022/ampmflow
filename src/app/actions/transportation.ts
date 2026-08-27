@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notifyCoordinators, writeAudit } from "@/lib/audit";
-import { todayKey } from "@/lib/dates";
+import { formatTime, todayKey } from "@/lib/dates";
 import { loadStudent, resolveTrip, addressHasNoRoute } from "@/lib/transportation";
 import { canRecordChange, isAfterDeadline, isAfterSnapshot } from "@/lib/policy";
 import { planSummary } from "@/lib/format";
@@ -257,7 +257,7 @@ export async function updateTransportation(
             title: urgent
               ? "Urgent last-minute transportation change"
               : "Transportation change",
-            body: `${loaded.effective.fullName}: ${planSummary(oldPlan, trip)} → ${newPlan ? planSummary(newPlan, trip) : "updated"} by ${user.name} at ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.`,
+            body: `${loaded.effective.fullName}: ${planSummary(oldPlan, trip)} → ${newPlan ? planSummary(newPlan, trip) : "updated"} by ${user.name} at ${formatTime(new Date())}.`,
           },
         });
       }

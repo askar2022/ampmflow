@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { emailTeacherLists } from "@/app/actions/email";
+import { EmailTeacherButton } from "@/components/EmailTeacherButton";
 
 const kinds = [
   ["teacher", "Teachers"],
@@ -30,17 +29,20 @@ export function PrintActions({
 }) {
   const router = useRouter();
   const params = useSearchParams();
-  const [pending, start] = useTransition();
-  const [message, setMessage] = useState("");
   const selected =
     params.get("kind") === "missing"
       ? "company"
       : params.get("kind") || "teacher";
-  const oneClass = selected === "teacher" && Boolean(group);
+  const groupFromUrl = params.get("group") || group || "";
+  const oneClass = selected === "teacher" && Boolean(groupFromUrl);
   const visible = isTeacher ? kinds.filter(([kind]) => kind === "teacher") : kinds;
   const exportHref = oneClass
-    ? `/print/export?kind=${selected}&group=${encodeURIComponent(group)}`
+    ? `/print/export?kind=${selected}&group=${encodeURIComponent(groupFromUrl)}`
     : `/print/export?kind=${selected}`;
+  const thisTeacher =
+    ready.find((row) => row.name === groupFromUrl) ||
+    (ready.length === 1 ? ready[0] : null);
+  const thisMissing = missing.find((row) => row.name === groupFromUrl);
 
   return (
     <div className="mt-5 space-y-4">
@@ -63,15 +65,42 @@ export function PrintActions({
           ))}
         </div>
       </div>
-      {!isTeacher && selected === "teacher" ? (
+
+      {oneClass ? (
         <div className="rounded-2xl border border-line bg-card p-5 text-sm">
-          <p className="font-semibold text-navy">
-            {oneClass ? "This class list" : "Teacher emails"}
-          </p>
+          <p className="font-semibold text-navy">Email this teacher only</p>
           <p className="mt-1 text-muted">
-            {oneClass
-              ? `This page is only for ${group}. The button below emails this teacher, not the whole school.`
-              : "Save emails once on Teachers. After that, Vercel sends the list every school day by itself. Use Email all teachers only when you want to send every class now."}
+            This page is {groupFromUrl}. It does not email the other teachers.
+            To email everyone at once, open Teachers or All class lists.
+          </p>
+          {thisTeacher ? (
+            <p className="mt-3">
+              {thisTeacher.name} → {thisTeacher.email}
+            </p>
+          ) : (
+            <p className="mt-3 text-red">
+              {thisMissing
+                ? `${thisMissing.name} has no email yet. Add it on Teachers first.`
+                : "This teacher has no email yet. Add it on Teachers first."}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Link href="/teachers" className="font-semibold text-navy">
+              Back to teachers
+            </Link>
+            <Link href="/print?kind=teacher" className="font-semibold text-navy">
+              Email all teachers
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {!isTeacher && selected === "teacher" && !oneClass ? (
+        <div className="rounded-2xl border border-line bg-card p-5 text-sm">
+          <p className="font-semibold text-navy">Email all teachers</p>
+          <p className="mt-1 text-muted">
+            This sends every class list at once. To email one teacher, open
+            that class on Teachers.
           </p>
           {ready.length ? (
             <ul className="mt-3 space-y-1">
@@ -83,9 +112,7 @@ export function PrintActions({
             </ul>
           ) : (
             <p className="mt-3 text-red">
-              {oneClass
-                ? "This teacher has no email yet. Add it on Teachers first."
-                : "No teacher emails saved yet. The daily send and this button will wait until you add them."}
+              No teacher emails saved yet. Add them on Teachers first.
             </p>
           )}
           {missing.length ? (
@@ -94,19 +121,13 @@ export function PrintActions({
               {missing.map((row) => row.name).join(", ")}.
             </p>
           ) : null}
-          <div className="mt-3 flex flex-wrap gap-4">
-            <Link href="/teachers" className="font-semibold text-navy">
-              {oneClass ? "Back to teachers" : "Add teacher emails"}
-            </Link>
-            {oneClass ? (
-              <Link href="/print?kind=teacher" className="font-semibold text-navy">
-                See all class lists
-              </Link>
-            ) : null}
-          </div>
+          <Link href="/teachers" className="mt-3 inline-block font-semibold text-navy">
+            Add teacher emails
+          </Link>
         </div>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+
+      <div className="flex flex-wrap items-start gap-2">
         <button
           type="button"
           onClick={() => window.print()}
@@ -120,43 +141,24 @@ export function PrintActions({
         >
           Download Excel
         </a>
-        {canEmail && selected === "teacher" ? (
-          <button
-            type="button"
-            disabled={pending || ready.length === 0}
-            onClick={() =>
-              start(async () => {
-                const result = await emailTeacherLists(oneClass ? group : undefined);
-                if (!result.ok) {
-                  setMessage(result.error || "Could not send.");
-                  return;
-                }
-                const sentTo = result.recipients
-                  ?.map((row) => `${row.name} (${row.email})`)
-                  .join(", ");
-                const stillNeed = result.missing?.map((row) => row.name).join(", ");
-                setMessage(
-                  oneClass
-                    ? `Sent this class list to ${sentTo || "no one"}.`
-                    : `Sent from dismissal@ampmflow.com to ${sentTo || "no one"}.${
-                        stillNeed ? ` Still need emails for ${stillNeed}.` : ""
-                      }`,
-                );
-              })
-            }
-            className="rounded-xl border border-line bg-card px-5 py-2.5 text-sm font-semibold disabled:opacity-50"
-          >
-            {pending
-              ? "Emailing…"
-              : oneClass
-                ? "Email this teacher"
-                : "Email all teachers"}
-          </button>
+        {canEmail && selected === "teacher" && oneClass ? (
+          <div className="min-w-[220px]">
+            <EmailTeacherButton
+              group={groupFromUrl}
+              label="Email this teacher only"
+              disabled={!thisTeacher}
+            />
+          </div>
+        ) : null}
+        {canEmail && selected === "teacher" && !oneClass ? (
+          <div className="min-w-[220px]">
+            <EmailTeacherButton
+              label="Email all teachers"
+              disabled={ready.length === 0}
+            />
+          </div>
         ) : null}
       </div>
-      {message && selected === "teacher" ? (
-        <p className="text-sm text-muted">{message}</p>
-      ) : null}
     </div>
   );
 }

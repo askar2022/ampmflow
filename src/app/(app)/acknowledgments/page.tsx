@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { eventPlanLabel, loadChangeEvents } from "@/lib/operations";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, formatTime } from "@/lib/dates";
 
 export default async function AcknowledgmentsPage() {
   const session = await getSession();
@@ -40,10 +40,7 @@ export default async function AcknowledgmentsPage() {
               </div>
               <p className="mt-1 text-sm">
                 Changed at{" "}
-                {event.createdAt.toLocaleTimeString("en-US", {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}{" "}
+                {formatTime(event.createdAt)}{" "}
                 by {event.createdBy.name}: {eventPlanLabel(event.previousPlan)} →{" "}
                 {eventPlanLabel(event.newPlan)}
               </p>

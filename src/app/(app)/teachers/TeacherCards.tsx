@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { saveTeacherProfile } from "@/app/actions/teachers";
+import { EmailTeacherButton } from "@/components/EmailTeacherButton";
 
 export type TeacherCardData = {
   id: string;
@@ -12,6 +13,7 @@ export type TeacherCardData = {
   room: string;
   studentCount: number;
   rosterHref: string;
+  groupName: string;
 };
 
 function initials(name: string) {
@@ -24,9 +26,11 @@ function initials(name: string) {
 export function TeacherCards({
   teachers,
   canEdit,
+  canEmail = false,
 }: {
   teachers: TeacherCardData[];
   canEdit: boolean;
+  canEmail?: boolean;
 }) {
   const [editing, setEditing] = useState<TeacherCardData | null>(null);
 
@@ -89,6 +93,13 @@ export function TeacherCards({
                 >
                   Add Email
                 </button>
+              ) : null}
+              {canEmail ? (
+                <EmailTeacherButton
+                  group={teacher.groupName}
+                  label={`Email ${teacher.name} only`}
+                  disabled={!teacher.email}
+                />
               ) : null}
               <Link
                 href={teacher.rosterHref}
