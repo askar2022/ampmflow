@@ -26,7 +26,7 @@ function SubmitButton({
 }
 
 type RequestKind = "TODAY_CHANGE" | "COMPANY_REPORT";
-type ChangeTo = "PARENT" | "BUS_TO_BUS";
+type ChangeTo = "PARENT" | "BUS_TO_BUS" | "PARENT_TO_BUS";
 type CompanyNeed = "MOVE" | "DAYCARE" | "PICKUP_TO_BUS";
 
 export function TodayChangeForm({
@@ -91,8 +91,9 @@ export function TodayChangeForm({
             className="mt-1"
           />
           <span>
-            <strong>Today’s ride</strong> — bus to parent pickup, or bus to a
-            different bus for today. The school can apply this.
+            <strong>Today’s ride</strong> — bus to parent pickup, parent
+            pickup to bus, or bus to a different bus for today. The school
+            can apply this.
           </span>
         </label>
         <label className="flex items-start gap-2 text-sm">
@@ -152,6 +153,16 @@ export function TodayChangeForm({
               <input
                 type="radio"
                 name="changeTo"
+                value="PARENT_TO_BUS"
+                checked={changeTo === "PARENT_TO_BUS"}
+                onChange={() => setChangeTo("PARENT_TO_BUS")}
+              />
+              Parent pickup → bus
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="changeTo"
                 value="BUS_TO_BUS"
                 checked={changeTo === "BUS_TO_BUS"}
                 onChange={() => setChangeTo("BUS_TO_BUS")}
@@ -166,26 +177,28 @@ export function TodayChangeForm({
               <option value="AM">AM</option>
             </select>
           </label>
-          {changeTo === "BUS_TO_BUS" ? (
+          {changeTo === "BUS_TO_BUS" || changeTo === "PARENT_TO_BUS" ? (
             <>
+              {changeTo === "BUS_TO_BUS" ? (
+                <label className="block text-sm font-medium">
+                  Current bus
+                  <input
+                    name="fromBusNumber"
+                    list="from-bus-numbers"
+                    className="mt-1 w-full rounded-xl border border-line px-3 py-2"
+                    placeholder="e.g. 4"
+                  />
+                  <datalist id="from-bus-numbers">
+                    {busNumbers.map((number) => (
+                      <option key={number} value={number}>
+                        Bus {number}
+                      </option>
+                    ))}
+                  </datalist>
+                </label>
+              ) : null}
               <label className="block text-sm font-medium">
-                Current bus
-                <input
-                  name="fromBusNumber"
-                  list="from-bus-numbers"
-                  className="mt-1 w-full rounded-xl border border-line px-3 py-2"
-                  placeholder="e.g. 4"
-                />
-                <datalist id="from-bus-numbers">
-                  {busNumbers.map((number) => (
-                    <option key={number} value={number}>
-                      Bus {number}
-                    </option>
-                  ))}
-                </datalist>
-              </label>
-              <label className="block text-sm font-medium">
-                New bus today
+                Bus today
                 <input
                   name="busNumber"
                   list="bus-numbers"

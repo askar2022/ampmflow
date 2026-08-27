@@ -41,7 +41,8 @@ export default async function RequestsPage({
       <section className="rounded-2xl border border-line bg-card p-6 md:p-8">
         <h1 className="font-serif text-4xl">Change requests</h1>
         <p className="mt-2 max-w-3xl text-sm text-muted">
-          Today’s ride: bus to parent pickup, or bus to a different bus. Report
+          Today’s ride: bus to parent pickup, parent pickup to bus, or bus to a
+          different bus. Report
           to the bus company: moving / new address, daycare, or parent pickup to
           bus. That student goes to Waiting for Route.
         </p>

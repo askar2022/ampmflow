@@ -51,11 +51,10 @@ function requestTitle(
     if (toBus) return `${who}: bus → bus ${toBus}${dest} today`;
     return `${who}: bus → bus today`;
   }
-  const what =
-    changeTo === "BUS"
-      ? `parent pickup → bus${toBus ? ` ${toBus}` : ""}${dest} today`
-      : "bus → parent pickup today";
-  return `${who}: ${what}`;
+  if (changeTo === "PARENT_TO_BUS" || changeTo === "BUS") {
+    return `${who}: parent pickup → bus${toBus ? ` ${toBus}` : ""}${dest} today`;
+  }
+  return `${who}: bus → parent pickup today`;
 }
 
 function planType(changeTo: string): TransportType {
