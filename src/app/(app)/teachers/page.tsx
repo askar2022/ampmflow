@@ -52,27 +52,26 @@ export default async function TeachersPage() {
           return (
             <section
               key={teacher.id}
-              className="rounded-2xl border border-line bg-card p-5"
+              className="rounded-2xl border border-line bg-card p-6"
             >
-              <h2 className="font-serif text-2xl">{teacher.name}</h2>
-              <p className="mt-1 text-sm text-muted">
+              <h2 className="font-serif text-3xl font-bold leading-tight text-navy sm:text-4xl">
                 {teacher.classroom.name} · {counts.get(groupName) ?? 0} students
-              </p>
+              </h2>
+              <p className="mt-2 text-lg font-semibold">{teacher.name}</p>
               {email ? (
-                <p className="mt-2 text-sm">List goes to {email}</p>
+                <p className="mt-1 text-sm text-muted">List goes to {email}</p>
               ) : (
-                <p className="mt-2 text-sm font-medium text-red">
+                <p className="mt-1 text-sm font-medium text-red">
                   No email yet — this class will not get the daily list.
                 </p>
               )}
-              {canEdit ? (
+              {canEdit && !email ? (
                 <form action={updateTeacherEmail} className="mt-4 flex flex-col gap-2 sm:flex-row">
                   <input type="hidden" name="teacherId" value={teacher.id} />
                   <input
                     name="email"
                     type="email"
                     required
-                    defaultValue={email}
                     placeholder="teacher@school.org"
                     className="w-full rounded-xl border border-line px-3 py-2"
                   />
@@ -83,7 +82,7 @@ export default async function TeachersPage() {
               ) : null}
               <Link
                 href={`/print?kind=teacher&group=${encodeURIComponent(groupName)}`}
-                className="mt-3 inline-block text-sm font-semibold text-navy"
+                className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-navy px-6 py-4 text-xl font-bold text-white"
               >
                 Open class list
               </Link>
