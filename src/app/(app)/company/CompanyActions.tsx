@@ -16,6 +16,7 @@ export function CompanyActions({ preview }: { preview: string }) {
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button
+          type="button"
           disabled={pending}
           onClick={() =>
             start(async () => {
@@ -27,7 +28,7 @@ export function CompanyActions({ preview }: { preview: string }) {
               );
             })
           }
-          className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white"
+          className="rounded-xl border border-line bg-white px-4 py-2 text-sm font-semibold"
         >
           {pending ? "Sending…" : "Email change report"}
         </button>

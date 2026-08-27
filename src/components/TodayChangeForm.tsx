@@ -1,8 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { createChangeRequest } from "@/app/actions/requests";
 import { StudentPicker, type StudentOption } from "@/components/StudentPicker";
+
+function SubmitButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="relative z-10 rounded-xl bg-navy px-4 py-2 font-semibold text-white disabled:opacity-70"
+    >
+      {pending ? "Saving…" : label}
+    </button>
+  );
+}
 
 type RequestKind = "TODAY_CHANGE" | "COMPANY_REPORT";
 type ChangeTo = "PARENT" | "BUS_TO_BUS";
@@ -27,6 +41,7 @@ export function TodayChangeForm({
   const [kind, setKind] = useState<RequestKind>("TODAY_CHANGE");
   const [changeTo, setChangeTo] = useState<ChangeTo>("PARENT");
   const [companyNeed, setCompanyNeed] = useState<CompanyNeed>("MOVE");
+  const [error, setError] = useState("");
   const submitLabel =
     kind === "COMPANY_REPORT"
       ? "Report to bus company"
@@ -35,12 +50,25 @@ export function TodayChangeForm({
         : "Submit for approval";
 
   return (
-    <form action={createChangeRequest} className="mt-4 space-y-3">
+    <form
+      action={async (formData) => {
+        setError("");
+        if (!String(formData.get("studentId") || "").trim()) {
+          setError("Click a student in the list first.");
+          return;
+        }
+        const result = await createChangeRequest(formData);
+        if (result && !result.ok) {
+          setError(result.error || "Could not save this request.");
+        }
+      }}
+      className="relative z-10 mt-4 space-y-3"
+    >
       <input type="hidden" name="kind" value={kind} />
-      <label className="block text-sm font-medium">
+      <div className="text-sm font-medium">
         Student
         <StudentPicker defaultId={defaultStudentId} students={students} />
-      </label>
+      </div>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">What kind of request?</legend>
         <label className="flex items-start gap-2 text-sm">
@@ -274,9 +302,11 @@ export function TodayChangeForm({
           }
         />
       </label>
-      <button className="rounded-xl bg-navy px-4 py-2 font-semibold text-white">
-        {submitLabel}
-      </button>
+      {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
+      <p className="text-sm text-muted">
+        This only saves the request. It does not open Outlook or send email.
+      </p>
+      <SubmitButton label={submitLabel} />
     </form>
   );
 }

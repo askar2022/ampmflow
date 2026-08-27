@@ -222,9 +222,11 @@ async function applyCompanyReport(args: {
   });
 }
 
-export async function createChangeRequest(formData: FormData): Promise<void> {
+export async function createChangeRequest(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
   const user = await getSession();
-  if (!user) return;
+  if (!user) return { ok: false, error: "Please sign in." };
 
   const kind = String(formData.get("kind") || "").trim();
   const caller = String(formData.get("caller") || "PARENT_TO_SCHOOL").trim();
@@ -255,7 +257,9 @@ export async function createChangeRequest(formData: FormData): Promise<void> {
     );
   const source = requestSource(caller, user.role);
 
-  if ((isTodayChange || isCompanyReport) && !studentId) return;
+  if ((isTodayChange || isCompanyReport) && !studentId) {
+    return { ok: false, error: "Click a student in the list first." };
+  }
 
   const request = await prisma.changeRequest.create({
     data: {
@@ -312,26 +316,30 @@ export async function createChangeRequest(formData: FormData): Promise<void> {
   const staffCanApply =
     user.role === "COORDINATOR" || user.role === "ADMINISTRATOR";
 
-  if (isTodayChange && staffCanApply && studentId) {
-    await applyTodayPlan({
-      studentId,
-      trip,
-      changeTo: planType(changeTo),
-      busNumber,
-      destination: destination === "DAYCARE" ? "DAYCARE" : "HOME",
-      reason: details || title,
-    });
-  }
+  try {
+    if (isTodayChange && staffCanApply && studentId) {
+      await applyTodayPlan({
+        studentId,
+        trip,
+        changeTo: planType(changeTo),
+        busNumber,
+        destination: destination === "DAYCARE" ? "DAYCARE" : "HOME",
+        reason: details || title,
+      });
+    }
 
-  if (isCompanyReport && staffCanApply && studentId) {
-    await applyCompanyReport({
-      studentId,
-      companyNeed,
-      daycareName,
-      daycareAddress,
-      homeAddress,
-      reason: details || title,
-    });
+    if (isCompanyReport && staffCanApply && studentId) {
+      await applyCompanyReport({
+        studentId,
+        companyNeed,
+        daycareName,
+        daycareAddress,
+        homeAddress,
+        reason: details || title,
+      });
+    }
+  } catch {
+    // The request is already saved. Do not block the staff member.
   }
 
   await notifyCoordinators(
@@ -348,6 +356,7 @@ export async function createChangeRequest(formData: FormData): Promise<void> {
   revalidatePath("/changes");
   revalidatePath("/company");
   revalidatePath("/waiting");
+  return { ok: true };
 }
 
 export async function reviewRequest(
