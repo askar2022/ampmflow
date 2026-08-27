@@ -10,7 +10,6 @@ const kinds = [
   ["bus", "Buses"],
   ["pickup", "Parent pickup"],
   ["changes", "Today’s changes"],
-  ["missing", "Waiting for a bus"],
   ["company", "Bus company"],
   ["checkin", "Bus check-in"],
 ];
@@ -20,7 +19,10 @@ export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
   const params = useSearchParams();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
-  const selected = params.get("kind") || "teacher";
+  const selected =
+    params.get("kind") === "missing"
+      ? "company"
+      : params.get("kind") || "teacher";
   const visible = isTeacher ? kinds.filter(([kind]) => kind === "teacher") : kinds;
 
   return (

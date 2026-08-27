@@ -39,7 +39,7 @@ export default async function PrintPage({
   }
 
   const header = stamp();
-  const selected = (kind || "teacher") as ReportKind;
+  const selected = ((kind === "missing" ? "company" : kind) || "teacher") as ReportKind;
   const companyApproved = await loadCompanyApprovedBuses(session.schoolId);
   const checkIns = await loadCheckInSummary(session.schoolId);
 

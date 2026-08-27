@@ -44,6 +44,43 @@ function sheet(wb: XLSX.WorkBook, name: string, rows: Record<string, unknown>[])
 export function checkInWorkbook(groups: CheckInBusSummary[]) {
   const header = stamp();
   const wb = XLSX.utils.book_new();
+  const students = groups.flatMap((group) => {
+    const bus =
+      group.busNumber === "No bus yet" ? "Waiting for a bus" : `Bus ${group.busNumber}`;
+    return [
+      ...group.onBusNames.map((name) => ({
+        Bus: bus,
+        Student: name,
+        Status: "Rode",
+        Generated: header.generated,
+      })),
+      ...group.missingNames.map((name) => ({
+        Bus: bus,
+        Student: name,
+        Status: "Missing",
+        Generated: header.generated,
+      })),
+      ...group.unassignedNames.map((name) => ({
+        Bus: bus,
+        Student: name,
+        Status: "Not assigned",
+        Generated: header.generated,
+      })),
+      ...group.leftSchoolNames.map((name) => ({
+        Bus: bus,
+        Student: name,
+        Status: "Left school",
+        Generated: header.generated,
+      })),
+      ...group.notMarkedNames.map((name) => ({
+        Bus: bus,
+        Student: name,
+        Status: "Not selected yet",
+        Generated: header.generated,
+      })),
+    ];
+  });
+  sheet(wb, "Students", students);
   sheet(
     wb,
     "By bus",
@@ -52,42 +89,18 @@ export function checkInWorkbook(groups: CheckInBusSummary[]) {
         group.busNumber === "No bus yet" ? "Waiting for a bus" : `Bus ${group.busNumber}`,
       "On list": group.onList,
       Rode: group.onBus,
+      "Who rode": group.onBusNames.join(", "),
       Missing: group.missing,
+      "Who is missing": group.missingNames.join(", "),
       "Not assigned": group.unassigned,
+      "Who is not assigned": group.unassignedNames.join(", "),
       "Left school": group.leftSchool,
+      "Who left school": group.leftSchoolNames.join(", "),
       "Not selected yet": group.notMarked,
+      "Who is not selected yet": group.notMarkedNames.join(", "),
       Generated: header.generated,
     })),
   );
-
-  const students = groups.flatMap((group) => {
-    const bus =
-      group.busNumber === "No bus yet" ? "Waiting for a bus" : `Bus ${group.busNumber}`;
-    return [
-      ...group.onBusNames.map((name) => ({ Bus: bus, Student: name, Status: "Rode" })),
-      ...group.missingNames.map((name) => ({
-        Bus: bus,
-        Student: name,
-        Status: "Missing",
-      })),
-      ...group.unassignedNames.map((name) => ({
-        Bus: bus,
-        Student: name,
-        Status: "Not assigned",
-      })),
-      ...group.leftSchoolNames.map((name) => ({
-        Bus: bus,
-        Student: name,
-        Status: "Left school",
-      })),
-      ...group.notMarkedNames.map((name) => ({
-        Bus: bus,
-        Student: name,
-        Status: "Not selected yet",
-      })),
-    ];
-  });
-  sheet(wb, "Students", students);
   return wb;
 }
 
