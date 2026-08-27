@@ -46,10 +46,10 @@ export default async function PrintPage({
   return (
     <div className="space-y-6">
       <div className="no-print">
-        <h1 className="font-serif text-4xl">Print / Email</h1>
-        <p className="mt-1 text-muted">
-          Every list includes the date, generation time, and version so staff do
-          not use an older copy. Each report has its own Download Excel button.
+        <h1 className="font-serif text-4xl">Reports</h1>
+        <p className="mt-2 max-w-2xl text-muted">
+          Choose a list, then print it or download Excel. The date and time are
+          on every copy so staff do not use an older one.
         </p>
         <Suspense>
           <PrintActions isTeacher={session.role === "TEACHER"} />
