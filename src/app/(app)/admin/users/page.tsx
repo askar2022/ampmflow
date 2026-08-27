@@ -5,6 +5,7 @@ import { approveUser, createUser, rejectUser, toggleUser } from "@/app/actions/u
 import { updateSchoolIdentity } from "@/app/actions/school";
 import { roleLabel } from "@/lib/format";
 import { PENDING_ROLE } from "@/lib/types";
+import { AddUserFields } from "./AddUserFields";
 
 export default async function UsersPage() {
   const session = await getSession();
@@ -16,6 +17,7 @@ export default async function UsersPage() {
   });
   const teachers = await prisma.teacher.findMany({
     where: { schoolId: session.schoolId },
+    include: { classroom: true },
     orderBy: { name: "asc" },
   });
   const pending = users.filter((user) => user.role === PENDING_ROLE);
@@ -169,29 +171,20 @@ export default async function UsersPage() {
       </section>
       <form action={createUser} className="rounded-2xl border border-line bg-card p-6">
         <h2 className="font-serif text-2xl">Add user</h2>
+        <p className="mt-1 text-sm text-muted">
+          For Bus Coordinator, Reception, Admin, or Bus Company, leave class
+          blank. Classrooms already exist from the student import. Only a
+          Teacher login needs to be linked to a class.
+        </p>
         <div className="mt-4 space-y-3">
           <input name="name" required placeholder="Name" className="w-full rounded-xl border border-line px-3 py-2" />
           <input name="email" type="email" required placeholder="Email" className="w-full rounded-xl border border-line px-3 py-2" />
-          <select name="role" className="w-full rounded-xl border border-line px-3 py-2">
-            <option value="TEACHER">Teacher</option>
-            <option value="FRONT_DESK">Reception</option>
-            <option value="COORDINATOR">Bus Coordinator</option>
-            <option value="ADMINISTRATOR">Admin</option>
-            <option value="BUS_COMPANY">Bus Company</option>
-            <option value="BUS_ASSISTANT">Bus Assistant</option>
-          </select>
-          <select name="teacherId" className="w-full rounded-xl border border-line px-3 py-2">
-            <option value="">Classroom (teachers only)</option>
-            {teachers.map((teacher) => (
-              <option key={teacher.id} value={teacher.id}>
-                {teacher.name}
-              </option>
-            ))}
-          </select>
-          <input
-            name="assignedBus"
-            placeholder="Bus number (bus assistants only)"
-            className="w-full rounded-xl border border-line px-3 py-2"
+          <AddUserFields
+            teachers={teachers.map((teacher) => ({
+              id: teacher.id,
+              name: teacher.name,
+              classroom: teacher.classroom?.name ?? "",
+            }))}
           />
           <input name="password" type="password" required placeholder="Temporary password" className="w-full rounded-xl border border-line px-3 py-2" />
           <button className="rounded-xl bg-navy px-4 py-2 font-semibold text-white">
