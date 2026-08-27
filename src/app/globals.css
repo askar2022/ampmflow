@@ -44,7 +44,7 @@ body {
   color: var(--ink);
 }
 
-a {
+a:not([class*="text-"]) {
   color: inherit;
 }
 

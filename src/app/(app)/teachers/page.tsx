@@ -7,7 +7,7 @@ import {
   clearPlaceholderTeacherEmails,
   usableTeacherEmail,
 } from "@/lib/teacher-snapshot";
-import { updateTeacherEmail } from "@/app/actions/teachers";
+import { updateTeacherClass, updateTeacherEmail } from "@/app/actions/teachers";
 
 export default async function TeachersPage() {
   const session = await getSession();
@@ -33,10 +33,10 @@ export default async function TeachersPage() {
       <div>
         <h1 className="font-serif text-4xl">Teachers and classes</h1>
         <p className="mt-1 max-w-2xl text-muted">
-          Save each teacher’s email here one time. After that, Vercel sends
-          their class list every school day at 2:45, or 11:45 on Friday, with
-          no click. You can also send it anytime from Reports. Mail comes from
-          dismissal@ampmflow.com.
+          Teacher and class names first come from your student upload. You can
+          change them here. Save each email one time. After that, Vercel sends
+          the class list every school day at 2:45, or 11:45 on Friday. Mail
+          comes from dismissal@ampmflow.com.
         </p>
         <a
           href="/print/export?kind=teacher"
@@ -52,12 +52,52 @@ export default async function TeachersPage() {
           return (
             <section
               key={teacher.id}
-              className="rounded-2xl border border-line bg-card p-6"
+              className="rounded-2xl border border-line bg-card p-5"
             >
-              <h2 className="font-serif text-3xl font-bold leading-tight text-navy sm:text-4xl">
-                {teacher.classroom.name} · {counts.get(groupName) ?? 0} students
-              </h2>
-              <p className="mt-2 text-lg font-semibold">{teacher.name}</p>
+              {canEdit ? (
+                <form action={updateTeacherClass} className="space-y-3">
+                  <input type="hidden" name="teacherId" value={teacher.id} />
+                  <label className="block">
+                    <span className="sr-only">Teacher name</span>
+                    <input
+                      name="name"
+                      required
+                      defaultValue={teacher.name}
+                      className="w-full rounded-xl border border-line bg-paper px-3 py-2 font-serif text-3xl font-bold text-navy sm:text-4xl"
+                    />
+                  </label>
+                  <p className="font-serif text-3xl font-bold text-navy sm:text-4xl">
+                    {counts.get(groupName) ?? 0} students
+                  </p>
+                  <label className="block">
+                    <span className="sr-only">Class name</span>
+                    <input
+                      name="classroomName"
+                      required
+                      defaultValue={teacher.classroom.name}
+                      className="w-full rounded-xl border border-line px-3 py-2 text-lg font-semibold"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="rounded-xl border border-line bg-paper px-4 py-2 text-sm font-semibold"
+                  >
+                    Save name and class
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <h2 className="font-serif text-3xl font-bold leading-tight text-navy sm:text-4xl">
+                    {teacher.name}
+                  </h2>
+                  <p className="mt-2 font-serif text-3xl font-bold text-navy sm:text-4xl">
+                    {counts.get(groupName) ?? 0} students
+                  </p>
+                  <p className="mt-1 text-base font-semibold text-muted">
+                    {teacher.classroom.name}
+                  </p>
+                </>
+              )}
               {email ? (
                 <p className="mt-1 text-sm text-muted">List goes to {email}</p>
               ) : (
@@ -66,7 +106,7 @@ export default async function TeachersPage() {
                 </p>
               )}
               {canEdit && !email ? (
-                <form action={updateTeacherEmail} className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <form action={updateTeacherEmail} className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <input type="hidden" name="teacherId" value={teacher.id} />
                   <input
                     name="email"
@@ -75,14 +115,17 @@ export default async function TeachersPage() {
                     placeholder="teacher@school.org"
                     className="w-full rounded-xl border border-line px-3 py-2"
                   />
-                  <button className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white">
+                  <button
+                    type="submit"
+                    className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-white"
+                  >
                     Save email
                   </button>
                 </form>
               ) : null}
               <Link
                 href={`/print?kind=teacher&group=${encodeURIComponent(groupName)}`}
-                className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-navy px-6 py-4 text-xl font-bold text-white"
+                className="action-button mt-4 inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-lg font-bold"
               >
                 Open class list
               </Link>
