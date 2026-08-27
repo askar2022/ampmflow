@@ -43,6 +43,10 @@ export default async function CheckInPage({
             <a href="/print?kind=checkin" className="font-semibold text-blue">
               Print / share
             </a>
+            {" · "}
+            <a href="/print/export?kind=checkin" className="font-semibold text-blue">
+              Download Excel
+            </a>
           </p>
         ) : null}
       </div>

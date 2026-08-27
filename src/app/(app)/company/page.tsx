@@ -8,6 +8,7 @@ import {
   collapseDuplicateRequests,
   reviewRequest,
 } from "@/app/actions/requests";
+import { uniqueChangeRequests } from "@/lib/request-dedupe";
 import { CompanyActions } from "./CompanyActions";
 import { TodayChangeForm } from "@/components/TodayChangeForm";
 
@@ -23,15 +24,18 @@ export default async function CompanyPage() {
       (s.am.type === "BUS" && !s.am.busNumber) ||
       (s.pm.type === "BUS" && !s.pm.busNumber),
   );
-  const requests = await prisma.changeRequest.findMany({
-    where: {
-      schoolId: session.schoolId,
-      source: { in: ["BUS_COMPANY", "COORDINATOR", "FRONT_DESK"] },
-    },
-    include: { student: true, createdBy: true },
-    orderBy: { createdAt: "desc" },
-    take: 30,
-  });
+  const requests = uniqueChangeRequests(
+    await prisma.changeRequest.findMany({
+      where: {
+        schoolId: session.schoolId,
+        source: { in: ["BUS_COMPANY", "COORDINATOR", "FRONT_DESK"] },
+        status: { not: "REJECTED" },
+      },
+      include: { student: true, createdBy: true },
+      orderBy: { createdAt: "desc" },
+      take: 80,
+    }),
+  ).slice(0, 30);
   const report = companyReportText(students);
   const limited = session.role === "BUS_COMPANY";
   const routes = await prisma.busRoute.findMany({
@@ -103,6 +107,10 @@ export default async function CompanyPage() {
 
       <section className="rounded-2xl border border-line bg-card p-5">
         <h2 className="font-serif text-2xl">Requests</h2>
+        <p className="mt-1 text-sm text-muted">
+          The same student is listed once, even if the move was saved more than
+          once.
+        </p>
         <ul className="mt-3 space-y-3">
           {requests.map((request) => (
             <li key={request.id} className="rounded-xl border border-line p-4">

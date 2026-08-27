@@ -20,16 +20,21 @@ function eventKey(event: {
   ].join("|");
 }
 
+export function uniqueStudentCount(events: { studentId: string }[]) {
+  return new Set(events.map((event) => event.studentId)).size;
+}
+
 export async function collapseDuplicateEvents(
   schoolId: string,
   day = todayKey(),
+  endDay = day,
 ) {
   const events = await prisma.changeEvent.findMany({
     where: {
       schoolId,
       createdAt: {
         gte: new Date(`${day}T00:00:00`),
-        lte: new Date(`${day}T23:59:59`),
+        lte: new Date(`${endDay}T23:59:59`),
       },
     },
     orderBy: { createdAt: "asc" },
@@ -137,7 +142,9 @@ export type CheckInBusSummary = {
   notMarked: number;
   onBusNames: string[];
   missingNames: string[];
+  unassignedNames: string[];
   leftSchoolNames: string[];
+  notMarkedNames: string[];
 };
 
 export async function loadCheckInSummary(
@@ -175,7 +182,9 @@ export async function loadCheckInSummary(
         notMarked: notMarked.length,
         onBusNames: onBus.map((row) => row.student.fullName),
         missingNames: missing.map((row) => row.student.fullName),
+        unassignedNames: unassigned.map((row) => row.student.fullName),
         leftSchoolNames: leftSchool.map((row) => row.student.fullName),
+        notMarkedNames: notMarked.map((row) => row.student.fullName),
       };
     });
 }
@@ -236,8 +245,13 @@ export async function loadChangeCheckIns(schoolId: string) {
 export async function leadershipStats(schoolId: string) {
   const students = await loadStudents(schoolId);
   const summary = dashboardSummary(students);
-  const events = await loadChangeEvents(schoolId);
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  try {
+    await collapseDuplicateEvents(schoolId, weekStart, todayKey());
+  } catch {
+    // Keep the page even if extras cannot be removed yet.
+  }
+  const events = await loadChangeEvents(schoolId);
   let weekEvents = events;
   try {
     weekEvents = await prisma.changeEvent.findMany({
@@ -270,22 +284,31 @@ export async function leadershipStats(schoolId: string) {
     return {
       day: format(new Date(`${key}T12:00:00`), "EEEE"),
       date: key,
-      total: dayEvents.length,
-      temporary: dayEvents.filter((e) => e.durationType !== "PERMANENT").length,
-      permanent: dayEvents.filter((e) => e.durationType === "PERMANENT").length,
-      late: dayEvents.filter((e) => e.late || e.urgent).length,
+      total: uniqueStudentCount(dayEvents),
+      temporary: uniqueStudentCount(
+        dayEvents.filter((event) => event.durationType !== "PERMANENT"),
+      ),
+      permanent: uniqueStudentCount(
+        dayEvents.filter((event) => event.durationType === "PERMANENT"),
+      ),
+      late: uniqueStudentCount(
+        dayEvents.filter((event) => event.late || event.urgent),
+      ),
     };
   });
 
-  const repeats = new Map<string, number>();
+  const distinctByStudent = new Map<string, Set<string>>();
   for (const event of weekEvents) {
-    repeats.set(event.studentId, (repeats.get(event.studentId) ?? 0) + 1);
+    const change = `${eventPlanLabel(event.previousPlan)}→${eventPlanLabel(event.newPlan)}`;
+    const set = distinctByStudent.get(event.studentId) ?? new Set<string>();
+    set.add(change);
+    distinctByStudent.set(event.studentId, set);
   }
-  const repeated = [...repeats.entries()]
-    .filter(([, count]) => count > 1)
-    .map(([id, count]) => {
+  const repeated = [...distinctByStudent.entries()]
+    .filter(([, changes]) => changes.size > 1)
+    .map(([id, changes]) => {
       const student = students.find((row) => row.id === id);
-      return { name: student?.fullName ?? id, count };
+      return { name: student?.fullName ?? id, count: changes.size };
     });
 
   const acknowledged = weekEvents.filter((event) =>
@@ -300,7 +323,11 @@ export async function leadershipStats(schoolId: string) {
     buses: [...buses.entries()].sort((a, b) => Number(a[0]) - Number(b[0])),
     days,
     repeated,
-    lateCount: weekEvents.filter((e) => e.late || e.urgent).length,
+    todayChangeStudents: uniqueStudentCount(events),
+    weekChangeStudents: uniqueStudentCount(weekEvents),
+    lateCount: uniqueStudentCount(
+      weekEvents.filter((event) => event.late || event.urgent),
+    ),
     temporaryCount: weekEvents.filter((e) => e.durationType !== "PERMANENT").length,
     permanentCount: weekEvents.filter((e) => e.durationType === "PERMANENT").length,
     ackRate: weekEvents.length

@@ -16,6 +16,12 @@ export default async function PickupPage() {
         <p className="mt-1 text-muted">
           Students whose effective PM plan is parent pickup today.
         </p>
+        <a
+          href="/print/export?kind=pickup"
+          className="mt-3 inline-block rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
+        >
+          Download Excel
+        </a>
       </div>
       <div className="overflow-hidden rounded-2xl border border-line bg-card">
         <table className="w-full text-left text-sm">

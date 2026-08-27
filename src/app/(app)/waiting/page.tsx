@@ -22,6 +22,12 @@ export default async function WaitingPage() {
         stays <strong>Waiting for Bus Company Assignment</strong> until the
         company proposes a number and the coordinator confirms it.
       </p>
+      <a
+        href="/print/export?kind=missing"
+        className="inline-block rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
+      >
+        Download Excel
+      </a>
       <div className="overflow-hidden rounded-2xl border border-line bg-card">
         <table className="w-full text-left text-sm">
           <thead className="bg-paper text-muted">

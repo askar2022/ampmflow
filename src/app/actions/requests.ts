@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { notifyCoordinators, writeAudit } from "@/lib/audit";
 import { updateTransportation } from "@/app/actions/transportation";
 import type { Destination, TransportType, Trip } from "@/lib/types";
+import { requestDedupeKey } from "@/lib/request-dedupe";
 
 function callerLabel(caller: string) {
   if (caller === "PARENT_TO_COMPANY") return "Parent to bus company";
@@ -226,21 +227,21 @@ async function applyCompanyReport(args: {
 }
 
 export async function collapseDuplicateRequests(schoolId: string) {
-  const pending = await prisma.changeRequest.findMany({
-    where: { schoolId, status: "PENDING" },
+  const rows = await prisma.changeRequest.findMany({
+    where: { schoolId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, studentId: true, title: true },
+    select: { id: true, studentId: true, title: true, payload: true },
   });
   const seen = new Set<string>();
   const extraIds: string[] = [];
-  for (const row of pending) {
-    const key = `${row.studentId ?? ""}|${row.title}`;
+  for (const row of rows) {
+    const key = requestDedupeKey(row);
     if (seen.has(key)) extraIds.push(row.id);
     else seen.add(key);
   }
   if (extraIds.length) {
     await prisma.changeRequest.updateMany({
-      where: { id: { in: extraIds } },
+      where: { id: { in: extraIds }, status: { not: "COMPLETED" } },
       data: { status: "REJECTED" },
     });
   }

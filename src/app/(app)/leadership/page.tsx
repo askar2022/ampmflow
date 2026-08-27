@@ -15,10 +15,9 @@ export default async function LeadershipPage() {
       <div>
         <h1 className="font-serif text-4xl">Leadership dashboard</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          This view shows the workload behind transportation: how many changes
-          staff manage, when parents submit them, and where policy may need to be
-          clearer. Reporting period for the weekly email is Monday through Friday
-          at 12:00 PM.
+          This view shows the workload behind transportation. Each student
+          counts once, even if the same change was saved many times. Reporting
+          period for the weekly email is Monday through Friday at 12:00 PM.
         </p>
       </div>
 
@@ -28,8 +27,8 @@ export default async function LeadershipPage() {
           ["Bus riders", stats.summary.busRiders],
           ["Parent pickup", stats.summary.parentPickup],
           ["Awaiting assignment", stats.waiting.length],
-          ["Changes today", stats.events.length],
-          ["Changes this week", stats.weekEvents.length],
+          ["Students changed today", stats.todayChangeStudents],
+          ["Students changed this week", stats.weekChangeStudents],
           ["Late changes this week", stats.lateCount],
           ["Teacher acknowledgment rate", `${stats.ackRate}%`],
         ].map(([label, value]) => (
@@ -45,9 +44,9 @@ export default async function LeadershipPage() {
           <div>
             <h2 className="font-serif text-2xl">Today’s bus check-in</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted">
-              This is the daily record from Bus Check-In. Use it to tell
-              leadership how many students rode Bus 5, how many were missing on
-              Bus 4, or who left school and should come off the company roster.
+              This is the daily record from Bus Check-In. Rode, Missing, Not
+              assigned, and Left school are buttons staff already tapped. Not
+              selected yet means nobody tapped a button for that student.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -57,6 +56,12 @@ export default async function LeadershipPage() {
               className="rounded-xl border border-line px-4 py-2 text-sm font-semibold"
             >
               Print / share
+            </a>
+            <a
+              href="/print/export?kind=checkin"
+              className="rounded-xl border border-line px-4 py-2 text-sm font-semibold"
+            >
+              Download Excel
             </a>
           </div>
         </div>
@@ -71,7 +76,7 @@ export default async function LeadershipPage() {
                   <th>Missing</th>
                   <th>Not assigned</th>
                   <th>Left school</th>
-                  <th>Not marked</th>
+                  <th>Not selected yet</th>
                 </tr>
               </thead>
               <tbody>
@@ -99,7 +104,14 @@ export default async function LeadershipPage() {
                         </div>
                       ) : null}
                     </td>
-                    <td className="py-2">{row.unassigned}</td>
+                    <td className="py-2">
+                      {row.unassigned}
+                      {row.unassignedNames.length ? (
+                        <div className="text-xs text-muted">
+                          {row.unassignedNames.join(", ")}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="py-2">
                       {row.leftSchool}
                       {row.leftSchoolNames.length ? (
@@ -108,7 +120,14 @@ export default async function LeadershipPage() {
                         </div>
                       ) : null}
                     </td>
-                    <td className="py-2">{row.notMarked}</td>
+                    <td className="py-2">
+                      {row.notMarked}
+                      {row.notMarkedNames.length ? (
+                        <div className="text-xs text-muted">
+                          {row.notMarkedNames.join(", ")}
+                        </div>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -184,10 +203,12 @@ export default async function LeadershipPage() {
           <p className="mt-2 text-sm text-muted">No student has more than one change this week.</p>
         )}
         <p className="mt-4 text-sm text-muted">
-          This week, {stats.weekEvents.length} transportation changes were
-          submitted. {stats.lateCount} were received after 2:15 PM
+          This week, {stats.weekChangeStudents} student
+          {stats.weekChangeStudents === 1 ? "" : "s"} had a transportation
+          change. {stats.lateCount}{" "}
+          {stats.lateCount === 1 ? "was" : "were"} received after 2:15 PM
           {stats.repeated.length
-            ? `, and ${stats.repeated.length} student(s) had multiple changes.`
+            ? `, and ${stats.repeated.length} student(s) had more than one different change.`
             : "."}
         </p>
       </section>

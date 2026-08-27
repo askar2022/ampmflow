@@ -20,35 +20,17 @@ export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
   const params = useSearchParams();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
+  const selected = params.get("kind") || "teacher";
+  const visible = isTeacher ? kinds.filter(([kind]) => kind === "teacher") : kinds;
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {(isTeacher
-          ? kinds.filter(([k]) => k === "teacher")
-          : kinds
-        ).map(
-          ([kind, label]) => (
-            <button
-              key={kind}
-              onClick={() => router.push(`/print?kind=${kind}`)}
-              className={`rounded-full px-3 py-1.5 text-sm ${
-                (params.get("kind") || "teacher") === kind
-                  ? "bg-navy text-white"
-                  : "border border-line bg-card"
-              }`}
-            >
-              {label}
-            </button>
-          ),
-        )}
-      </div>
+    <div className="mt-4 space-y-4">
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => window.print()}
           className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white"
         >
-          Print all classrooms
+          Print this list
         </button>
         {!isTeacher ? (
           <button
@@ -70,6 +52,43 @@ export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
         ) : null}
       </div>
       {message ? <p className="text-sm">{message}</p> : null}
+      <div className="overflow-hidden rounded-2xl border border-line bg-card">
+        {visible.map(([kind, label]) => (
+          <div
+            key={kind}
+            className={`flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 first:border-t-0 ${
+              selected === kind ? "bg-paper" : ""
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => router.push(`/print?kind=${kind}`)}
+              className="text-left text-sm font-semibold"
+            >
+              {label}
+            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => router.push(`/print?kind=${kind}`)}
+                className={`rounded-full px-3 py-1.5 text-sm ${
+                  selected === kind
+                    ? "bg-navy text-white"
+                    : "border border-line bg-card"
+                }`}
+              >
+                View
+              </button>
+              <a
+                href={`/print/export?kind=${kind}`}
+                className="rounded-full border border-line bg-card px-3 py-1.5 text-sm font-semibold"
+              >
+                Download Excel
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

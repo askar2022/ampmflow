@@ -45,6 +45,12 @@ export default async function TeacherPage() {
   return (
     <div className="space-y-3">
       <LiveRefresh />
+      <a
+        href="/print/export?kind=teacher"
+        className="inline-block rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
+      >
+        Download Excel
+      </a>
       <TeacherBoard heading={heading} students={students} pending={pending} />
     </div>
   );

@@ -23,7 +23,7 @@ function markLabel(status?: string | null) {
   if (status === "UNASSIGNED") return "Not assigned";
   if (status === "WRONG") return "Wrong assignment";
   if (status === "LEFT_SCHOOL") return "Left school";
-  return "Not marked";
+  return "Not selected yet";
 }
 
 function StudentCard({

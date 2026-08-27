@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { dashboardSummary, loadStudents, studentsOnBothLists } from "@/lib/transportation";
-import { loadChangeEvents, unacknowledgedUrgent } from "@/lib/operations";
+import {
+  loadChangeEvents,
+  unacknowledgedUrgent,
+  uniqueStudentCount,
+} from "@/lib/operations";
 import { formatLongDate, schoolNow } from "@/lib/dates";
 import { CHANGE_DEADLINE, SNAPSHOT_TIME } from "@/lib/policy";
 import { eventPlanLabel } from "@/lib/operations";
@@ -65,7 +69,11 @@ export default async function DashboardPage() {
           {[
             ["Bus students", summary.busRiders, "/buses"],
             ["Parent pickup", summary.parentPickup, "/pickup"],
-            ["Changes today", events.length || summary.temporaryChanges, "/activity"],
+            [
+              "Students changed today",
+              uniqueStudentCount(events) || summary.temporaryChanges,
+              "/activity",
+            ],
             ["Waiting for bus assignment", waiting, "/waiting"],
             ["Unacknowledged urgent changes", urgentOpen.length, "/acknowledgments"],
           ].map(([label, count, href]) => (

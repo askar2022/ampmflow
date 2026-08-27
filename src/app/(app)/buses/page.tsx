@@ -22,12 +22,20 @@ export default async function BusesPage() {
           a new company roster. To tap On Bus, Missing, or Left school, open
           Bus Check-In.
         </p>
-        <a
-          href="/print?kind=bus"
-          className="mt-3 inline-block text-sm font-semibold text-blue"
-        >
-          Print bus lists
-        </a>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href="/print?kind=bus"
+            className="rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
+          >
+            Print bus lists
+          </a>
+          <a
+            href="/print/export?kind=bus"
+            className="rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
+          >
+            Download Excel
+          </a>
+        </div>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {groups.map(([number, riders]) => (

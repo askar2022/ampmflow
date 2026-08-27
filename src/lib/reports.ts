@@ -134,10 +134,12 @@ export function checkInReportText(groups: CheckInBusSummary[]) {
       const title =
         group.busNumber === "No bus yet" ? "Waiting for a bus" : `Bus ${group.busNumber}`;
       return [
-        `${title}: ${group.onList} on the list · ${group.onBus} rode · ${group.missing} missing · ${group.unassigned} not assigned · ${group.leftSchool} left school · ${group.notMarked} not marked yet`,
+        `${title}: ${group.onList} on the list · ${group.onBus} rode · ${group.missing} missing · ${group.unassigned} not assigned · ${group.leftSchool} left school · ${group.notMarked} not selected yet`,
         ...group.missingNames.map((name) => `  Missing: ${name}`),
+        ...group.unassignedNames.map((name) => `  Not assigned: ${name}`),
         ...group.leftSchoolNames.map((name) => `  Left school: ${name}`),
         ...group.onBusNames.map((name) => `  On bus: ${name}`),
+        ...group.notMarkedNames.map((name) => `  Not selected yet: ${name}`),
         "",
       ];
     }),

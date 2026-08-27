@@ -49,7 +49,7 @@ export default async function PrintPage({
         <h1 className="font-serif text-4xl">Print / Email</h1>
         <p className="mt-1 text-muted">
           Every list includes the date, generation time, and version so staff do
-          not use an older copy.
+          not use an older copy. Each report has its own Download Excel button.
         </p>
         <Suspense>
           <PrintActions isTeacher={session.role === "TEACHER"} />
@@ -113,6 +113,10 @@ function CheckInPrint({
   return (
     <section className="print-sheet rounded-2xl border border-line bg-card p-5">
       <PrintHeader title={title} header={header} />
+      <p className="mb-3 text-sm text-muted">
+        Not selected yet means staff has not tapped On Bus, Missing, Not
+        assigned, or Left school for that student.
+      </p>
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="text-muted">
@@ -120,8 +124,9 @@ function CheckInPrint({
             <th>On list</th>
             <th>Rode</th>
             <th>Missing</th>
+            <th>Not assigned</th>
             <th>Left school</th>
-            <th>Not marked</th>
+            <th>Not selected yet</th>
           </tr>
         </thead>
         <tbody>
@@ -144,12 +149,23 @@ function CheckInPrint({
                 ) : null}
               </td>
               <td className="py-2">
+                {row.unassigned}
+                {row.unassignedNames.length ? (
+                  <div className="text-xs">{row.unassignedNames.join(", ")}</div>
+                ) : null}
+              </td>
+              <td className="py-2">
                 {row.leftSchool}
                 {row.leftSchoolNames.length ? (
                   <div className="text-xs">{row.leftSchoolNames.join(", ")}</div>
                 ) : null}
               </td>
-              <td className="py-2">{row.notMarked}</td>
+              <td className="py-2">
+                {row.notMarked}
+                {row.notMarkedNames.length ? (
+                  <div className="text-xs">{row.notMarkedNames.join(", ")}</div>
+                ) : null}
+              </td>
             </tr>
           ))}
         </tbody>

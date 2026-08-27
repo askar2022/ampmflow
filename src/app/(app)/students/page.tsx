@@ -35,7 +35,15 @@ export default async function StudentsPage({
             Search by name, student ID, grade, teacher, bus, or parent phone.
           </p>
         </div>
-        {!empty ? uploadButton : null}
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="/print/export?kind=master"
+            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-line bg-card px-4 text-sm font-semibold"
+          >
+            Download Excel
+          </a>
+          {!empty ? uploadButton : null}
+        </div>
       </div>
 
       <form className="flex gap-2">

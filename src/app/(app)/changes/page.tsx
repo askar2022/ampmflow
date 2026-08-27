@@ -21,6 +21,12 @@ export default async function ChangesPage() {
           These students have a today-only or date-range exception. When the dates
           end, they automatically return to their permanent AM and PM assignments.
         </p>
+        <a
+          href="/print/export?kind=changes"
+          className="mt-3 inline-block rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
+        >
+          Download Excel
+        </a>
       </div>
       <div className="overflow-hidden rounded-2xl border border-line bg-card">
         <table className="w-full text-left text-sm">

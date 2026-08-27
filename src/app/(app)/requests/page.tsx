@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { collapseDuplicateRequests, reviewRequest } from "@/app/actions/requests";
 import { formatDateTime } from "@/lib/dates";
 import { roleLabel } from "@/lib/format";
+import { uniqueChangeRequests } from "@/lib/request-dedupe";
 import { TodayChangeForm } from "@/components/TodayChangeForm";
 
 export default async function RequestsPage({
@@ -14,11 +15,13 @@ export default async function RequestsPage({
   if (!session) return null;
   await collapseDuplicateRequests(session.schoolId);
   const { studentId } = await searchParams;
-  const requests = await prisma.changeRequest.findMany({
-    where: { schoolId: session.schoolId },
-    include: { student: true, createdBy: true, reviewedBy: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const requests = uniqueChangeRequests(
+    await prisma.changeRequest.findMany({
+      where: { schoolId: session.schoolId, status: { not: "REJECTED" } },
+      include: { student: true, createdBy: true, reviewedBy: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  );
   const students = await prisma.student.findMany({
     where: { schoolId: session.schoolId },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
