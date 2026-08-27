@@ -207,7 +207,7 @@ async function loadTeacherContacts(schoolId: string) {
   }));
 }
 
-export async function teacherEmailPlan(schoolId: string) {
+export async function teacherEmailPlan(schoolId: string, onlyGroup?: string) {
   const [students, teachers] = await Promise.all([
     loadStudents(schoolId),
     loadTeacherContacts(schoolId),
@@ -215,6 +215,7 @@ export async function teacherEmailPlan(schoolId: string) {
   const ready: { name: string; email: string }[] = [];
   const missing: { name: string }[] = [];
   for (const [name] of groupByTeacher(students)) {
+    if (onlyGroup && name !== onlyGroup) continue;
     const contact = teacherEmailForGroup(teachers, name);
     if (contact.email) ready.push({ name, email: contact.email });
     else missing.push({ name });
@@ -269,6 +270,7 @@ export async function sendTeacherClassroomLists(args: {
   schoolId: string;
   actorId: string;
   automatic?: boolean;
+  onlyGroup?: string;
 }) {
   const dateKey = schoolLocalTime().dateKey;
   if (args.automatic && (await snapshotAlreadySent(args.schoolId, dateKey))) {
@@ -298,7 +300,19 @@ export async function sendTeacherClassroomLists(args: {
     loadStudents(args.schoolId),
     loadTeacherContacts(args.schoolId),
   ]);
-  const groups = groupByTeacher(students);
+  const groups = groupByTeacher(students).filter(
+    ([name]) => !args.onlyGroup || name === args.onlyGroup,
+  );
+  if (args.onlyGroup && groups.length === 0) {
+    return {
+      ok: false,
+      sent: 0,
+      skipped: 0,
+      recipients: [],
+      missing: [],
+      error: "That class list was not found.",
+    };
+  }
   const header = stamp();
   const recipients: { name: string; email: string }[] = [];
   const missing: { name: string }[] = [];
@@ -347,8 +361,9 @@ export async function sendTeacherClassroomLists(args: {
       skipped,
       recipients,
       missing,
-      error:
-        "Add teacher emails on the Teachers page first. Nothing was sent.",
+      error: args.onlyGroup
+        ? "This teacher has no email yet. Add it on Teachers first."
+        : "Add teacher emails on the Teachers page first. Nothing was sent.",
     };
   }
 

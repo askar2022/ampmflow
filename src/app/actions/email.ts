@@ -7,7 +7,7 @@ import { companyReportText, pickupList, stamp } from "@/lib/reports";
 import { sendTeacherClassroomLists } from "@/lib/teacher-snapshot";
 import { writeAudit } from "@/lib/audit";
 
-export async function emailTeacherLists() {
+export async function emailTeacherLists(onlyGroup?: string) {
   const user = await getSession();
   if (!user || (user.role !== "COORDINATOR" && user.role !== "ADMINISTRATOR")) {
     return { ok: false, error: "Not authorized to email lists." };
@@ -17,6 +17,7 @@ export async function emailTeacherLists() {
     schoolId: user.schoolId,
     actorId: user.id,
     automatic: false,
+    onlyGroup: onlyGroup?.trim() || undefined,
   });
   if (!result.ok) {
     const students = await loadStudents(user.schoolId);

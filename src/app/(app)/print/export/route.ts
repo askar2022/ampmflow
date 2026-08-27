@@ -27,7 +27,9 @@ export async function GET(request: Request) {
     return new Response("Please sign in.", { status: 401 });
   }
 
-  const requested = new URL(request.url).searchParams.get("kind") || "checkin";
+  const search = new URL(request.url).searchParams;
+  const requested = search.get("kind") || "checkin";
+  const group = search.get("group") || "";
   const kind = (
     session.role === "TEACHER"
       ? "teacher"
@@ -44,6 +46,11 @@ export async function GET(request: Request) {
     if (teacher) {
       students = students.filter((row) => row.classroomId === teacher.classroomId);
     }
+  }
+  if (kind === "teacher" && group) {
+    students = students.filter(
+      (row) => `${row.teacherName} · ${row.classroomName}` === group,
+    );
   }
 
   const workbook =

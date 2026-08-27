@@ -45,7 +45,10 @@ export default async function PrintPage({
   const companyApproved = await loadCompanyApprovedBuses(session.schoolId);
   const checkIns = await loadCheckInSummary(session.schoolId);
   const lastEmail = session.role === "TEACHER" ? null : await lastTeacherEmail(session.schoolId);
-  const emailPlan = session.role === "TEACHER" ? { ready: [], missing: [] } : await teacherEmailPlan(session.schoolId);
+  const emailPlan =
+    session.role === "TEACHER"
+      ? { ready: [], missing: [] }
+      : await teacherEmailPlan(session.schoolId, selected === "teacher" ? group : "");
 
   return (
     <div className="space-y-6">
@@ -63,8 +66,12 @@ export default async function PrintPage({
         <Suspense>
           <PrintActions
             isTeacher={session.role === "TEACHER"}
+            canEmail={
+              session.role === "COORDINATOR" || session.role === "ADMINISTRATOR"
+            }
             ready={emailPlan.ready}
             missing={emailPlan.missing}
+            group={selected === "teacher" ? group : ""}
           />
         </Suspense>
       </div>
