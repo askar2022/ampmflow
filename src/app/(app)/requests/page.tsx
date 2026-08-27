@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createChangeRequest, reviewRequest } from "@/app/actions/requests";
 import { formatDateTime } from "@/lib/dates";
+import { StudentPicker } from "@/components/StudentPicker";
 
 export default async function RequestsPage({
   searchParams,
@@ -34,18 +35,16 @@ export default async function RequestsPage({
         <form action={createChangeRequest} className="mt-4 space-y-3">
           <label className="block text-sm font-medium">
             Student
-            <select
-              name="studentId"
-              defaultValue={studentId || ""}
-              className="mt-1 w-full rounded-xl border border-line px-3 py-2"
-            >
-              <option value="">Select student</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.lastName}, {s.firstName} ({s.studentId})
-                </option>
-              ))}
-            </select>
+            <StudentPicker
+              defaultId={studentId || ""}
+              students={students.map((student) => ({
+                id: student.id,
+                firstName: student.firstName,
+                lastName: student.lastName,
+                studentId: student.studentId,
+                grade: student.grade,
+              }))}
+            />
           </label>
           <label className="block text-sm font-medium">
             Trip
