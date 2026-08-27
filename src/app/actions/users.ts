@@ -23,23 +23,60 @@ export async function createUser(formData: FormData): Promise<void> {
     return;
   }
 
-  await prisma.user.create({
-    data: {
-      schoolId: session.schoolId,
-      name,
-      email,
-      role,
-      teacherId: role === "TEACHER" ? teacherId : null,
-      assignedBus: role === "BUS_ASSISTANT" ? assignedBus : null,
-      passwordHash: await hashPassword(password),
-      active: true,
-    },
-  });
+  try {
+    await prisma.user.create({
+      data: {
+        schoolId: session.schoolId,
+        name,
+        email,
+        role,
+        teacherId: role === "TEACHER" ? teacherId : null,
+        assignedBus: role === "BUS_ASSISTANT" ? assignedBus : null,
+        passwordHash: await hashPassword(password),
+        active: true,
+      },
+    });
+  } catch {
+    return;
+  }
 
   await writeAudit({
     user: session,
     action: "CREATE_USER",
     newPlan: { name, email, role },
+  });
+
+  revalidatePath("/admin/users");
+}
+
+export async function resetUserPassword(formData: FormData): Promise<void> {
+  const session = await getSession();
+  if (!session || !canManageUsers(session.role)) {
+    return;
+  }
+
+  const id = String(formData.get("id") || "");
+  const password = String(formData.get("password") || "");
+  if (!id || password.length < 4) {
+    return;
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id, schoolId: session.schoolId },
+  });
+  if (!user || user.role === PENDING_ROLE) {
+    return;
+  }
+
+  await prisma.user.update({
+    where: { id },
+    data: { passwordHash: await hashPassword(password), active: true },
+  });
+
+  await writeAudit({
+    user: session,
+    action: "RESET_USER_PASSWORD",
+    newPlan: { name: user.name, email: user.email },
   });
 
   revalidatePath("/admin/users");

@@ -1,7 +1,13 @@
 import { redirect } from "next/navigation";
 import { canManageUsers, getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { approveUser, createUser, rejectUser, toggleUser } from "@/app/actions/users";
+import {
+  approveUser,
+  createUser,
+  rejectUser,
+  resetUserPassword,
+  toggleUser,
+} from "@/app/actions/users";
 import { updateSchoolIdentity } from "@/app/actions/school";
 import { roleLabel } from "@/lib/format";
 import { PENDING_ROLE } from "@/lib/types";
@@ -127,8 +133,9 @@ export default async function UsersPage() {
       <section>
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
-          Administrators can view everything and manage accounts. Parent access is
-          not included in this first version.
+          The system does not email a password or a verification link. Type a
+          temporary password, tell that person, and they sign in on the login
+          page. If login fails, set a new password here and try again.
         </p>
         <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
           <table className="w-full text-left text-sm">
@@ -149,7 +156,21 @@ export default async function UsersPage() {
                   </td>
                   <td>{roleLabel(user.role)}</td>
                   <td>{user.active ? "Active" : "Disabled"}</td>
-                  <td>
+                  <td className="px-4 py-3">
+                    <form action={resetUserPassword} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="id" value={user.id} />
+                      <input
+                        name="password"
+                        type="password"
+                        required
+                        minLength={4}
+                        placeholder="New password"
+                        className="w-36 rounded-xl border border-line px-2 py-1.5"
+                      />
+                      <button className="text-sm font-semibold text-blue">
+                        Set password
+                      </button>
+                    </form>
                     {user.id !== session.id ? (
                       <form
                         action={async () => {
@@ -157,7 +178,7 @@ export default async function UsersPage() {
                           await toggleUser(user.id);
                         }}
                       >
-                        <button className="text-sm font-semibold text-blue">
+                        <button className="mt-1 text-sm font-semibold text-blue">
                           {user.active ? "Disable" : "Enable"}
                         </button>
                       </form>
@@ -173,8 +194,8 @@ export default async function UsersPage() {
         <h2 className="font-serif text-2xl">Add user</h2>
         <p className="mt-1 text-sm text-muted">
           For Bus Coordinator, Reception, Admin, or Bus Company, leave class
-          blank. Classrooms already exist from the student import. Only a
-          Teacher login needs to be linked to a class.
+          blank. Only a Teacher login needs a class. Write down the temporary
+          password and give it to that person — AMPM Flow does not send it.
         </p>
         <div className="mt-4 space-y-3">
           <input name="name" required placeholder="Name" className="w-full rounded-xl border border-line px-3 py-2" />
