@@ -373,6 +373,7 @@ export async function undoLastChange(studentId: string): Promise<UpdateResult> {
 
   revalidatePath("/dashboard");
   revalidatePath("/changes");
+  revalidatePath("/students");
   revalidatePath(`/students/${studentId}`);
   return { ok: true };
 }

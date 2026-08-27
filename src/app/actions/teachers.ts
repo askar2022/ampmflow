@@ -39,6 +39,57 @@ export async function updateTeacherEmail(formData: FormData) {
   revalidatePath("/print");
 }
 
+export async function saveTeacherProfile(formData: FormData) {
+  const session = await getSession();
+  if (
+    !session ||
+    (session.role !== "COORDINATOR" &&
+      session.role !== "ADMINISTRATOR" &&
+      session.role !== "FRONT_DESK")
+  ) {
+    return;
+  }
+
+  const teacherId = String(formData.get("teacherId") || "");
+  const name = String(formData.get("name") || "").trim();
+  const classroomName = String(formData.get("classroomName") || "").trim();
+  const grade = String(formData.get("grade") || "").trim();
+  const emailRaw = String(formData.get("email") || "").trim();
+  const email = emailRaw ? usableTeacherEmail(emailRaw) : "";
+  if (!teacherId || !name || !classroomName || !grade) return;
+  if (emailRaw && !email) return;
+
+  const teacher = await prisma.teacher.findFirst({
+    where: { id: teacherId, schoolId: session.schoolId },
+  });
+  if (!teacher) return;
+
+  await prisma.$transaction([
+    prisma.teacher.update({
+      where: { id: teacher.id },
+      data: email ? { name, email } : { name },
+    }),
+    prisma.classroom.update({
+      where: { id: teacher.classroomId },
+      data: { name: classroomName, grade },
+    }),
+  ]);
+  await writeAudit({
+    user: session,
+    action: "UPDATE_TEACHER_CLASS",
+    newPlan: {
+      teacherId: teacher.id,
+      name,
+      classroomName,
+      grade,
+      email: email || teacher.email,
+    },
+  });
+  revalidatePath("/teachers");
+  revalidatePath("/print");
+  revalidatePath("/students");
+}
+
 export async function updateTeacherClass(formData: FormData) {
   const session = await getSession();
   if (

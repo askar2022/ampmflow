@@ -6,7 +6,7 @@ import { loadStudent } from "@/lib/transportation";
 import { formatDateTime } from "@/lib/dates";
 import { destinationLabel, durationLabel, planSummary, planTone, typeLabel } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
-import { undoLastChange } from "@/app/actions/transportation";
+import { UndoLastChangeButton } from "./UndoLastChangeButton";
 
 export default async function StudentPage({
   params,
@@ -27,13 +27,15 @@ export default async function StudentPage({
     take: 20,
   });
 
-  async function undo() {
-    "use server";
-    await undoLastChange(id);
-  }
+  const canUndo = audits.some(
+    (log) => log.action === "UPDATE_PERMANENT" || log.action === "CREATE_TEMPORARY",
+  );
 
   return (
     <div className="space-y-8">
+      <Link href="/students" className="inline-block text-sm font-medium text-navy underline">
+        ← Back to students
+      </Link>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted">{student.studentId}</p>
@@ -42,21 +44,20 @@ export default async function StudentPage({
             Grade {student.grade} · {student.teacherName} · {student.classroomName}
           </p>
         </div>
-        <div className="flex gap-2">
-          {session.role === "COORDINATOR" || session.role === "ADMINISTRATOR" ? (
-            <>
-              <Link
-                href={`/students/${id}/update`}
-                className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"
-              >
-                Update Transportation
-              </Link>
-              <form action={undo}>
-                <button className="rounded-full border border-line bg-card px-4 py-2 text-sm font-semibold">
-                  Undo last change
-                </button>
-              </form>
-            </>
+        <div className="flex flex-wrap items-start gap-2">
+          {session.role === "COORDINATOR" ||
+          session.role === "ADMINISTRATOR" ||
+          session.role === "FRONT_DESK" ? (
+            <Link
+              href={`/students/${id}/update`}
+              className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"
+            >
+              Update Transportation
+            </Link>
+          ) : null}
+          {(session.role === "COORDINATOR" || session.role === "ADMINISTRATOR") &&
+          canUndo ? (
+            <UndoLastChangeButton studentId={id} />
           ) : null}
         </div>
       </div>

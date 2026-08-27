@@ -85,7 +85,7 @@ export function UpdateForm({
         setWarnings(result.warnings ?? []);
         return;
       }
-      router.push(`/students/${studentId}`);
+      router.push("/students");
       router.refresh();
     });
   }

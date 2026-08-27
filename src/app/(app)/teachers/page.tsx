@@ -1,13 +1,11 @@
-import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
-import { groupByTeacher } from "@/lib/reports";
 import {
   clearPlaceholderTeacherEmails,
   usableTeacherEmail,
 } from "@/lib/teacher-snapshot";
-import { updateTeacherClass, updateTeacherEmail } from "@/app/actions/teachers";
+import { TeacherCards } from "./TeacherCards";
 
 export default async function TeachersPage() {
   const session = await getSession();
@@ -21,8 +19,10 @@ export default async function TeachersPage() {
       orderBy: { name: "asc" },
     }),
   ]);
-  const groups = groupByTeacher(students);
-  const counts = new Map(groups.map(([name, rows]) => [name, rows.length]));
+  const counts = new Map<string, number>();
+  for (const student of students) {
+    counts.set(student.classroomId, (counts.get(student.classroomId) ?? 0) + 1);
+  }
   const canEdit =
     session.role === "COORDINATOR" ||
     session.role === "ADMINISTRATOR" ||
@@ -30,109 +30,37 @@ export default async function TeachersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-serif text-4xl">Teachers and classes</h1>
-        <p className="mt-1 max-w-2xl text-muted">
-          Teacher and class names first come from your student upload. You can
-          change them here. Save each email one time. After that, Vercel sends
-          the class list every school day at 2:45, or 11:45 on Friday. Mail
-          comes from dismissal@ampmflow.com.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-4xl">Teachers and classes</h1>
+          <p className="mt-1 max-w-2xl text-muted">
+            Names and rooms come from your student upload. Save each email once
+            so the daily list can go out at 2:45, or 11:45 on Friday, from
+            dismissal@ampmflow.com.
+          </p>
+        </div>
         <a
           href="/print/export?kind=teacher"
-          className="mt-3 inline-block rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
+          className="inline-flex min-h-11 items-center rounded-xl border border-line bg-card px-4 py-2 text-sm font-medium"
         >
           Download Excel
         </a>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {teachers.map((teacher) => {
-          const groupName = `${teacher.name} · ${teacher.classroom.name}`;
+      <TeacherCards
+        canEdit={canEdit}
+        teachers={teachers.map((teacher) => {
           const email = usableTeacherEmail(teacher.email);
-          return (
-            <section
-              key={teacher.id}
-              className="rounded-2xl border border-line bg-card p-5"
-            >
-              {canEdit ? (
-                <form action={updateTeacherClass} className="space-y-3">
-                  <input type="hidden" name="teacherId" value={teacher.id} />
-                  <label className="block">
-                    <span className="sr-only">Teacher name</span>
-                    <input
-                      name="name"
-                      required
-                      defaultValue={teacher.name}
-                      className="w-full rounded-xl border border-line bg-paper px-3 py-2 font-serif text-3xl font-bold text-navy sm:text-4xl"
-                    />
-                  </label>
-                  <p className="font-serif text-3xl font-bold text-navy sm:text-4xl">
-                    {counts.get(groupName) ?? 0} students
-                  </p>
-                  <label className="block">
-                    <span className="sr-only">Class name</span>
-                    <input
-                      name="classroomName"
-                      required
-                      defaultValue={teacher.classroom.name}
-                      className="w-full rounded-xl border border-line px-3 py-2 text-lg font-semibold"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="rounded-xl border border-line bg-paper px-4 py-2 text-sm font-semibold"
-                  >
-                    Save name and class
-                  </button>
-                </form>
-              ) : (
-                <>
-                  <h2 className="font-serif text-3xl font-bold leading-tight text-navy sm:text-4xl">
-                    {teacher.name}
-                  </h2>
-                  <p className="mt-2 font-serif text-3xl font-bold text-navy sm:text-4xl">
-                    {counts.get(groupName) ?? 0} students
-                  </p>
-                  <p className="mt-1 text-base font-semibold text-muted">
-                    {teacher.classroom.name}
-                  </p>
-                </>
-              )}
-              {email ? (
-                <p className="mt-1 text-sm text-muted">List goes to {email}</p>
-              ) : (
-                <p className="mt-1 text-sm font-medium text-red">
-                  No email yet — this class will not get the daily list.
-                </p>
-              )}
-              {canEdit && !email ? (
-                <form action={updateTeacherEmail} className="mt-3 flex flex-col gap-2 sm:flex-row">
-                  <input type="hidden" name="teacherId" value={teacher.id} />
-                  <input
-                    name="email"
-                    type="email"
-                    required
-                    placeholder="teacher@school.org"
-                    className="w-full rounded-xl border border-line px-3 py-2"
-                  />
-                  <button
-                    type="submit"
-                    className="rounded-xl bg-teal px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    Save email
-                  </button>
-                </form>
-              ) : null}
-              <Link
-                href={`/print?kind=teacher&group=${encodeURIComponent(groupName)}`}
-                className="action-button mt-4 inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-lg font-bold"
-              >
-                Open class list
-              </Link>
-            </section>
-          );
+          return {
+            id: teacher.id,
+            name: teacher.name,
+            email,
+            grade: teacher.classroom.grade,
+            room: teacher.classroom.name,
+            studentCount: counts.get(teacher.classroomId) ?? 0,
+            rosterHref: `/print?kind=teacher&group=${encodeURIComponent(`${teacher.name} · ${teacher.classroom.name}`)}`,
+          };
         })}
-      </div>
+      />
     </div>
   );
 }

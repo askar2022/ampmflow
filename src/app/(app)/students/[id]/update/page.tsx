@@ -31,8 +31,8 @@ export default async function UpdatePage({
   return (
     <div className="space-y-6">
       <div>
-        <Link href={`/students/${id}`} className="text-sm text-blue">
-          ← Back to {loaded.effective.fullName}
+        <Link href="/students" className="text-sm font-medium text-navy underline">
+          ← Back to students
         </Link>
         <h1 className="mt-2 font-serif text-4xl">
           Update Transportation
