@@ -198,6 +198,18 @@ export async function updateTransportation(
 
     const refreshed = await loadStudent(input.studentId, day);
     const newPlan = refreshed ? resolveTrip(refreshed.record, trip, day) : null;
+    const unchanged =
+      oldPlan &&
+      newPlan &&
+      oldPlan.type === newPlan.type &&
+      oldPlan.destination === newPlan.destination &&
+      (oldPlan.busNumber || "") === (newPlan.busNumber || "") &&
+      Boolean(oldPlan.waitingForAssignment) ===
+        Boolean(newPlan.waitingForAssignment);
+    if (unchanged) {
+      continue;
+    }
+
     await writeAudit({
       user,
       studentId: input.studentId,

@@ -4,7 +4,66 @@ import { dashboardSummary, loadStudents } from "./transportation";
 import { planSummary } from "./format";
 import { startOfWeek, subDays, format } from "date-fns";
 
+function eventKey(event: {
+  studentId: string;
+  trip: string;
+  previousPlan: string;
+  newPlan: string;
+  waitingForRoute: boolean;
+}) {
+  return [
+    event.studentId,
+    event.trip,
+    eventPlanLabel(event.previousPlan),
+    eventPlanLabel(event.newPlan),
+    event.waitingForRoute ? "wait" : "ready",
+  ].join("|");
+}
+
+export async function collapseDuplicateEvents(
+  schoolId: string,
+  day = todayKey(),
+) {
+  const events = await prisma.changeEvent.findMany({
+    where: {
+      schoolId,
+      createdAt: {
+        gte: new Date(`${day}T00:00:00`),
+        lte: new Date(`${day}T23:59:59`),
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      studentId: true,
+      trip: true,
+      previousPlan: true,
+      newPlan: true,
+      waitingForRoute: true,
+    },
+  });
+  const seen = new Set<string>();
+  const extraIds: string[] = [];
+  for (const event of events) {
+    const key = eventKey(event);
+    if (seen.has(key)) extraIds.push(event.id);
+    else seen.add(key);
+  }
+  if (!extraIds.length) return;
+  await prisma.teacherAcknowledgment.deleteMany({
+    where: { changeEventId: { in: extraIds } },
+  });
+  await prisma.changeEvent.deleteMany({
+    where: { id: { in: extraIds } },
+  });
+}
+
 export async function loadChangeEvents(schoolId: string, day = todayKey()) {
+  try {
+    await collapseDuplicateEvents(schoolId, day);
+  } catch {
+    // Keep the list even if extras cannot be removed yet.
+  }
   try {
     return await prisma.changeEvent.findMany({
       where: {

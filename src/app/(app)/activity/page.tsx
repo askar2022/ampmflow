@@ -11,9 +11,10 @@ export default async function ActivityPage() {
     <div className="space-y-4">
       <h1 className="font-serif text-4xl">Today’s Activity</h1>
       <p className="text-muted">
-        Every parent request is stamped with who recorded it and the exact time.
-        After 2:15 PM the row is Late/Emergency. After 2:45 PM the teacher must
-        acknowledge it.
+        Each real change is listed once, with who recorded it and the time.
+        Saving the same student again does not add another row. After 2:15 PM
+        the row is Late/Emergency. After 2:45 PM the teacher must acknowledge
+        it.
       </p>
       <div className="overflow-hidden rounded-2xl border border-line bg-card">
         <table className="w-full text-left text-sm">
