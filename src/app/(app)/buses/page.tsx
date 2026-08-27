@@ -17,10 +17,17 @@ export default async function BusesPage() {
       <div>
         <h1 className="font-serif text-4xl">Buses</h1>
         <p className="mt-1 max-w-2xl text-muted">
-          Today’s school roster by bus — the same names as Bus Check-In, without
-          the On Bus / Missing buttons. A red line is a today change. Show it
-          to the driver if they did not print a new company roster.
+          Display and print only. This is today’s full school roster. A red
+          line is a today change — show it to the driver if they did not print
+          a new company roster. To tap On Bus, Missing, or Left school, open
+          Bus Check-In.
         </p>
+        <a
+          href="/print?kind=bus"
+          className="mt-3 inline-block text-sm font-semibold text-blue"
+        >
+          Print bus lists
+        </a>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {groups.map(([number, riders]) => (

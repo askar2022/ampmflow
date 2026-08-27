@@ -12,7 +12,8 @@ import {
   type ReportKind,
 } from "@/lib/reports";
 import { planSummary, planTone, rosterChangeLabel } from "@/lib/format";
-import { loadCompanyApprovedBuses } from "@/lib/operations";
+import { loadCheckInSummary, loadCompanyApprovedBuses } from "@/lib/operations";
+import type { CheckInBusSummary } from "@/lib/operations";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Suspense } from "react";
 import { PrintActions } from "./PrintActions";
@@ -40,6 +41,7 @@ export default async function PrintPage({
   const header = stamp();
   const selected = (kind || "teacher") as ReportKind;
   const companyApproved = await loadCompanyApprovedBuses(session.schoolId);
+  const checkIns = await loadCheckInSummary(session.schoolId);
 
   return (
     <div className="space-y-6">
@@ -92,7 +94,67 @@ export default async function PrintPage({
           students={missingList(students)}
         />
       ) : null}
+      {selected === "checkin" ? (
+        <CheckInPrint title={reportTitle("checkin")} header={header} groups={checkIns} />
+      ) : null}
     </div>
+  );
+}
+
+function CheckInPrint({
+  title,
+  header,
+  groups,
+}: {
+  title: string;
+  header: { generated: string; version: string };
+  groups: CheckInBusSummary[];
+}) {
+  return (
+    <section className="print-sheet rounded-2xl border border-line bg-card p-5">
+      <PrintHeader title={title} header={header} />
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="text-muted">
+            <th className="py-2">Bus</th>
+            <th>On list</th>
+            <th>Rode</th>
+            <th>Missing</th>
+            <th>Left school</th>
+            <th>Not marked</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((row) => (
+            <tr key={row.busNumber} className="border-t border-line align-top">
+              <td className="py-2 font-medium">
+                {row.busNumber === "No bus yet" ? "Waiting" : `Bus ${row.busNumber}`}
+              </td>
+              <td className="py-2">{row.onList}</td>
+              <td className="py-2">
+                {row.onBus}
+                {row.onBusNames.length ? (
+                  <div className="text-xs">{row.onBusNames.join(", ")}</div>
+                ) : null}
+              </td>
+              <td className="py-2">
+                {row.missing}
+                {row.missingNames.length ? (
+                  <div className="text-xs">{row.missingNames.join(", ")}</div>
+                ) : null}
+              </td>
+              <td className="py-2">
+                {row.leftSchool}
+                {row.leftSchoolNames.length ? (
+                  <div className="text-xs">{row.leftSchoolNames.join(", ")}</div>
+                ) : null}
+              </td>
+              <td className="py-2">{row.notMarked}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 

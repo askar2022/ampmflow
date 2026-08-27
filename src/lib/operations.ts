@@ -68,6 +68,59 @@ async function attachCheckIns(
   }));
 }
 
+export type CheckInBusSummary = {
+  busNumber: string;
+  onList: number;
+  onBus: number;
+  missing: number;
+  unassigned: number;
+  leftSchool: number;
+  notMarked: number;
+  onBusNames: string[];
+  missingNames: string[];
+  leftSchoolNames: string[];
+};
+
+export async function loadCheckInSummary(
+  schoolId: string,
+): Promise<CheckInBusSummary[]> {
+  const rows = await loadCheckIns(schoolId);
+  const byBus = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const number = row.student.pm.busNumber || "No bus yet";
+    const list = byBus.get(number) ?? [];
+    list.push(row);
+    byBus.set(number, list);
+  }
+  return [...byBus.entries()]
+    .sort(([a], [b]) => Number(a) - Number(b) || a.localeCompare(b))
+    .map(([busNumber, list]) => {
+      const statusOf = (status: string) =>
+        list.filter((row) => row.checkIn?.status === status);
+      const onBus = statusOf("ON_BUS");
+      const missing = statusOf("MISSING");
+      const unassigned = list.filter(
+        (row) =>
+          row.checkIn?.status === "UNASSIGNED" ||
+          row.checkIn?.status === "WRONG",
+      );
+      const leftSchool = statusOf("LEFT_SCHOOL");
+      const notMarked = list.filter((row) => !row.checkIn?.status);
+      return {
+        busNumber,
+        onList: list.length,
+        onBus: onBus.length,
+        missing: missing.length,
+        unassigned: unassigned.length,
+        leftSchool: leftSchool.length,
+        notMarked: notMarked.length,
+        onBusNames: onBus.map((row) => row.student.fullName),
+        missingNames: missing.map((row) => row.student.fullName),
+        leftSchoolNames: leftSchool.map((row) => row.student.fullName),
+      };
+    });
+}
+
 export async function loadCheckIns(schoolId: string, busNumber?: string) {
   const students = (await loadStudents(schoolId)).filter((student) => {
     if (!busNumber) return student.pm.type === "BUS" && student.pm.busNumber;

@@ -1,5 +1,6 @@
 import { generatedStamp, listVersion } from "./dates";
 import { planSummary } from "./format";
+import type { CheckInBusSummary } from "./operations";
 import type { EffectiveStudent } from "./types";
 
 export type ReportKind =
@@ -9,7 +10,8 @@ export type ReportKind =
   | "pickup"
   | "changes"
   | "missing"
-  | "company";
+  | "company"
+  | "checkin";
 
 export function reportTitle(kind: ReportKind, extra?: string) {
   switch (kind) {
@@ -27,6 +29,8 @@ export function reportTitle(kind: ReportKind, extra?: string) {
       return "Missing assignments";
     case "company":
       return "Bus-company change report";
+    case "checkin":
+      return "Today’s bus check-in";
   }
 }
 
@@ -116,4 +120,27 @@ export function companyReportText(students: EffectiveStudent[]) {
     ),
   ];
   return lines.join("\n");
+}
+
+export function checkInReportText(groups: CheckInBusSummary[]) {
+  const header = stamp();
+  const lines = [
+    "AMPM Flow",
+    "Today’s bus check-in",
+    header.generated,
+    header.version,
+    "",
+    ...groups.flatMap((group) => {
+      const title =
+        group.busNumber === "No bus yet" ? "Waiting for a bus" : `Bus ${group.busNumber}`;
+      return [
+        `${title}: ${group.onList} on the list · ${group.onBus} rode · ${group.missing} missing · ${group.unassigned} not assigned · ${group.leftSchool} left school · ${group.notMarked} not marked yet`,
+        ...group.missingNames.map((name) => `  Missing: ${name}`),
+        ...group.leftSchoolNames.map((name) => `  Left school: ${name}`),
+        ...group.onBusNames.map((name) => `  On bus: ${name}`),
+        "",
+      ];
+    }),
+  ];
+  return lines.join("\n").trim();
 }

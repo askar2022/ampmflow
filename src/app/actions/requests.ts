@@ -39,6 +39,9 @@ function requestTitle(
   if (companyNeed === "PICKUP_TO_BUS") {
     return `${who}: parent pickup → bus (waiting for a route)`;
   }
+  if (companyNeed === "LEFT_SCHOOL") {
+    return `${who}: no longer at this school — remove from bus roster`;
+  }
   const dest =
     destination === "DAYCARE" ? " to daycare" : destination === "HOME" ? " home" : "";
   if (changeTo === "BUS_TO_BUS") {

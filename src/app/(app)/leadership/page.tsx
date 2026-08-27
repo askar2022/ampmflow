@@ -1,10 +1,14 @@
 import { getSession } from "@/lib/auth";
-import { leadershipStats } from "@/lib/operations";
+import { leadershipStats, loadCheckInSummary } from "@/lib/operations";
+import { checkInReportText } from "@/lib/reports";
+import { CopyReport } from "@/components/CopyReport";
 
 export default async function LeadershipPage() {
   const session = await getSession();
   if (!session) return null;
   const stats = await leadershipStats(session.schoolId);
+  const checkIns = await loadCheckInSummary(session.schoolId);
+  const checkInText = checkInReportText(checkIns);
 
   return (
     <div className="space-y-8">
@@ -34,6 +38,87 @@ export default async function LeadershipPage() {
             <div className="mt-2 font-serif text-3xl">{value}</div>
           </div>
         ))}
+      </section>
+
+      <section className="rounded-2xl border border-line bg-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-serif text-2xl">Today’s bus check-in</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              This is the daily record from Bus Check-In. Use it to tell
+              leadership how many students rode Bus 5, how many were missing on
+              Bus 4, or who left school and should come off the company roster.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <CopyReport text={checkInText} />
+            <a
+              href="/print?kind=checkin"
+              className="rounded-xl border border-line px-4 py-2 text-sm font-semibold"
+            >
+              Print / share
+            </a>
+          </div>
+        </div>
+        {checkIns.length ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-muted">
+                <tr>
+                  <th className="py-2">Bus</th>
+                  <th>On list</th>
+                  <th>Rode</th>
+                  <th>Missing</th>
+                  <th>Not assigned</th>
+                  <th>Left school</th>
+                  <th>Not marked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {checkIns.map((row) => (
+                  <tr key={row.busNumber} className="border-t border-line align-top">
+                    <td className="py-2 font-medium">
+                      {row.busNumber === "No bus yet"
+                        ? "Waiting"
+                        : `Bus ${row.busNumber}`}
+                    </td>
+                    <td className="py-2">{row.onList}</td>
+                    <td className="py-2">
+                      {row.onBus}
+                      {row.onBusNames.length ? (
+                        <div className="text-xs text-muted">
+                          {row.onBusNames.join(", ")}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="py-2">
+                      {row.missing}
+                      {row.missingNames.length ? (
+                        <div className="text-xs text-muted">
+                          {row.missingNames.join(", ")}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="py-2">{row.unassigned}</td>
+                    <td className="py-2">
+                      {row.leftSchool}
+                      {row.leftSchoolNames.length ? (
+                        <div className="text-xs text-muted">
+                          {row.leftSchoolNames.join(", ")}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="py-2">{row.notMarked}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted">
+            No bus riders yet. Marks from Bus Check-In appear here the same day.
+          </p>
+        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">

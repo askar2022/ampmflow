@@ -12,6 +12,7 @@ const kinds = [
   ["changes", "Temporary changes only"],
   ["missing", "Missing assignments"],
   ["company", "Bus-company change report"],
+  ["checkin", "Today’s bus check-in"],
 ];
 
 export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
@@ -23,7 +24,10 @@ export function PrintActions({ isTeacher }: { isTeacher: boolean }) {
   return (
     <div className="mt-4 space-y-3">
       <div className="flex flex-wrap gap-2">
-        {(isTeacher ? kinds.filter(([k]) => k === "teacher") : kinds).map(
+        {(isTeacher
+          ? kinds.filter(([k]) => k === "teacher")
+          : kinds
+        ).map(
           ([kind, label]) => (
             <button
               key={kind}
