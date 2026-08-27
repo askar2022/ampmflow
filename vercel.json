@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/teacher-snapshot",
       "schedule": "45 16,17,19,20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/ops-changes",
+      "schedule": "30 16,17,19,20 * * 1-5"
     }
   ]
 }

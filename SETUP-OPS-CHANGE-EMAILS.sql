@@ -1,0 +1,1 @@
+ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT '';

@@ -3,8 +3,10 @@ import type { DurationType, Role } from "./types";
 
 export const CHANGE_DEADLINE = "14:15";
 export const SNAPSHOT_TIME = "14:45";
+export const OPS_CHANGES_TIME = "14:30";
 export const FRIDAY_CHANGE_DEADLINE = "11:15";
 export const FRIDAY_SNAPSHOT_TIME = "11:45";
+export const FRIDAY_OPS_CHANGES_TIME = "11:30";
 export const FRIDAY_CLOSE_TIME = "12:00";
 
 function minutes(hhmm: string) {
@@ -30,6 +32,14 @@ export function deadlineClockLabel() {
 
 export function snapshotClockLabel() {
   return isFriday() ? "11:45 AM" : "2:45 PM";
+}
+
+export function opsChangesTimeForToday() {
+  return isFriday() ? FRIDAY_OPS_CHANGES_TIME : OPS_CHANGES_TIME;
+}
+
+export function opsChangesClockLabel() {
+  return isFriday() ? "11:30 AM" : "2:30 PM";
 }
 
 export function isAfterDeadline(date = schoolNow()) {

@@ -5,8 +5,11 @@ CREATE TABLE IF NOT EXISTS "SchoolSettings" (
   "schoolId" TEXT NOT NULL UNIQUE REFERENCES "School"("id"),
   "changeDeadline" TEXT NOT NULL DEFAULT '14:15',
   "snapshotTime" TEXT NOT NULL DEFAULT '14:45',
-  "weeklyReportTime" TEXT NOT NULL DEFAULT '12:00'
+  "weeklyReportTime" TEXT NOT NULL DEFAULT '12:00',
+  "opsChangeEmails" TEXT NOT NULL DEFAULT ''
 );
+
+ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS "ChangeEvent" (
   "id" TEXT PRIMARY KEY,
