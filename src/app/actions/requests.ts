@@ -28,16 +28,16 @@ function requestTitle(
   const who = callerLabel(caller);
   if (companyNeed === "MOVE" || changeTo === "MOVE") {
     return homeAddress
-      ? `${who}: moving / new address — ${homeAddress} (report to bus company)`
-      : `${who}: moving / new address (report to bus company)`;
+      ? `${who}: moving / new address — ${homeAddress} (waiting for a route)`
+      : `${who}: moving / new address (waiting for a route)`;
   }
   if (companyNeed === "DAYCARE" || changeTo === "PM_DAYCARE") {
     return daycareName
-      ? `${who}: daycare change — ${daycareName} (report to bus company)`
-      : `${who}: daycare change (report to bus company)`;
+      ? `${who}: daycare change — ${daycareName} (waiting for a route)`
+      : `${who}: daycare change (waiting for a route)`;
   }
   if (companyNeed === "PICKUP_TO_BUS") {
-    return `${who}: parent pickup → bus (report to bus company)`;
+    return `${who}: parent pickup → bus (waiting for a route)`;
   }
   const dest =
     destination === "DAYCARE" ? " to daycare" : destination === "HOME" ? " home" : "";
@@ -222,6 +222,27 @@ async function applyCompanyReport(args: {
   });
 }
 
+export async function collapseDuplicateRequests(schoolId: string) {
+  const pending = await prisma.changeRequest.findMany({
+    where: { schoolId, status: "PENDING" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, studentId: true, title: true },
+  });
+  const seen = new Set<string>();
+  const extraIds: string[] = [];
+  for (const row of pending) {
+    const key = `${row.studentId ?? ""}|${row.title}`;
+    if (seen.has(key)) extraIds.push(row.id);
+    else seen.add(key);
+  }
+  if (extraIds.length) {
+    await prisma.changeRequest.updateMany({
+      where: { id: { in: extraIds } },
+      data: { status: "REJECTED" },
+    });
+  }
+}
+
 export async function createChangeRequest(
   formData: FormData,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -259,6 +280,22 @@ export async function createChangeRequest(
 
   if ((isTodayChange || isCompanyReport) && !studentId) {
     return { ok: false, error: "Click a student in the list first." };
+  }
+
+  if (studentId) {
+    const recent = await prisma.changeRequest.findFirst({
+      where: {
+        schoolId: user.schoolId,
+        studentId,
+        title,
+        status: "PENDING",
+        createdAt: { gte: new Date(Date.now() - 15 * 60 * 1000) },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (recent) {
+      return { ok: true };
+    }
   }
 
   const request = await prisma.changeRequest.create({

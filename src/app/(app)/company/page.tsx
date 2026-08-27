@@ -3,13 +3,18 @@ import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { companyReportText, missingList } from "@/lib/reports";
 import { planSummary } from "@/lib/format";
-import { assignBusFromCompany, reviewRequest } from "@/app/actions/requests";
+import {
+  assignBusFromCompany,
+  collapseDuplicateRequests,
+  reviewRequest,
+} from "@/app/actions/requests";
 import { CompanyActions } from "./CompanyActions";
 import { TodayChangeForm } from "@/components/TodayChangeForm";
 
 export default async function CompanyPage() {
   const session = await getSession();
   if (!session) return null;
+  await collapseDuplicateRequests(session.schoolId);
   const students = await loadStudents(session.schoolId);
   const waiting = missingList(students).filter(
     (s) =>
@@ -45,7 +50,7 @@ export default async function CompanyPage() {
         <p className="mt-2 max-w-2xl text-muted">
           {limited
             ? "Record a parent call to the company, or send a today-only change to the school. Proposed bus numbers are not final until Admin or the Bus Coordinator approves them."
-            : "Record a parent or company request for today, or email a change report. Proposed bus numbers are not final until you approve them."}
+            : "Record a parent or company request. That save does not send email. Print the report at the bottom if you need a copy."}
         </p>
       </div>
 
@@ -69,8 +74,6 @@ export default async function CompanyPage() {
           }))}
         />
       </section>
-
-      {!limited ? <CompanyActions preview={report} /> : null}
 
       <section className="rounded-2xl border border-line bg-card p-5">
         <h2 className="font-serif text-2xl">Students waiting for a bus</h2>
@@ -150,6 +153,8 @@ export default async function CompanyPage() {
           ))}
         </ul>
       </section>
+
+      {!limited ? <CompanyActions preview={report} /> : null}
     </div>
   );
 }

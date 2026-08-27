@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { reviewRequest } from "@/app/actions/requests";
+import { collapseDuplicateRequests, reviewRequest } from "@/app/actions/requests";
 import { formatDateTime } from "@/lib/dates";
 import { roleLabel } from "@/lib/format";
 import { TodayChangeForm } from "@/components/TodayChangeForm";
@@ -12,6 +12,7 @@ export default async function RequestsPage({
 }) {
   const session = await getSession();
   if (!session) return null;
+  await collapseDuplicateRequests(session.schoolId);
   const { studentId } = await searchParams;
   const requests = await prisma.changeRequest.findMany({
     where: { schoolId: session.schoolId },

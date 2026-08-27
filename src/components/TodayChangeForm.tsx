@@ -5,15 +5,22 @@ import { useFormStatus } from "react-dom";
 import { createChangeRequest } from "@/app/actions/requests";
 import { StudentPicker, type StudentOption } from "@/components/StudentPicker";
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({
+  label,
+  locked,
+}: {
+  label: string;
+  locked: boolean;
+}) {
   const { pending } = useFormStatus();
+  const busy = pending || locked;
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={busy}
       className="relative z-10 rounded-xl bg-navy px-4 py-2 font-semibold text-white disabled:opacity-70"
     >
-      {pending ? "Saving…" : label}
+      {busy ? "Saving…" : label}
     </button>
   );
 }
@@ -42,9 +49,11 @@ export function TodayChangeForm({
   const [changeTo, setChangeTo] = useState<ChangeTo>("PARENT");
   const [companyNeed, setCompanyNeed] = useState<CompanyNeed>("MOVE");
   const [error, setError] = useState("");
+  const [locked, setLocked] = useState(false);
+  const [saved, setSaved] = useState(false);
   const submitLabel =
     kind === "COMPANY_REPORT"
-      ? "Report to bus company"
+      ? "Save request"
       : canApplyToday
         ? "Save today’s change"
         : "Submit for approval";
@@ -52,15 +61,21 @@ export function TodayChangeForm({
   return (
     <form
       action={async (formData) => {
+        if (locked || saved) return;
         setError("");
+        setLocked(true);
         if (!String(formData.get("studentId") || "").trim()) {
           setError("Click a student in the list first.");
+          setLocked(false);
           return;
         }
         const result = await createChangeRequest(formData);
         if (result && !result.ok) {
           setError(result.error || "Could not save this request.");
+          setLocked(false);
+          return;
         }
+        setSaved(true);
       }}
       className="relative z-10 mt-4 space-y-3"
     >
@@ -303,10 +318,17 @@ export function TodayChangeForm({
         />
       </label>
       {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
-      <p className="text-sm text-muted">
-        This only saves the request. It does not open Outlook or send email.
-      </p>
-      <SubmitButton label={submitLabel} />
+      {saved ? (
+        <p className="text-sm font-medium text-navy">
+          Saved. One request is enough — do not click again.
+        </p>
+      ) : (
+        <p className="text-sm text-muted">
+          This only saves the request. It does not open Outlook or send email.
+          Click Save once.
+        </p>
+      )}
+      <SubmitButton label={submitLabel} locked={locked || saved} />
     </form>
   );
 }
