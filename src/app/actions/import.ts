@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import * as XLSX from "xlsx";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
@@ -54,8 +55,10 @@ const HEADER_ALIASES = new Set([
   "full name",
   "first_name",
   "first name",
+  "student first name",
   "last_name",
   "last name",
+  "student last name",
   "grade",
   "teacher",
   "classroom",
@@ -66,6 +69,13 @@ const HEADER_ALIASES = new Set([
   "pm_type",
   "am_bus",
   "pm_bus",
+  "family id",
+  "family_id",
+  "parent/guardian",
+  "primary phone",
+  "zip code",
+  "enrollment status",
+  "source",
 ]);
 
 const POSITIONAL_KEYS = ["id", "student", "grade", "teacher", "room", "am", "pm"];
@@ -95,11 +105,37 @@ function rowsFromSheet(sheet: XLSX.WorkSheet): Row[] {
   });
 }
 
+function normalizeGrade(value: string) {
+  const raw = value.trim();
+  if (!raw || raw === "—") return "—";
+  if (/^k(indergarten)?$/i.test(raw) || raw === "0") return "Kindergarten";
+  const digits = raw.match(/(\d+)/);
+  if (digits) return `Grade ${Number(digits[1])}`;
+  return raw;
+}
+
+function slugStudentId(first: string, last: string, familyKey: string, index: number) {
+  const slug = `${last}-${first}`
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 36);
+  return slug || `${familyKey || "STU"}-${index + 1}`;
+}
+
 function parsePlan(value: string) {
   const raw = value.trim();
   const v = raw.toLowerCase();
   const dest = v.includes("daycare") ? "DAYCARE" : "HOME";
   if (!v) return { type: null as "BUS" | "PARENT" | null, bus: "", dest };
+  if (
+    v.includes("not checked") ||
+    v.includes("not confirmed") ||
+    v.includes("follow-up") ||
+    v.includes("absent")
+  ) {
+    return { type: null as "BUS" | "PARENT" | null, bus: "", dest };
+  }
   if (v.includes("parent") || v.includes("pickup") || v.includes("drop-off")) {
     return { type: "PARENT" as const, bus: "", dest };
   }
@@ -108,6 +144,50 @@ function parsePlan(value: string) {
     return { type: "BUS" as const, bus: busMatch?.[1] || "", dest };
   }
   return { type: parseType(raw), bus: "", dest };
+}
+
+function newId() {
+  return randomUUID().replace(/-/g, "").slice(0, 24);
+}
+
+async function findExistingStudent(
+  schoolId: string,
+  studentId: string,
+  firstName: string,
+  lastName: string,
+  parentPhone: string,
+) {
+  const byCode = await prisma.student.findUnique({
+    where: { schoolId_studentId: { schoolId, studentId } },
+  });
+  if (byCode) return byCode;
+
+  const matches = await prisma.student.findMany({
+    where: { schoolId, firstName, lastName },
+  });
+  if (matches.length === 1) return matches[0];
+  const phone = usablePhone(parentPhone);
+  if (phone) {
+    return (
+      matches.find((row) => usablePhone(row.parentPhone) === phone) || null
+    );
+  }
+  return null;
+}
+
+async function ensureNamedFamily(schoolId: string, familyKey: string) {
+  await ensureGateTables();
+  const existing = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "Family"
+    WHERE "schoolId" = ${schoolId} AND "familyKey" = ${familyKey}
+  `;
+  if (existing[0]) return existing[0].id;
+  const id = newId();
+  await prisma.$executeRaw`
+    INSERT INTO "Family" ("id", "schoolId", "familyKey", "reviewNeeded", "reviewNote", "createdAt")
+    VALUES (${id}, ${schoolId}, ${familyKey}, false, '', CURRENT_TIMESTAMP)
+  `;
+  return id;
 }
 
 export async function importStudents(formData: FormData) {
@@ -128,39 +208,60 @@ export async function importStudents(formData: FormData) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const sheetName =
+    workbook.SheetNames.find((name) => /master/i.test(name)) ||
+    workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
   const rows = rowsFromSheet(sheet);
   if (!rows.length) return { ok: false, error: "The file has no data rows." };
+
+  await ensureGateTables();
 
   let created = 0;
   let updated = 0;
   const errors: string[] = [];
+  const isFamilyMaster = Boolean(
+    cell(rows[0] || {}, "family id", "family_id") ||
+      cell(rows[0] || {}, "student first name"),
+  );
+  const canUpdate = overwrite || isFamilyMaster;
 
   for (const [index, row] of rows.entries()) {
-    const studentId = cell(row, "student_id", "id", "student id");
     const fullName = cell(row, "student", "name", "full name");
     const names = splitName(fullName);
-    const firstName = cell(row, "first_name", "first name") || names.first;
-    const lastName = cell(row, "last_name", "last name") || names.last;
-    if (!studentId || !firstName || !lastName) {
-      errors.push(`Row ${index + 2}: ID and Student name are required.`);
+    const firstName =
+      cell(row, "student first name", "first_name", "first name") || names.first;
+    const lastName =
+      cell(row, "student last name", "last_name", "last name") || names.last;
+    const familyKey = cell(row, "family id", "family_id", "family");
+    const studentId =
+      cell(row, "student_id", "id", "student id") ||
+      slugStudentId(firstName, lastName, familyKey, index);
+    if (!firstName || !lastName) {
+      errors.push(`Row ${index + 2}: Student first and last name are required.`);
       continue;
     }
 
-    const grade = cell(row, "grade") || "—";
-    const room = cell(row, "classroom", "room");
+    const rowSource = parseEnrollment(
+      cell(row, "enrollment status", "source", "enrollment", "enrollment source"),
+      enrollmentSource,
+    );
+    const grade = normalizeGrade(cell(row, "grade") || "—");
+    const room = cell(row, "classroom", "room", "teacher/class");
     const classroomName = room
       ? /^\d+$/.test(room)
         ? `Room ${room}`
         : room
       : `${grade} classroom`;
     const teacherName = cell(row, "teacher") || "Unassigned";
-    const parentName = cell(row, "parent_name", "parent") || "—";
-    const parentPhone = cell(row, "parent_phone", "phone") || "—";
+    const parentName =
+      cell(row, "parent/guardian", "parent_name", "parent") || "—";
+    const parentPhone =
+      cell(row, "primary phone", "parent_phone", "phone") || "—";
     const homeLine = cell(row, "home_address", "address") || "Address pending";
-    const city = cell(row, "home_city", "city") || "Springfield";
-    const state = cell(row, "home_state", "state") || "IL";
-    const zip = cell(row, "home_zip", "zip") || "62701";
+    const city = cell(row, "home_city", "city") || "Minneapolis";
+    const state = cell(row, "home_state", "state") || "MN";
+    const zip = cell(row, "home_zip", "zip code", "zip") || "";
     const amPlan = parsePlan(cell(row, "am_type", "am"));
     const pmPlan = parsePlan(cell(row, "pm_type", "pm"));
     let daycareName = cell(row, "daycare_name", "daycare");
@@ -171,13 +272,14 @@ export async function importStudents(formData: FormData) {
     const notes = cell(row, "notes");
 
     try {
-    const existingEarly = await prisma.student.findUnique({
-      where: {
-        schoolId_studentId: { schoolId: user.schoolId, studentId },
-      },
-      select: { id: true },
-    });
-    if (existingEarly && !overwrite) {
+    const existingEarly = await findExistingStudent(
+      user.schoolId,
+      studentId,
+      firstName,
+      lastName,
+      parentPhone,
+    );
+    if (existingEarly && !canUpdate) {
       errors.push(
         `Row ${index + 2}: ${firstName} ${lastName} already exists. Check “Update existing students” to overwrite.`,
       );
@@ -244,18 +346,7 @@ export async function importStudents(formData: FormData) {
       daycareId = daycare.id;
     }
 
-    const existing = await prisma.student.findUnique({
-      where: {
-        schoolId_studentId: { schoolId: user.schoolId, studentId },
-      },
-    });
-
-    if (existing && !overwrite) {
-      errors.push(
-        `Row ${index + 2}: ${firstName} ${lastName} already exists. Check “Update existing students” to overwrite.`,
-      );
-      continue;
-    }
+    const existing = existingEarly;
 
     const student = existing
       ? await prisma.student.update({
@@ -292,9 +383,14 @@ export async function importStudents(formData: FormData) {
     else created += 1;
 
     await ensureGateTables();
+    const familyId = familyKey
+      ? await ensureNamedFamily(user.schoolId, familyKey)
+      : null;
     await prisma.$executeRaw`
       UPDATE "Student"
-      SET "enrollmentSource" = ${enrollmentSource}
+      SET
+        "enrollmentSource" = ${rowSource},
+        "familyId" = COALESCE(${familyId}, "familyId")
       WHERE "id" = ${student.id}
     `;
 
@@ -418,23 +514,37 @@ async function rowsFromUpload(
 ) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const sheetName =
+    workbook.SheetNames.find((name) => /master/i.test(name)) ||
+    workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
   return rowsFromSheet(sheet).map((row) => {
     const fullName = cell(row, "student", "name", "full name");
     const names = splitName(fullName);
+    const firstName =
+      cell(row, "student first name", "first_name", "first name") || names.first;
+    const lastName =
+      cell(row, "student last name", "last_name", "last name") || names.last;
     return {
-      studentId: cell(row, "student_id", "id", "student id"),
-      firstName: cell(row, "first_name", "first name") || names.first,
-      lastName: cell(row, "last_name", "last name") || names.last,
-      grade: cell(row, "grade") || "—",
+      studentId: cell(row, "student_id", "id", "student id", "family id"),
+      firstName,
+      lastName,
+      grade: normalizeGrade(cell(row, "grade") || "—"),
       teacherName: cell(row, "teacher") || "Unassigned",
-      parentName: cell(row, "parent_name", "parent") || "—",
-      parentPhone: cell(row, "parent_phone", "phone") || "—",
+      parentName: cell(row, "parent/guardian", "parent_name", "parent") || "—",
+      parentPhone: cell(row, "primary phone", "parent_phone", "phone") || "—",
       address: cell(row, "home_address", "address") || "",
       city: cell(row, "home_city", "city") || "",
-      zip: cell(row, "home_zip", "zip") || "",
+      zip: cell(row, "home_zip", "zip code", "zip") || "",
       enrollmentSource: parseEnrollment(
-        cell(row, "enrollment", "source", "enrollment source", "type"),
+        cell(
+          row,
+          "enrollment status",
+          "source",
+          "enrollment",
+          "enrollment source",
+          "type",
+        ),
         fallback,
       ),
     };
