@@ -1,0 +1,396 @@
+import type { GateCounts } from "./gate";
+
+const NAVY = "#123052";
+const GREEN = "#0F8A72";
+const BLUE = "#2F6FED";
+const AMBER = "#E6A700";
+const ORANGE = "#E87524";
+const PAGE = "#EEF1F4";
+const CARD = "#FFFFFF";
+const INK = "#123052";
+const MUTED = "#5B6D7E";
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function pct(part: number, whole: number) {
+  if (!whole) return 0;
+  return Math.round((part / whole) * 100);
+}
+
+function barWidth(part: number, whole: number) {
+  if (!whole || !part) return 0;
+  return Math.min(100, Math.max(2, Math.round((part / whole) * 100)));
+}
+
+function studentsWord(n: number) {
+  return n === 1 ? "Student" : "Students";
+}
+
+export function leadershipDashboardUrl() {
+  const raw =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    "https://ampmflow.com";
+  return `${raw.replace(/\/$/, "")}/first-day`;
+}
+
+export function leadershipDashboardSubject(counts: GateCounts, schoolName: string) {
+  const name = schoolName.includes("Sankofa") ? "Sankofa" : schoolName;
+  return `${name} First-Day Update — ${counts.checkedIn} ${studentsWord(counts.checkedIn)} Checked In`;
+}
+
+export function leadershipSummary(counts: GateCounts) {
+  const parts = [
+    `${counts.checkedIn} of ${counts.totalStudents} students have checked in today.`,
+  ];
+  if (counts.pickupTodayBusTomorrow.students > 0) {
+    parts.push(
+      `Transportation is needed tomorrow for ${counts.pickupTodayBusTomorrow.students} students from ${counts.pickupTodayBusTomorrow.families} families.`,
+    );
+  }
+  if (counts.notConfirmed.students > 0) {
+    parts.push(
+      `PM dismissal remains unconfirmed for ${counts.notConfirmed.students} students.`,
+    );
+  } else {
+    parts.push("PM dismissal is confirmed for every student.");
+  }
+  return parts.join(" ");
+}
+
+function followUpItems(counts: GateCounts) {
+  return [
+    { label: "Confirmed Absences", value: counts.confirmedAbsences },
+    { label: "Arriving Late", value: counts.arrivingLate },
+    { label: "Absent—No Bus", value: counts.absentNoBus },
+    { label: "Absent—Sick", value: counts.absentSick },
+    { label: "Transferred", value: counts.transferred },
+    { label: "Unable to Reach", value: counts.unableToReach },
+  ];
+}
+
+function actionItems(counts: GateCounts) {
+  const items: string[] = [];
+  if (counts.notCheckedIn > 0) {
+    items.push(
+      `Follow up with ${counts.notCheckedIn} students who have not checked in.`,
+    );
+  }
+  if (counts.notConfirmed.students > 0) {
+    items.push(
+      `Confirm dismissal for ${counts.notConfirmed.students} students from ${counts.notConfirmed.families} families.`,
+    );
+  }
+  if (counts.pickupTodayBusTomorrow.students > 0) {
+    items.push(
+      `Arrange tomorrow’s transportation for ${counts.pickupTodayBusTomorrow.students} students from ${counts.pickupTodayBusTomorrow.families} families.`,
+    );
+  }
+  return items;
+}
+
+export function leadershipDashboardText(args: {
+  schoolName: string;
+  dateLabel: string;
+  updatedTime: string;
+  counts: GateCounts;
+  dashboardUrl: string;
+}) {
+  const { counts } = args;
+  const follow = followUpItems(counts);
+  const allFollowZero = follow.every((item) => item.value === 0);
+  const actions = actionItems(counts);
+  return [
+    "AMPM FLOW",
+    args.schoolName,
+    "First-Day Leadership Dashboard",
+    "",
+    args.dateLabel,
+    `Last updated: ${args.updatedTime}`,
+    "",
+    leadershipSummary(counts),
+    "",
+    `Total Students: ${counts.totalStudents}`,
+    `Checked In: ${counts.checkedIn} (${pct(counts.checkedIn, counts.totalStudents)}%)`,
+    `Not Checked In: ${counts.notCheckedIn}`,
+    `Bus Needed Tomorrow: ${counts.pickupTodayBusTomorrow.students} students / ${counts.pickupTodayBusTomorrow.families} families`,
+    "",
+    "AM ARRIVAL",
+    `Parent Drop-Off: ${counts.parentDropOff}`,
+    `Bus Drop-Off: ${counts.busDropOff}`,
+    `Total Checked In: ${counts.checkedIn}`,
+    "",
+    "PM DISMISSAL",
+    `Parent Pickup—Confirmed: ${counts.parentPickupConfirmed.students} students · ${counts.parentPickupConfirmed.families} families`,
+    `Bus Needed Tomorrow: ${counts.pickupTodayBusTomorrow.students} students · ${counts.pickupTodayBusTomorrow.families} families`,
+    `Confirmed Bus: ${counts.confirmedBus.students} students · ${counts.confirmedBus.families} families`,
+    `Not Confirmed: ${counts.notConfirmed.students} students · ${counts.notConfirmed.families} families`,
+    "",
+    "FOLLOW-UP",
+    ...(allFollowZero
+      ? [
+          "No confirmed absences or additional follow-up outcomes have been recorded.",
+        ]
+      : follow.map((item) => `${item.label}: ${item.value}`)),
+    "",
+    ...(actions.length
+      ? ["ACTION NEEDED", ...actions.map((item) => `• ${item}`), ""]
+      : []),
+    "Generated by AMPM Flow",
+    "Student Arrival · Safe Dismissal · Transportation Coordination",
+    `View live dashboard: ${args.dashboardUrl}`,
+  ].join("\n");
+}
+
+function kpiCard(args: {
+  label: string;
+  value: string;
+  sub?: string;
+  bg: string;
+  color: string;
+  accent: string;
+}) {
+  return `<td width="50%" valign="top" style="padding:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${args.bg}" style="background:${args.bg};border-radius:8px;border-left:6px solid ${args.accent};">
+      <tr>
+        <td style="padding:16px 14px 16px 16px;">
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${args.color};opacity:0.9;">${args.label}</div>
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;line-height:1.1;font-weight:700;color:${args.color};margin-top:6px;">${args.value}</div>
+          ${
+            args.sub
+              ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.35;color:${args.color};margin-top:4px;">${args.sub}</div>`
+              : ""
+          }
+        </td>
+      </tr>
+    </table>
+  </td>`;
+}
+
+function sectionCard(title: string, body: string) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${CARD}" style="background:${CARD};border-radius:8px;margin:0 0 12px;">
+    <tr>
+      <td style="padding:18px 20px 20px;">
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};margin:0 0 12px;">${title}</div>
+        ${body}
+      </td>
+    </tr>
+  </table>`;
+}
+
+function countRow(label: string, value: string, color?: string) {
+  return `<tr>
+    <td width="8" valign="top" bgcolor="${color || PAGE}" style="background:${color || PAGE};font-size:0;line-height:0;width:8px;">&nbsp;</td>
+    <td style="padding:9px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK};border-bottom:1px solid #EEF2F5;">${label}</td>
+    <td align="right" style="padding:9px 4px 9px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;color:${INK};white-space:nowrap;border-bottom:1px solid #EEF2F5;">${value}</td>
+  </tr>`;
+}
+
+function stackedBar(segments: Array<{ width: number; color: string }>) {
+  const parts = segments.filter((segment) => segment.width > 0);
+  if (!parts.length) {
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#E8EEF3" style="background:#E8EEF3;height:10px;"><tr><td height="10" style="height:10px;font-size:0;line-height:0;">&nbsp;</td></tr></table>`;
+  }
+  const used = parts.reduce((sum, segment) => sum + segment.width, 0);
+  const rest = Math.max(0, 100 - used);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#E8EEF3" style="background:#E8EEF3;height:10px;">
+    <tr>
+      ${parts
+        .map(
+          (segment) =>
+            `<td width="${segment.width}%" height="10" bgcolor="${segment.color}" style="background:${segment.color};height:10px;font-size:0;line-height:0;">&nbsp;</td>`,
+        )
+        .join("")}
+      ${
+        rest
+          ? `<td width="${rest}%" height="10" style="height:10px;font-size:0;line-height:0;">&nbsp;</td>`
+          : ""
+      }
+    </tr>
+  </table>`;
+}
+
+export function leadershipDashboardHtml(args: {
+  schoolName: string;
+  dateLabel: string;
+  updatedTime: string;
+  counts: GateCounts;
+  dashboardUrl: string;
+}) {
+  const { counts } = args;
+  const active = counts.totalStudents;
+  const attendance = pct(counts.checkedIn, active);
+  const follow = followUpItems(counts);
+  const allFollowZero = follow.every((item) => item.value === 0);
+  const actions = actionItems(counts);
+  const schoolName = args.schoolName || "Sankofa Prep";
+
+  const followHtml = allFollowZero
+    ? `<p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${MUTED};">No confirmed absences or additional follow-up outcomes have been recorded.</p>`
+    : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${follow
+        .map((item) =>
+          countRow(escapeHtml(item.label), String(item.value), item.value ? AMBER : "#D5DEE6"),
+        )
+        .join("")}</table>`;
+
+  const actionHtml = actions.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#FFF4E8" style="background:#FFF4E8;border:1px solid #F0C7A0;border-radius:8px;margin:0 0 12px;">
+        <tr>
+          <td style="padding:16px 18px 18px;">
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8A3B00;margin:0 0 10px;">Action Needed</div>
+            ${actions
+              .map(
+                (item) =>
+                  `<p style="margin:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.45;color:#8A3B00;">• ${escapeHtml(item)}</p>`,
+              )
+              .join("")}
+          </td>
+        </tr>
+      </table>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>${escapeHtml(leadershipDashboardSubject(counts, schoolName))}</title>
+</head>
+<body style="margin:0;padding:0;background:${PAGE};font-family:Arial,Helvetica,sans-serif;color:${INK};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${PAGE}" style="background:${PAGE};padding:20px 8px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;max-width:680px;">
+          <tr>
+            <td bgcolor="${NAVY}" style="background:${NAVY};color:#ffffff;padding:22px 24px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#C9D6E3;">AMPM FLOW</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:1.25;font-weight:700;color:#ffffff;margin:6px 0 2px;">${escapeHtml(schoolName)}</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#E8EEF5;margin:0 0 12px;">First-Day Leadership Dashboard</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#D5DEEA;">
+                ${escapeHtml(args.dateLabel)}<br>
+                Last updated: ${escapeHtml(args.updatedTime)}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="${CARD}" style="background:${CARD};padding:18px 22px 8px;">
+              <p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:${INK};">
+                ${escapeHtml(leadershipSummary(counts))}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="${CARD}" style="background:${CARD};padding:0 16px 10px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  ${kpiCard({
+                    label: "Total Students",
+                    value: String(counts.totalStudents),
+                    bg: "#E7EEF5",
+                    color: NAVY,
+                    accent: NAVY,
+                  })}
+                  ${kpiCard({
+                    label: "Checked In",
+                    value: `${counts.checkedIn} <span style="font-size:16px;font-weight:700;">(${attendance}%)</span>`,
+                    bg: "#E5F6F2",
+                    color: "#0B5E4E",
+                    accent: GREEN,
+                  })}
+                </tr>
+                <tr>
+                  ${kpiCard({
+                    label: "Not Checked In",
+                    value: String(counts.notCheckedIn),
+                    bg: "#FFF6D8",
+                    color: "#6B4E00",
+                    accent: AMBER,
+                  })}
+                  ${kpiCard({
+                    label: "Bus Needed Tomorrow",
+                    value: String(counts.pickupTodayBusTomorrow.students),
+                    sub: `${counts.pickupTodayBusTomorrow.students} students / ${counts.pickupTodayBusTomorrow.families} families`,
+                    bg: "#FFF1E6",
+                    color: "#8A3B00",
+                    accent: ORANGE,
+                  })}
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="${PAGE}" style="background:${PAGE};padding:12px 0 0;">
+              ${sectionCard(
+                "AM Arrival",
+                `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  ${countRow("Parent Drop-Off", String(counts.parentDropOff), GREEN)}
+                  ${countRow("Bus Drop-Off", String(counts.busDropOff), BLUE)}
+                  ${countRow("Total Checked In", String(counts.checkedIn), NAVY)}
+                </table>
+                <div style="height:10px;font-size:0;line-height:0;">&nbsp;</div>
+                ${stackedBar([
+                  { width: barWidth(counts.parentDropOff, active), color: GREEN },
+                  { width: barWidth(counts.busDropOff, active), color: BLUE },
+                ])}
+                <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};margin-top:8px;">
+                  Parent Drop-Off ${counts.parentDropOff} · Bus Drop-Off ${counts.busDropOff} · ${attendance}% checked in
+                </div>`,
+              )}
+              ${sectionCard(
+                "PM Dismissal",
+                `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  ${countRow(
+                    "Parent Pickup—Confirmed",
+                    `${counts.parentPickupConfirmed.students} students · ${counts.parentPickupConfirmed.families} families`,
+                    BLUE,
+                  )}
+                  ${countRow(
+                    "Bus Needed Tomorrow",
+                    `${counts.pickupTodayBusTomorrow.students} students · ${counts.pickupTodayBusTomorrow.families} families`,
+                    ORANGE,
+                  )}
+                  ${countRow(
+                    "Confirmed Bus",
+                    `${counts.confirmedBus.students} students · ${counts.confirmedBus.families} families`,
+                    GREEN,
+                  )}
+                  ${countRow(
+                    "Not Confirmed",
+                    `${counts.notConfirmed.students} students · ${counts.notConfirmed.families} families`,
+                    AMBER,
+                  )}
+                </table>`,
+              )}
+              ${sectionCard("Follow-Up", followHtml)}
+              ${actionHtml}
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 20px 24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" bgcolor="${NAVY}" style="background:${NAVY};border-radius:6px;">
+                    <a href="${escapeHtml(args.dashboardUrl)}" style="display:inline-block;padding:12px 22px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">View Live Dashboard</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:${MUTED};">
+                Generated by AMPM Flow<br>
+                Student Arrival · Safe Dismissal · Transportation Coordination
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}

@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { sendMail } from "@/lib/email";
-import { formatLongDate, todayKey } from "@/lib/dates";
+import { formatLongDate, formatTime, schoolNow, todayKey } from "@/lib/dates";
+import {
+  leadershipDashboardHtml,
+  leadershipDashboardSubject,
+  leadershipDashboardText,
+  leadershipDashboardUrl,
+} from "@/lib/first-day-email";
+import { getSchoolIdentityById } from "@/lib/school";
 import {
   AM_LABEL,
   PM_LABEL,
@@ -236,6 +243,7 @@ export async function emailLeadershipAction(to?: string) {
   }
   const roster = await loadGateRoster(user.schoolId);
   const counts = gateCounts(roster);
+  const school = await getSchoolIdentityById(user.schoolId);
   const extra = usableOpsEmail(to || "");
   const saved = await loadSavedOpsEmails(user.schoolId);
   const emails = [...new Set([extra, ...saved].filter(Boolean))];
@@ -247,35 +255,23 @@ export async function emailLeadershipAction(to?: string) {
     };
   }
 
-  const text = [
-    "AMPM Flow — First-day leadership dashboard",
-    formatLongDate(),
-    `Last updated: ${lastUpdatedStamp(roster)}`,
-    "",
-    `Total students: ${counts.totalStudents}`,
-    `Unique families: ${counts.totalFamilies}`,
-    `Checked in: ${counts.checkedIn}`,
-    `Not checked in: ${counts.notCheckedIn}`,
-    `Confirmed absences: ${counts.confirmedAbsences}`,
-    `Arriving late: ${counts.arrivingLate}`,
-    `Absent—no bus: ${counts.absentNoBus}`,
-    `Absent—sick: ${counts.absentSick}`,
-    `Transferred: ${counts.transferred}`,
-    `Unable to reach: ${counts.unableToReach}`,
-    "",
-    `AM Parent Drop-Off: ${counts.parentDropOff}`,
-    `AM Bus Drop-Off: ${counts.busDropOff}`,
-    "",
-    `Parent Pickup—Confirmed: ${counts.parentPickupConfirmed.students} students from ${counts.parentPickupConfirmed.families} families`,
-    `Bus Needed Tomorrow: ${counts.pickupTodayBusTomorrow.students} students from ${counts.pickupTodayBusTomorrow.families} families`,
-    `Confirmed Bus: ${counts.confirmedBus.students} students from ${counts.confirmedBus.families} families`,
-    `Not Confirmed: ${counts.notConfirmed.students} students from ${counts.notConfirmed.families} families`,
-  ].join("\n");
+  const stamp = lastUpdatedStamp(roster);
+  const updatedTime = stamp.includes(" · ")
+    ? stamp.split(" · ")[1]
+    : formatTime(schoolNow());
+  const report = {
+    schoolName: school?.name || "Sankofa Prep",
+    dateLabel: formatLongDate(),
+    updatedTime,
+    counts,
+    dashboardUrl: leadershipDashboardUrl(),
+  };
 
   const sent = await sendMail({
     to: emails,
-    subject: `First-day dashboard — ${formatLongDate()}`,
-    text,
+    subject: leadershipDashboardSubject(counts, report.schoolName),
+    text: leadershipDashboardText(report),
+    html: leadershipDashboardHtml(report),
   });
   if (!sent.sent) return { ok: false as const, error: sent.reason };
   return { ok: true as const, to: emails };
