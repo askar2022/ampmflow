@@ -468,6 +468,7 @@ export async function importStudents(formData: FormData) {
   revalidatePath("/students");
   revalidatePath("/dashboard");
   revalidatePath("/gate");
+  revalidatePath("/first-day");
   return { ok: true, created, updated, errors };
 }
 

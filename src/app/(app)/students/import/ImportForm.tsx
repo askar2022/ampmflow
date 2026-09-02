@@ -1,9 +1,11 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { importStudents } from "@/app/actions/import";
 
 export function ImportForm() {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [pending, start] = useTransition();
@@ -21,16 +23,21 @@ export function ImportForm() {
         }
         const data = new FormData(event.currentTarget);
         start(async () => {
-          const result = await importStudents(data);
-          if (!result.ok) {
-            setMessage(result.error || "Import failed.");
-            setErrors([]);
-            return;
+          try {
+            const result = await importStudents(data);
+            if (!result?.ok) {
+              setMessage(result?.error || "Import failed.");
+              setErrors([]);
+              return;
+            }
+            router.push(
+              `/students?imported=${result.created ?? 0}&updated=${result.updated ?? 0}&issues=${result.errors?.length ?? 0}`,
+            );
+          } catch {
+            setMessage(
+              "The file may have saved even if this page did not finish. Open Students or The Gate to confirm.",
+            );
           }
-          setMessage(
-            `Imported ${result.created} new students and updated ${result.updated}.`,
-          );
-          setErrors(result.errors ?? []);
         });
       }}
     >
@@ -67,7 +74,11 @@ export function ImportForm() {
         Update existing students (overwrite confirmed)
       </label>
       <input type="hidden" name="enrollmentSource" value="RETURNING" />
-      {message ? <p className="mt-3 text-sm">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 rounded-xl border border-green bg-green-50 px-4 py-3 text-base font-semibold text-green">
+          {message}
+        </p>
+      ) : null}
       {errors.length ? (
         <ul className="mt-2 list-disc pl-5 text-sm text-red">
           {errors.slice(0, 8).map((error) => (

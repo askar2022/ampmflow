@@ -7,11 +7,11 @@ import { StatusBadge } from "@/components/StatusBadge";
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; imported?: string; updated?: string; issues?: string }>;
 }) {
   const session = await getSession();
   if (!session) return null;
-  const { q = "" } = await searchParams;
+  const { q = "", imported, updated, issues } = await searchParams;
   const students = searchStudents(await loadStudents(session.schoolId), q);
   const canImport =
     session.role === "COORDINATOR" || session.role === "ADMINISTRATOR";
@@ -28,6 +28,14 @@ export default async function StudentsPage({
 
   return (
     <div className="space-y-6">
+      {imported != null && imported !== "" ? (
+        <p className="rounded-2xl border border-green bg-green-50 px-4 py-3 text-base font-semibold text-green">
+          Upload complete. Imported {imported} new students
+          {updated && updated !== "0" ? ` and updated ${updated}` : ""}.
+          {issues && issues !== "0" ? ` ${issues} rows need review.` : ""}{" "}
+          Open The Gate to start AM arrival.
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-serif text-4xl">Students</h1>
