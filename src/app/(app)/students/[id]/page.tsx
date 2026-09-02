@@ -7,6 +7,14 @@ import { formatDateTime } from "@/lib/dates";
 import { destinationLabel, durationLabel, planSummary, planTone, typeLabel } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UndoLastChangeButton } from "./UndoLastChangeButton";
+import {
+  AM_LABEL,
+  ENROLL_LABEL,
+  FOLLOW_LABEL,
+  PM_LABEL,
+  loadGateHistory,
+  loadGateRoster,
+} from "@/lib/gate";
 
 export default async function StudentPage({
   params,
@@ -26,6 +34,15 @@ export default async function StudentPage({
     orderBy: { createdAt: "desc" },
     take: 20,
   });
+
+  const [gateHistory, roster] = await Promise.all([
+    loadGateHistory(session.schoolId, id),
+    loadGateRoster(session.schoolId),
+  ]);
+  const gateStudent = roster.find((row) => row.id === id);
+  const siblings = roster.filter(
+    (row) => gateStudent?.familyId && row.familyId === gateStudent.familyId,
+  );
 
   const canUndo = audits.some(
     (log) => log.action === "UPDATE_PERMANENT" || log.action === "CREATE_TEMPORARY",
@@ -105,6 +122,35 @@ export default async function StudentPage({
         <div className="rounded-2xl border border-line bg-card p-5">
           <h2 className="font-serif text-2xl">Family & destinations</h2>
           <dl className="mt-4 space-y-2 text-sm">
+            <Row label="Family ID" value={gateStudent?.familyKey || "—"} />
+            <Row
+              label="Enrollment"
+              value={
+                gateStudent
+                  ? ENROLL_LABEL[gateStudent.enrollmentSource]
+                  : "—"
+              }
+            />
+            <Row
+              label="Siblings"
+              value={
+                siblings.length
+                  ? siblings.map((row) => row.fullName).join(", ")
+                  : "None grouped"
+              }
+            />
+            <Row
+              label="Assigned Vehicle/Route"
+              value={
+                gateStudent
+                  ? `${gateStudent.vehicleName}${
+                      gateStudent.driverName
+                        ? ` · ${gateStudent.driverName} ${gateStudent.driverPhone}`
+                        : ""
+                    }`
+                  : "Not Assigned"
+              }
+            />
             <Row label="Parent" value={`${student.parentName} · ${student.parentPhone}`} />
             <Row label="Home address" value={student.homeAddress} />
             <Row label="Daycare" value={student.daycareName ? `${student.daycareName} — ${student.daycareAddress}` : "None on file"} />
@@ -135,6 +181,39 @@ export default async function StudentPage({
           </ul>
         </div>
       </section>
+
+      {gateHistory.length ? (
+        <section className="rounded-2xl border border-line bg-card p-5">
+          <h2 className="font-serif text-2xl">Gate status history</h2>
+          <p className="text-sm text-muted">
+            Arrival and dismissal changes are never deleted.
+          </p>
+          <table className="mt-4 w-full text-left text-sm">
+            <thead className="text-muted">
+              <tr>
+                <th className="py-2">When</th>
+                <th>Staff</th>
+                <th>Field</th>
+                <th>Previous</th>
+                <th>New</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gateHistory.map((row, index) => (
+                <tr key={`${row.createdAt}-${index}`} className="border-t border-line">
+                  <td className="py-2 whitespace-nowrap">
+                    {formatDateTime(row.createdAt)}
+                  </td>
+                  <td>{row.actorName}</td>
+                  <td>{row.field}</td>
+                  <td>{gateHistoryLabel(row.field, row.previous)}</td>
+                  <td>{gateHistoryLabel(row.field, row.next)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-line bg-card p-5">
         <h2 className="font-serif text-2xl">Audit history</h2>
@@ -171,6 +250,13 @@ export default async function StudentPage({
       </section>
     </div>
   );
+}
+
+function gateHistoryLabel(field: string, value: string) {
+  if (field === "amArrival") return AM_LABEL[value as keyof typeof AM_LABEL] || value;
+  if (field === "amFollowUp") return FOLLOW_LABEL[value as keyof typeof FOLLOW_LABEL] || value;
+  if (field === "pmDismissal") return PM_LABEL[value as keyof typeof PM_LABEL] || value;
+  return value || "—";
 }
 
 function Row({ label, value }: { label: string; value: string }) {

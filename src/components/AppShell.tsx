@@ -8,7 +8,12 @@ import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/gate", label: "The Gate", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/dismissal-grade", label: "Dismissal by Grade/Class", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/bus-tomorrow", label: "Bus Needed Tomorrow", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/first-day", label: "First-Day Dashboard", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/leadership", label: "Leadership", roles: ["ADMINISTRATOR", "COORDINATOR"] },
+  { href: "/vehicles", label: "Vehicles", roles: ["ADMINISTRATOR", "COORDINATOR"] },
   { href: "/changes", label: "Today’s Changes", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/requests", label: "Requests", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/activity", label: "Today’s Activity", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },

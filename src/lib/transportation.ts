@@ -1,3 +1,4 @@
+import { ensureGateTables } from "./gate";
 import { prisma } from "./prisma";
 import { dateInRange, todayKey } from "./dates";
 import { formatAddress, locationFor } from "./format";
@@ -178,6 +179,7 @@ export function toEffective(
 }
 
 export async function loadStudents(schoolId: string, day = todayKey()) {
+  await ensureGateTables();
   const rows = await prisma.student.findMany({
     where: { schoolId },
     include: studentInclude,
@@ -187,6 +189,7 @@ export async function loadStudents(schoolId: string, day = todayKey()) {
 }
 
 export async function loadStudent(id: string, day = todayKey()) {
+  await ensureGateTables();
   const row = await prisma.student.findUnique({
     where: { id },
     include: studentInclude,

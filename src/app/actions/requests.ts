@@ -296,6 +296,13 @@ export async function createChangeRequest(
   if ((isTodayChange || isCompanyReport) && !studentId) {
     return { ok: false, error: "Click a student in the list first." };
   }
+  if (
+    isTodayChange &&
+    (changeTo === "PARENT_TO_BUS" || changeTo === "BUS_TO_BUS") &&
+    !busNumber
+  ) {
+    return { ok: false, error: "Enter the bus number for today." };
+  }
 
   if (studentId) {
     const recent = await prisma.changeRequest.findFirst({

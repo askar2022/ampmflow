@@ -14,6 +14,10 @@ import {
 import { eventPlanLabel } from "@/lib/operations";
 
 const tiles = [
+  { href: "/gate", title: "The Gate", copy: "AM arrival, follow-up, and PM dismissal for first-day families." },
+  { href: "/dismissal-grade", title: "Dismissal by Grade/Class", copy: "Print or email one grade only." },
+  { href: "/bus-tomorrow", title: "Bus Needed Tomorrow", copy: "Families who need transportation the next school day." },
+  { href: "/first-day", title: "First-Day Dashboard", copy: "Leadership counts for arrival, absence, and dismissal." },
   { href: "/changes", title: "Today’s Changes", copy: "Live exceptions teachers must see first." },
   { href: "/buses", title: "Buses", copy: "Full printable roster. Red line = changed today." },
   { href: "/pickup", title: "Parent Pickup", copy: "Students going home with a parent." },

@@ -47,7 +47,8 @@ export function TodayChangeForm({
   const [companyNeed, setCompanyNeed] = useState<CompanyNeed>("MOVE");
   const [error, setError] = useState("");
   const [locked, setLocked] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState("");
+  const [pickerKey, setPickerKey] = useState(0);
   const submitLabel =
     kind === "COMPANY_REPORT"
       ? "Save request"
@@ -58,11 +59,21 @@ export function TodayChangeForm({
   return (
     <form
       action={async (formData) => {
-        if (locked || saved) return;
+        if (locked) return;
         setError("");
+        setSaved("");
         setLocked(true);
         if (!String(formData.get("studentId") || "").trim()) {
           setError("Click a student in the list first.");
+          setLocked(false);
+          return;
+        }
+        if (
+          kind === "TODAY_CHANGE" &&
+          (changeTo === "PARENT_TO_BUS" || changeTo === "BUS_TO_BUS") &&
+          !String(formData.get("busNumber") || "").trim()
+        ) {
+          setError("Enter the bus number for today.");
           setLocked(false);
           return;
         }
@@ -72,14 +83,20 @@ export function TodayChangeForm({
           setLocked(false);
           return;
         }
-        setSaved(true);
+        setSaved("Saved. Choose another student if you need to save again.");
+        setLocked(false);
+        setPickerKey((value) => value + 1);
       }}
       className="mt-4 space-y-3"
     >
       <input type="hidden" name="kind" value={kind} />
       <div className="text-sm font-medium">
         Student
-        <StudentPicker defaultId={defaultStudentId} students={students} />
+        <StudentPicker
+          key={pickerKey}
+          defaultId={pickerKey === 0 ? defaultStudentId : ""}
+          students={students}
+        />
       </div>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">What kind of request?</legend>
@@ -324,16 +341,13 @@ export function TodayChangeForm({
       </label>
       {error ? <p className="text-sm font-medium text-red-700">{error}</p> : null}
       {saved ? (
-        <p className="text-sm font-medium text-navy">
-          Saved. One request is enough — do not click again.
-        </p>
+        <p className="text-sm font-medium text-navy">{saved}</p>
       ) : (
         <p className="text-sm text-muted">
           This only saves the request. It does not open Outlook or send email.
-          Click Save once.
         </p>
       )}
-      <SubmitButton label={submitLabel} locked={locked || saved} />
+      <SubmitButton label={submitLabel} locked={locked} />
     </form>
   );
 }

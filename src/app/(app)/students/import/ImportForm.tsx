@@ -62,6 +62,11 @@ export function ImportForm() {
       <p className="mt-3 text-sm font-medium text-navy">
         {fileName ? `Selected: ${fileName}` : "No file chosen yet."}
       </p>
+      <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" name="overwrite" />
+        Update existing students (overwrite confirmed)
+      </label>
+      <input type="hidden" name="enrollmentSource" value="RETURNING" />
       {message ? <p className="mt-3 text-sm">{message}</p> : null}
       {errors.length ? (
         <ul className="mt-2 list-disc pl-5 text-sm text-red">

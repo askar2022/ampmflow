@@ -18,6 +18,11 @@ export default async function LeadershipPage() {
           This view shows the workload behind transportation. Each student
           counts once, even if the same change was saved many times. Reporting
           period for the weekly email is Monday through Friday at 12:00 PM.
+          First-day arrival and dismissal counts are on the{" "}
+          <a href="/first-day" className="font-semibold text-blue">
+            First-Day Dashboard
+          </a>
+          .
         </p>
       </div>
 

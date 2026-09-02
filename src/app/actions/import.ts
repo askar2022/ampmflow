@@ -5,6 +5,14 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
+import {
+  assignMissingFamilies,
+  digitsPhone,
+  ensureGateTables,
+  normAddress,
+  normName,
+  usablePhone,
+} from "@/lib/gate";
 
 type Row = Record<string, string>;
 
@@ -112,6 +120,11 @@ export async function importStudents(formData: FormData) {
   if (!(file instanceof File)) {
     return { ok: false, error: "Choose an Excel or CSV file." };
   }
+  const overwrite = String(formData.get("overwrite") || "") === "on";
+  const enrollmentSource =
+    String(formData.get("enrollmentSource") || "RETURNING") === "NEW_APPLICATION"
+      ? "NEW_APPLICATION"
+      : "RETURNING";
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -158,6 +171,19 @@ export async function importStudents(formData: FormData) {
     const notes = cell(row, "notes");
 
     try {
+    const existingEarly = await prisma.student.findUnique({
+      where: {
+        schoolId_studentId: { schoolId: user.schoolId, studentId },
+      },
+      select: { id: true },
+    });
+    if (existingEarly && !overwrite) {
+      errors.push(
+        `Row ${index + 2}: ${firstName} ${lastName} already exists. Check “Update existing students” to overwrite.`,
+      );
+      continue;
+    }
+
     let classroom = await prisma.classroom.findFirst({
       where: { schoolId: user.schoolId, name: classroomName },
     });
@@ -224,6 +250,13 @@ export async function importStudents(formData: FormData) {
       },
     });
 
+    if (existing && !overwrite) {
+      errors.push(
+        `Row ${index + 2}: ${firstName} ${lastName} already exists. Check “Update existing students” to overwrite.`,
+      );
+      continue;
+    }
+
     const student = existing
       ? await prisma.student.update({
           where: { id: existing.id },
@@ -257,6 +290,13 @@ export async function importStudents(formData: FormData) {
 
     if (existing) updated += 1;
     else created += 1;
+
+    await ensureGateTables();
+    await prisma.$executeRaw`
+      UPDATE "Student"
+      SET "enrollmentSource" = ${enrollmentSource}
+      WHERE "id" = ${student.id}
+    `;
 
     const amType = parseType(cell(row, "am_type")) || amPlan.type;
     const pmType = parseType(cell(row, "pm_type")) || pmPlan.type;
@@ -327,7 +367,180 @@ export async function importStudents(formData: FormData) {
     newPlan: { created, updated, errors: errors.length },
   });
 
+  await assignMissingFamilies(user.schoolId).catch(() => undefined);
+
   revalidatePath("/students");
   revalidatePath("/dashboard");
+  revalidatePath("/gate");
   return { ok: true, created, updated, errors };
+}
+
+export type ImportPreviewRow = {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  grade: string;
+  teacherName: string;
+  parentName: string;
+  parentPhone: string;
+  address: string;
+  city: string;
+  zip: string;
+  enrollmentSource: "RETURNING" | "NEW_APPLICATION";
+  duplicate: boolean;
+  duplicateOf: string;
+  siblingHint: string;
+  uncertain: boolean;
+  uncertainNote: string;
+};
+
+export type ImportPreview = {
+  rows: ImportPreviewRow[];
+  totalStudents: number;
+  uniqueFamilies: number;
+  returning: number;
+  newApplication: number;
+  duplicates: number;
+  uncertain: number;
+  existingConflicts: number;
+};
+
+function parseEnrollment(value: string, fallback: "RETURNING" | "NEW_APPLICATION") {
+  const v = value.toLowerCase();
+  if (v.includes("new") || v.includes("application")) return "NEW_APPLICATION";
+  if (v.includes("return") || v.includes("retention")) return "RETURNING";
+  return fallback;
+}
+
+async function rowsFromUpload(
+  file: File,
+  fallback: "RETURNING" | "NEW_APPLICATION",
+) {
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  return rowsFromSheet(sheet).map((row) => {
+    const fullName = cell(row, "student", "name", "full name");
+    const names = splitName(fullName);
+    return {
+      studentId: cell(row, "student_id", "id", "student id"),
+      firstName: cell(row, "first_name", "first name") || names.first,
+      lastName: cell(row, "last_name", "last name") || names.last,
+      grade: cell(row, "grade") || "—",
+      teacherName: cell(row, "teacher") || "Unassigned",
+      parentName: cell(row, "parent_name", "parent") || "—",
+      parentPhone: cell(row, "parent_phone", "phone") || "—",
+      address: cell(row, "home_address", "address") || "",
+      city: cell(row, "home_city", "city") || "",
+      zip: cell(row, "home_zip", "zip") || "",
+      enrollmentSource: parseEnrollment(
+        cell(row, "enrollment", "source", "enrollment source", "type"),
+        fallback,
+      ),
+    };
+  });
+}
+
+export async function previewStudentImport(formData: FormData) {
+  const user = await getSession();
+  if (!user || (user.role !== "COORDINATOR" && user.role !== "ADMINISTRATOR")) {
+    return { ok: false as const, error: "Only an admin or bus coordinator can import students." };
+  }
+
+  const returning = formData.get("returning");
+  const incoming = formData.get("newApplication");
+  const combined: Awaited<ReturnType<typeof rowsFromUpload>> = [];
+  if (returning instanceof File && returning.size) {
+    combined.push(...(await rowsFromUpload(returning, "RETURNING")));
+  }
+  if (incoming instanceof File && incoming.size) {
+    combined.push(...(await rowsFromUpload(incoming, "NEW_APPLICATION")));
+  }
+  if (!combined.length) {
+    return { ok: false as const, error: "Choose a returning file, a new-application file, or both." };
+  }
+
+  await ensureGateTables();
+  const existing = await prisma.student.findMany({
+    where: { schoolId: user.schoolId },
+    include: { homeAddress: true },
+  });
+
+  const seenIds = new Map<string, string>();
+  const rows: ImportPreviewRow[] = combined
+    .filter((row) => row.firstName && row.lastName)
+    .map((row) => {
+      const key = row.studentId || `${normName(row.firstName)}|${normName(row.lastName)}|${digitsPhone(row.parentPhone)}`;
+      const prior = seenIds.get(key);
+      seenIds.set(key, `${row.firstName} ${row.lastName}`);
+      const existingHit = existing.find(
+        (s) =>
+          (row.studentId && s.studentId === row.studentId) ||
+          (normName(s.firstName) === normName(row.firstName) &&
+            normName(s.lastName) === normName(row.lastName) &&
+            usablePhone(s.parentPhone) &&
+            usablePhone(s.parentPhone) === usablePhone(row.parentPhone)),
+      );
+      const sibling = combined.find((other) => {
+        if (other === row) return false;
+        const phone =
+          usablePhone(row.parentPhone) &&
+          usablePhone(row.parentPhone) === usablePhone(other.parentPhone);
+        const name =
+          normName(row.parentName) &&
+          normName(row.parentName) === normName(other.parentName);
+        return Boolean(phone && name);
+      });
+      const uncertainPeer = combined.find((other) => {
+        if (other === row) return false;
+        const phone =
+          usablePhone(row.parentPhone) &&
+          usablePhone(row.parentPhone) === usablePhone(other.parentPhone);
+        const name = normName(row.parentName) === normName(other.parentName);
+        const address =
+          normAddress(row.address) &&
+          normAddress(row.address) === normAddress(other.address);
+        return (phone && !name) || (name && address && !phone);
+      });
+      return {
+        ...row,
+        duplicate: Boolean(prior || existingHit),
+        duplicateOf: existingHit
+          ? `Existing ${existingHit.firstName} ${existingHit.lastName} (${existingHit.studentId})`
+          : prior
+            ? `Also in this import as ${prior}`
+            : "",
+        siblingHint: sibling
+          ? `Likely siblings with ${sibling.firstName} ${sibling.lastName}`
+          : "",
+        uncertain: Boolean(uncertainPeer),
+        uncertainNote: uncertainPeer
+          ? `Possible family match with ${uncertainPeer.firstName} ${uncertainPeer.lastName} — do not auto-combine.`
+          : "",
+      };
+    });
+
+  const familyKeys = new Set(
+    rows.map((row) => {
+      const phone = usablePhone(row.parentPhone);
+      const parent = normName(row.parentName);
+      if (phone && parent) return `${phone}|${parent}`;
+      return `solo|${row.studentId || row.firstName + row.lastName}`;
+    }),
+  );
+
+  const preview: ImportPreview = {
+    rows,
+    totalStudents: rows.length,
+    uniqueFamilies: familyKeys.size,
+    returning: rows.filter((r) => r.enrollmentSource === "RETURNING").length,
+    newApplication: rows.filter((r) => r.enrollmentSource === "NEW_APPLICATION")
+      .length,
+    duplicates: rows.filter((r) => r.duplicate).length,
+    uncertain: rows.filter((r) => r.uncertain).length,
+    existingConflicts: rows.filter((r) => r.duplicateOf.startsWith("Existing"))
+      .length,
+  };
+
+  return { ok: true as const, preview };
 }
