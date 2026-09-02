@@ -223,6 +223,28 @@ export async function importStudents(formData: FormData) {
 
   await ensureGateTables();
 
+  const existingRows = await prisma.student.findMany({
+    where: { schoolId: user.schoolId },
+    select: {
+      id: true,
+      studentId: true,
+      firstName: true,
+      lastName: true,
+      parentPhone: true,
+    },
+  });
+  const existingByCode = new Map(existingRows.map((row) => [row.studentId, row]));
+  const existingByName = new Map<string, typeof existingRows>();
+  for (const row of existingRows) {
+    const key = `${normName(row.firstName)}|${normName(row.lastName)}`;
+    const list = existingByName.get(key) || [];
+    list.push(row);
+    existingByName.set(key, list);
+  }
+  const classroomCache = new Map<string, { id: string }>();
+  const teacherDone = new Set<string>();
+  const familyCache = new Map<string, string>();
+
   let created = 0;
   let updated = 0;
   let excludedNotReturning = 0;
@@ -301,13 +323,14 @@ export async function importStudents(formData: FormData) {
     const notes = cell(row, "notes");
 
     try {
-    const existingEarly = await findExistingStudent(
-      user.schoolId,
-      studentId,
-      firstName,
-      lastName,
-      parentPhone,
-    );
+    const nameMatches = existingByName.get(`${normName(firstName)}|${normName(lastName)}`) || [];
+    const phone = usablePhone(parentPhone);
+    const existingEarly =
+      existingByCode.get(studentId) ||
+      (nameMatches.length === 1
+        ? nameMatches[0]
+        : nameMatches.find((row) => usablePhone(row.parentPhone) === phone) ||
+          null);
     if (existingEarly && !canUpdate) {
       errors.push(
         `Row ${index + 2}: ${firstName} ${lastName} already exists. Check “Update existing students” to overwrite.`,
@@ -315,26 +338,35 @@ export async function importStudents(formData: FormData) {
       continue;
     }
 
-    let classroom = await prisma.classroom.findFirst({
-      where: { schoolId: user.schoolId, name: classroomName },
-    });
+    let classroom = classroomCache.get(classroomName);
     if (!classroom) {
-      classroom = await prisma.classroom.create({
-        data: { schoolId: user.schoolId, name: classroomName, grade },
-      });
+      classroom =
+        (await prisma.classroom.findFirst({
+          where: { schoolId: user.schoolId, name: classroomName },
+          select: { id: true },
+        })) ||
+        (await prisma.classroom.create({
+          data: { schoolId: user.schoolId, name: classroomName, grade },
+          select: { id: true },
+        }));
+      classroomCache.set(classroomName, classroom);
     }
-    const existingTeacher = await prisma.teacher.findFirst({
-      where: { classroomId: classroom.id },
-    });
-    if (!existingTeacher) {
-      await prisma.teacher.create({
-        data: {
-          schoolId: user.schoolId,
-          classroomId: classroom.id,
-          name: teacherName,
-          email: "",
-        },
+    if (!teacherDone.has(classroom.id)) {
+      const existingTeacher = await prisma.teacher.findFirst({
+        where: { classroomId: classroom.id },
+        select: { id: true },
       });
+      if (!existingTeacher) {
+        await prisma.teacher.create({
+          data: {
+            schoolId: user.schoolId,
+            classroomId: classroom.id,
+            name: teacherName,
+            email: "",
+          },
+        });
+      }
+      teacherDone.add(classroom.id);
     }
 
     const home = await prisma.address.create({
@@ -410,11 +442,19 @@ export async function importStudents(formData: FormData) {
 
     if (existing) updated += 1;
     else created += 1;
+    existingByCode.set(studentId, {
+      id: student.id,
+      studentId,
+      firstName,
+      lastName,
+      parentPhone,
+    });
 
-    await ensureGateTables();
-    const familyId = familyKey
-      ? await ensureNamedFamily(user.schoolId, familyKey)
-      : null;
+    let familyId = familyKey ? familyCache.get(familyKey) || null : null;
+    if (familyKey && !familyId) {
+      familyId = await ensureNamedFamily(user.schoolId, familyKey);
+      familyCache.set(familyKey, familyId);
+    }
     await prisma.$executeRaw`
       UPDATE "Student"
       SET
@@ -492,7 +532,9 @@ export async function importStudents(formData: FormData) {
     newPlan: { created, updated, errors: errors.length },
   });
 
-  await assignMissingFamilies(user.schoolId).catch(() => undefined);
+  if (![...sourceFamilies].length) {
+    await assignMissingFamilies(user.schoolId).catch(() => undefined);
+  }
 
   const rosterStudents = await prisma.student.count({
     where: { schoolId: user.schoolId },

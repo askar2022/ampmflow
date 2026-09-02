@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth";
 import { ImportForm } from "./ImportForm";
 import { ImportPreviewForm } from "./ImportPreview";
 
+export const maxDuration = 60;
+
 export default async function ImportPage() {
   const session = await getSession();
   if (!session || (session.role !== "COORDINATOR" && session.role !== "ADMINISTRATOR")) {

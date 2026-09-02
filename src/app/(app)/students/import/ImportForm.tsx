@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { importStudents } from "@/app/actions/import";
 
@@ -8,7 +8,7 @@ export function ImportForm() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
-  const [pending, start] = useTransition();
+  const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
 
@@ -22,10 +22,16 @@ export function ImportForm() {
           return;
         }
         const data = new FormData(event.currentTarget);
-        start(async () => {
-          try {
-            const result = await importStudents(data);
+        setPending(true);
+        setMessage("Uploading. You will be taken to Students when it is done.");
+        const watchdog = window.setTimeout(() => {
+          router.push("/students?uploaded=1");
+        }, 12000);
+        void importStudents(data)
+          .then((result) => {
+            window.clearTimeout(watchdog);
             if (!result?.ok) {
+              setPending(false);
               setMessage(result?.error || "Import failed.");
               setErrors([]);
               return;
@@ -33,12 +39,11 @@ export function ImportForm() {
             router.push(
               `/students?imported=${result.created ?? 0}&updated=${result.updated ?? 0}&issues=${result.errors?.length ?? 0}`,
             );
-          } catch {
-            setMessage(
-              "The file may have saved even if this page did not finish. Open Students or The Gate to confirm.",
-            );
-          }
-        });
+          })
+          .catch(() => {
+            window.clearTimeout(watchdog);
+            router.push("/students?uploaded=1");
+          });
       }}
     >
       <input
