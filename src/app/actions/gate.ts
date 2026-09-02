@@ -3,10 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/auth";
 import { sendMail } from "@/lib/email";
-import { formatDateTime, formatLongDate, todayKey } from "@/lib/dates";
+import { formatLongDate, todayKey } from "@/lib/dates";
 import {
   AM_LABEL,
-  FOLLOW_LABEL,
   PM_LABEL,
   activeDismissalStudents,
   applyFamilyStatuses,
@@ -339,19 +338,4 @@ export async function searchGateAction(query: string) {
     students: searchGateStudents(roster, query),
     stamp: lastUpdatedStamp(roster),
   };
-}
-
-export function gateFieldLabel(
-  field: string,
-  value: string,
-) {
-  if (field === "amArrival") return AM_LABEL[value as AmArrival] || value;
-  if (field === "amFollowUp") return FOLLOW_LABEL[value as AmFollowUp] || value;
-  if (field === "pmDismissal") return PM_LABEL[value as PmDismissal] || value;
-  return value;
-}
-
-export function formatGateTime(value: string | null) {
-  if (!value) return "—";
-  return formatDateTime(value);
 }
