@@ -30,16 +30,14 @@ export default async function GatePage() {
   ]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <p className="text-xs text-muted">{formatLongDate(schoolNow())}</p>
-          <h1 className="font-serif text-3xl">
-            The Gate: AM Arrival and PM Dismissal
-          </h1>
-        </div>
+    <div className="gate-wrap">
+      <div className="gate-titlebar">
+        <h1>
+          The Gate: AM Arrival and PM Dismissal
+          <span> · {formatLongDate(schoolNow())}</span>
+        </h1>
         <div className="no-print">
-          <LiveRefresh seconds={8} />
+          <LiveRefresh seconds={8} compact />
         </div>
       </div>
       <GateBoard

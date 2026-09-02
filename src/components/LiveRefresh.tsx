@@ -4,12 +4,21 @@ import { snapshotClockLabel } from "@/lib/policy";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-export function LiveRefresh({ seconds = 20 }: { seconds?: number }) {
+export function LiveRefresh({
+  seconds = 20,
+  compact = false,
+}: {
+  seconds?: number;
+  compact?: boolean;
+}) {
   const router = useRouter();
   useEffect(() => {
     const id = setInterval(() => router.refresh(), seconds * 1000);
     return () => clearInterval(id);
   }, [router, seconds]);
+  if (compact) {
+    return <p className="text-xs text-muted">Live · {seconds}s</p>;
+  }
   return (
     <p className="text-xs text-muted">
       Live board · refreshes every {seconds} seconds so a parent call after{" "}
