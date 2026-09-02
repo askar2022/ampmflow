@@ -3,7 +3,6 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applyFamilyGate, updateGateField } from "@/app/actions/gate";
-import { formatDateTime } from "@/lib/dates";
 import {
   AM_ARRIVAL,
   AM_FOLLOW_UP,
@@ -15,16 +14,10 @@ import {
   PM_TONE,
   groupFamilies,
   searchGateStudents,
-  type AmArrival,
   type AmFollowUp,
   type GateStudent,
-  type PmDismissal,
-} from "@/lib/gate"; // AmArrival/PmDismissal used by family plan state
-
-function stamp(value: string | null) {
-  if (!value) return "Not updated yet";
-  return formatDateTime(value);
-}
+  type ImportSummary,
+} from "@/lib/gate";
 
 function StatusSelect<T extends string>({
   value,
@@ -46,6 +39,7 @@ function StatusSelect<T extends string>({
       className={`gate-select tone-${tones[value] || "gray"}`}
       value={value}
       disabled={disabled}
+      aria-label={labels[value]}
       onChange={(event) => onChange(event.target.value as T)}
     >
       {options.map((option) => (
@@ -57,21 +51,25 @@ function StatusSelect<T extends string>({
   );
 }
 
+function showFollowUp(am: string) {
+  return am === "NOT_CHECKED_IN" || am === "ABSENT_CONFIRMED";
+}
+
 export function GateBoard({
   students,
   lastUpdated,
+  importSummary,
 }: {
   students: GateStudent[];
   lastUpdated: string;
+  importSummary: ImportSummary | null;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "am" | "pm">("all");
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
-  const [familyPlan, setFamilyPlan] = useState<
-    Record<string, { am: AmArrival; pm: PmDismissal }>
-  >({});
+  const [openNote, setOpenNote] = useState<string | null>(null);
   const [identityFor, setIdentityFor] = useState<string | null>(null);
   const [pendingChange, setPendingChange] = useState<{
     studentId: string;
@@ -84,15 +82,13 @@ export function GateBoard({
 
   const visible = useMemo(() => {
     let rows = searchGateStudents(students, query);
-    if (filter === "am") {
-      rows = rows.filter((s) => s.amArrival === "NOT_CHECKED_IN");
-    } else if (filter === "pm") {
-      rows = rows.filter((s) => s.pmDismissal === "NOT_CONFIRMED");
-    }
+    if (filter === "am") rows = rows.filter((s) => s.amArrival === "NOT_CHECKED_IN");
+    if (filter === "pm") rows = rows.filter((s) => s.pmDismissal === "NOT_CONFIRMED");
     return rows;
   }, [students, query, filter]);
 
   const families = useMemo(() => groupFamilies(visible), [visible]);
+  const allFamilies = useMemo(() => groupFamilies(students), [students]);
 
   function runUpdate(
     student: GateStudent,
@@ -147,7 +143,7 @@ export function GateBoard({
       const conflict = result.results?.find((row) => row.conflict);
       if (conflict) {
         setMessage(
-          `${conflict.name} was just updated by someone else. The board refreshed — check the current status and try again.`,
+          `${conflict.name} was just updated by someone else. Refresh and try again.`,
         );
         router.refresh();
         return;
@@ -199,123 +195,172 @@ export function GateBoard({
     runUpdate(student, field, value);
   }
 
+  const missing =
+    importSummary &&
+    importSummary.sourceStudents >
+      importSummary.created +
+        importSummary.updated +
+        importSummary.excludedNotReturning +
+        importSummary.excludedNoName;
+
   return (
-    <div className="space-y-4">
-      <div className="no-print rounded-2xl border border-line bg-card p-4 sm:p-5">
-        <label className="block text-sm font-semibold text-navy" htmlFor="gate-search">
-          Search student, parent, phone, family ID, or address
-        </label>
+    <div className="space-y-2">
+      <div className="gate-sticky no-print rounded-xl border border-line bg-card px-3 py-2">
         <input
           id="gate-search"
           autoFocus
-          className="mt-2 min-h-14 w-full rounded-xl border border-line px-4 text-lg"
-          placeholder="Type a name, phone, family ID, or street"
+          className="min-h-10 w-full rounded-lg border border-line px-3 text-base"
+          placeholder="Search name, phone, family ID, or address"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           {[
-            ["all", "All families"],
+            ["all", "All"],
             ["am", "Not checked in"],
             ["pm", "PM not confirmed"],
           ].map(([id, label]) => (
             <button
               key={id}
               type="button"
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                filter === id
-                  ? "bg-navy text-white"
-                  : "border border-line bg-white"
+              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                filter === id ? "bg-navy text-white" : "border border-line bg-white"
               }`}
               onClick={() => setFilter(id as typeof filter)}
             >
               {label}
             </button>
           ))}
+          <span className="text-xs text-muted">
+            {families.length} families · {visible.length} students
+            {pending ? " · Saving…" : ""}
+            {message ? ` · ${message}` : ""}
+          </span>
         </div>
-        <p className="mt-3 text-sm text-muted">
-          {families.length} families · {visible.length} students · Last updated{" "}
-          {lastUpdated}
-          {pending ? " · Saving…" : ""}
-        </p>
-        {message ? (
-          <p className="mt-2 text-sm font-semibold text-navy">{message}</p>
-        ) : null}
       </div>
 
-      {families.map((family) => (
-        <section
-          key={family.familyId}
-          className="rounded-2xl border border-line bg-card p-4 sm:p-5 print-sheet"
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="font-serif text-2xl">
-                {family.parentName}{" "}
-                <span className="text-base font-sans text-muted">
-                  · {family.familyKey}
+      <section className="rounded-xl border border-line bg-card px-3 py-2 text-sm">
+        <h2 className="font-semibold">Import summary</h2>
+        {importSummary ? (
+          <p className="mt-1 text-muted">
+            {importSummary.fileName}: {importSummary.sourceStudents} students /{" "}
+            {importSummary.sourceFamilies} families in the file. Imported{" "}
+            {importSummary.created} new, updated {importSummary.updated}. Excluded{" "}
+            {importSummary.excludedNotReturning} marked Not Returning
+            {importSummary.excludedNoName
+              ? `, ${importSummary.excludedNoName} missing a name`
+              : ""}
+            {importSummary.duplicateNameRows
+              ? `, ${importSummary.duplicateNameRows} duplicate-name rows kept separate`
+              : ""}
+            {importSummary.errors ? `, ${importSummary.errors} row errors` : ""}.
+            Roster now: {allFamilies.length} families · {students.length} students.
+            {missing
+              ? " Some rows were not saved — upload the file again to finish."
+              : ""}
+          </p>
+        ) : (
+          <p className="mt-1 text-muted">
+            This board has {students.length} students and {allFamilies.length}{" "}
+            families. The Sankofa master workbook has 115 students and 69
+            families. 12 are marked Not Returning (those should not appear here).
+            The remaining gap is from the last upload stopping before it finished,
+            plus one duplicate name (Abdirahman Mohamed). Upload the Excel file
+            again to import the missing students.
+          </p>
+        )}
+        <p className="mt-1 text-xs text-muted">Last updated {lastUpdated}</p>
+      </section>
+
+      {families.map((family) => {
+        const first = family.students[0];
+        return (
+          <section
+            key={family.familyId}
+            className="rounded-xl border border-line bg-card px-3 py-2 print-sheet"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+              <div>
+                <span className="font-semibold">{family.parentName}</span>
+                <span className="text-muted"> · {family.familyKey}</span>
+                <span className="text-muted"> · {family.parentPhone}</span>
+                <span className="text-muted">
+                  {" "}
+                  · {family.zip || family.address}
                 </span>
-              </h2>
-              <p className="mt-1 text-sm">
-                {family.parentPhone} · {family.address}, {family.city} {family.zip}
-              </p>
-              <p className="text-sm text-muted">
-                {family.students.length}{" "}
-                {family.students.length === 1 ? "student" : "siblings"}
-              </p>
-              {family.reviewNeeded ? (
-                <p className="mt-2 rounded-lg bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-900">
-                  Review possible siblings: {family.reviewNote || "Staff should confirm this family."}
-                </p>
-              ) : null}
+                <span className="text-muted">
+                  {" "}
+                  · {family.students.length}{" "}
+                  {family.students.length === 1 ? "child" : "children"}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 no-print">
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-blue"
+                  onClick={() =>
+                    setOpenNote((id) =>
+                      id === family.familyId ? null : family.familyId,
+                    )
+                  }
+                >
+                  {first?.transportNotes ? "Note" : "Add note"}
+                </button>
+                {family.students.length > 1 ? (
+                  <label className="flex items-center gap-1 text-xs font-semibold">
+                    <input
+                      type="checkbox"
+                      onChange={(event) => {
+                        if (!event.target.checked) return;
+                        const names = family.students
+                          .map((s) => s.fullName)
+                          .join(", ");
+                        if (
+                          !window.confirm(
+                            `Apply ${AM_LABEL[first.amArrival]} and ${PM_LABEL[first.pmDismissal]} to all children?\n\n${names}`,
+                          )
+                        ) {
+                          event.target.checked = false;
+                          return;
+                        }
+                        start(async () => {
+                          const result = await applyFamilyGate({
+                            studentId: first.id,
+                            amArrival: first.amArrival,
+                            pmDismissal: first.pmDismissal,
+                            confirmed: true,
+                          });
+                          setMessage(
+                            result.ok
+                              ? `Updated ${result.count} children.`
+                              : result.error || "Could not update the family.",
+                          );
+                          event.target.checked = false;
+                          router.refresh();
+                        });
+                      }}
+                    />
+                    Apply these selections to all children
+                  </label>
+                ) : null}
+              </div>
             </div>
-            <div className="no-print flex min-w-[260px] flex-col gap-2">
-              <StatusSelect
-                value={familyPlan[family.familyId]?.am || family.students[0].amArrival}
-                options={AM_ARRIVAL}
-                labels={AM_LABEL}
-                tones={AM_TONE}
-                disabled={pending}
-                onChange={(am) =>
-                  setFamilyPlan((prev) => ({
-                    ...prev,
-                    [family.familyId]: {
-                      am,
-                      pm:
-                        prev[family.familyId]?.pm ||
-                        family.students[0].pmDismissal,
-                    },
-                  }))
-                }
-              />
-              <StatusSelect
-                value={familyPlan[family.familyId]?.pm || family.students[0].pmDismissal}
-                options={PM_DISMISSAL}
-                labels={PM_LABEL}
-                tones={PM_TONE}
-                disabled={pending}
-                onChange={(pm) =>
-                  setFamilyPlan((prev) => ({
-                    ...prev,
-                    [family.familyId]: {
-                      am:
-                        prev[family.familyId]?.am ||
-                        family.students[0].amArrival,
-                      pm,
-                    },
-                  }))
-                }
-              />
+            {family.reviewNeeded ? (
+              <p className="mt-1 text-xs font-semibold text-orange">
+                Review: {family.reviewNote || "Confirm this family match."}
+              </p>
+            ) : null}
+            {openNote === family.familyId ? (
               <textarea
-                className="min-h-16 rounded-xl border border-line px-3 py-2 text-sm"
-                placeholder="Optional transportation notes"
-                defaultValue={family.students[0]?.transportNotes || ""}
+                className="mt-1 min-h-14 w-full rounded-lg border border-line px-2 py-1 text-sm"
+                defaultValue={first?.transportNotes || ""}
+                placeholder="Transportation notes"
                 onBlur={(event) => {
                   const notes = event.target.value;
-                  if (notes === (family.students[0]?.transportNotes || "")) return;
+                  if (notes === (first?.transportNotes || "")) return;
                   start(async () => {
                     await updateGateField({
-                      studentId: family.students[0].id,
+                      studentId: first.id,
                       field: "transportNotes",
                       value: notes,
                     });
@@ -323,196 +368,118 @@ export function GateBoard({
                   });
                 }}
               />
-              <button
-                type="button"
-                className="action-button rounded-xl px-4 py-2 text-sm font-bold"
-                onClick={() => {
-                  const first = family.students[0];
-                  const plan = familyPlan[family.familyId] || {
-                    am: first.amArrival,
-                    pm: first.pmDismissal,
-                  };
-                  const names = family.students.map((s) => s.fullName).join(", ");
-                  if (
-                    !window.confirm(
-                      `Apply ${AM_LABEL[plan.am]} and ${PM_LABEL[plan.pm]} to every sibling?\n\n${names}`,
-                    )
-                  ) {
-                    return;
-                  }
-                  start(async () => {
-                    const result = await applyFamilyGate({
-                      studentId: first.id,
-                      amArrival: plan.am,
-                      pmDismissal: plan.pm,
-                      confirmed: true,
-                    });
-                    setMessage(
-                      result.ok
-                        ? `Updated ${result.count} siblings.`
-                        : result.error || "Could not update the family.",
-                    );
-                    router.refresh();
-                  });
-                }}
-              >
-                Apply AM + PM to all siblings
-              </button>
-            </div>
-          </div>
+            ) : null}
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="text-muted">
-                <tr>
-                  <th className="py-2 pr-3">Student</th>
-                  <th className="pr-3">AM Arrival Status</th>
-                  <th className="pr-3">AM Follow-Up Outcome</th>
-                  <th className="pr-3">PM Dismissal Today</th>
-                </tr>
-              </thead>
-              <tbody>
-                {family.students.map((student) => (
-                  <tr key={student.id} className={`row-${AM_TONE[student.amArrival]}`}>
-                    <td className="py-3 pr-3 align-top">
-                      <div className="font-semibold">{student.fullName}</div>
-                      <div className="text-muted">
-                        {student.grade} · {student.teacherName}
+            <div className="mt-1">
+              {family.students.map((student) => (
+                <div
+                  key={student.id}
+                  className="grid grid-cols-1 items-center gap-1 border-t border-line py-1.5 sm:grid-cols-[minmax(0,1fr)_10.5rem_10.5rem]"
+                >
+                  <div className="min-w-0 text-sm">
+                    <span className="font-semibold">{student.fullName}</span>
+                    <span className="text-muted"> · {student.grade}</span>
+                    {student.nameDupCount > 1 ? (
+                      <span className="ml-2 text-xs font-semibold text-red">
+                        Duplicate name — confirm {student.parentPhone}
+                      </span>
+                    ) : null}
+                    {identityFor === student.id &&
+                    pendingChange?.needsIdentity ? (
+                      <label className="mt-1 flex items-start gap-2 text-xs font-semibold">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          onChange={(event) => {
+                            if (!event.target.checked || !pendingChange) return;
+                            runUpdate(
+                              student,
+                              pendingChange.field,
+                              pendingChange.value,
+                              { confirmedIdentity: true },
+                            );
+                          }}
+                        />
+                        I confirmed {student.fullName}, parent{" "}
+                        {student.parentName}, {student.parentPhone}.
+                      </label>
+                    ) : null}
+                  </div>
+                  <div>
+                    <StatusSelect
+                      value={student.amArrival}
+                      options={AM_ARRIVAL}
+                      labels={AM_LABEL}
+                      tones={AM_TONE}
+                      disabled={pending}
+                      onChange={(value) =>
+                        onFieldChange(student, "amArrival", value)
+                      }
+                    />
+                    {showFollowUp(student.amArrival) ? (
+                      <div className="mt-1">
+                        <StatusSelect
+                          value={student.amFollowUp}
+                          options={AM_FOLLOW_UP}
+                          labels={FOLLOW_LABEL}
+                          tones={{}}
+                          disabled={pending}
+                          onChange={(value) =>
+                            onFieldChange(
+                              student,
+                              "amFollowUp",
+                              value as AmFollowUp,
+                            )
+                          }
+                        />
                       </div>
-                      <div className="text-xs text-muted">
-                        {student.enrollmentSource === "NEW_APPLICATION"
-                          ? "New Application"
-                          : "Returning"}
-                      </div>
-                      {student.nameDupCount > 1 ? (
-                        <div className="mt-1 text-xs font-semibold text-red">
-                          Duplicate name — confirm parent {student.parentName} or{" "}
-                          {student.parentPhone}
-                        </div>
-                      ) : null}
-                      {identityFor === student.id && pendingChange?.needsIdentity ? (
-                        <label className="mt-2 flex items-start gap-2 text-xs font-semibold">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5"
-                            onChange={(event) => {
-                              if (!event.target.checked || !pendingChange) return;
-                              runUpdate(
-                                student,
-                                pendingChange.field,
-                                pendingChange.value,
-                                { confirmedIdentity: true },
-                              );
-                            }}
-                          />
-                          I confirmed this is {student.fullName}, parent{" "}
-                          {student.parentName}, {student.parentPhone}.
-                        </label>
-                      ) : null}
-                    </td>
-                    <td className="pr-3 align-top">
-                      <StatusSelect
-                        value={student.amArrival}
-                        options={AM_ARRIVAL}
-                        labels={AM_LABEL}
-                        tones={AM_TONE}
-                        disabled={pending}
-                        onChange={(value) =>
-                          onFieldChange(student, "amArrival", value)
+                    ) : null}
+                  </div>
+                  <div>
+                    <StatusSelect
+                      value={student.pmDismissal}
+                      options={PM_DISMISSAL}
+                      labels={PM_LABEL}
+                      tones={PM_TONE}
+                      disabled={pending}
+                      onChange={(value) =>
+                        onFieldChange(student, "pmDismissal", value)
+                      }
+                    />
+                  </div>
+                  {pendingChange?.studentId === student.id &&
+                  pendingChange.needsBusWarning ? (
+                    <div className="sm:col-span-3 rounded-lg border border-red bg-red-50 px-2 py-1 text-xs">
+                      {student.fullName} is parent pickup. Confirm before bus.
+                      <button
+                        type="button"
+                        className="ml-2 font-bold"
+                        onClick={() =>
+                          runUpdate(student, "pmDismissal", "CONFIRMED_BUS", {
+                            warnPickupToBus: true,
+                          })
                         }
-                      />
-                      <p className="mt-1 text-xs text-muted">
-                        {AM_LABEL[student.amArrival]}
-                        {student.amArrivalAt
-                          ? ` · ${stamp(student.amArrivalAt)}`
-                          : ""}
-                      </p>
-                    </td>
-                    <td className="pr-3 align-top">
-                      <StatusSelect
-                        value={student.amFollowUp}
-                        options={AM_FOLLOW_UP}
-                        labels={FOLLOW_LABEL}
-                        tones={{}}
-                        disabled={pending}
-                        onChange={(value) =>
-                          onFieldChange(student, "amFollowUp", value as AmFollowUp)
-                        }
-                      />
-                    </td>
-                    <td className="align-top">
-                      <StatusSelect
-                        value={student.pmDismissal}
-                        options={PM_DISMISSAL}
-                        labels={PM_LABEL}
-                        tones={PM_TONE}
-                        disabled={pending}
-                        onChange={(value) =>
-                          onFieldChange(student, "pmDismissal", value)
-                        }
-                      />
-                      <p className="mt-1 text-xs text-muted">
-                        {PM_LABEL[student.pmDismissal]}
-                        {student.updatedAt
-                          ? ` · ${student.updatedByName} · ${stamp(student.updatedAt)}`
-                          : ""}
-                      </p>
-                      {student.vehicleName !== "Not Assigned" ? (
-                        <p className="mt-1 text-xs">
-                          Assigned later: {student.vehicleName}
-                          {student.driverName ? ` · ${student.driverName}` : ""}
-                          {student.driverPhone ? ` · ${student.driverPhone}` : ""}
-                        </p>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {family.students.map((student) =>
-            pendingChange?.studentId === student.id &&
-            pendingChange.needsBusWarning ? (
-              <div
-                key={`${student.id}-warn`}
-                className="mt-3 rounded-xl border border-red bg-red-50 p-3 text-sm no-print"
-              >
-                <p className="font-semibold">
-                  {student.fullName} is parent pickup today. Do not place this
-                  student on a bus unless you are sure.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="action-button rounded-lg px-3 py-2 text-sm font-bold"
-                    onClick={() =>
-                      runUpdate(
-                        student,
-                        "pmDismissal",
-                        "CONFIRMED_BUS",
-                        { warnPickupToBus: true },
-                      )
-                    }
-                  >
-                    Yes — Confirmed Bus today
-                  </button>
-                  <button
-                    type="button"
-                    className="action-button-secondary rounded-lg px-3 py-2 text-sm font-bold"
-                    onClick={() => setPendingChange(null)}
-                  >
-                    Keep parent pickup
-                  </button>
+                      >
+                        Yes — Confirmed Bus
+                      </button>
+                      <button
+                        type="button"
+                        className="ml-2 font-bold"
+                        onClick={() => setPendingChange(null)}
+                      >
+                        Keep pickup
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            ) : null,
-          )}
-        </section>
-      ))}
+              ))}
+            </div>
+          </section>
+        );
+      })}
 
       {!families.length ? (
-        <p className="rounded-2xl border border-line bg-card p-6 text-muted">
+        <p className="rounded-xl border border-line bg-card px-3 py-4 text-sm text-muted">
           {query
             ? "No student or parent matches that search."
             : "No students match this filter."}

@@ -1121,6 +1121,63 @@ export function activeDismissalStudents(students: GateStudent[]) {
   return students.filter((s) => arrivedPhysically(s.amArrival));
 }
 
+export type ImportSummary = {
+  fileName: string;
+  sourceStudents: number;
+  sourceFamilies: number;
+  created: number;
+  updated: number;
+  excludedNotReturning: number;
+  excludedNoName: number;
+  duplicateNameRows: number;
+  errors: number;
+  rosterStudents: number;
+  rosterFamilies: number;
+  at: string;
+};
+
+async function ensureImportSummaryColumn() {
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "importSummary" TEXT NOT NULL DEFAULT ''`,
+  ).catch(() => undefined);
+}
+
+export async function saveImportSummary(
+  schoolId: string,
+  summary: ImportSummary,
+) {
+  await ensureImportSummaryColumn();
+  const existing = await prisma.schoolSettings.findUnique({
+    where: { schoolId },
+    select: { id: true },
+  });
+  if (!existing) {
+    await prisma.schoolSettings.create({
+      data: { id: randomUUID(), schoolId },
+    }).catch(() => undefined);
+  }
+  const payload = JSON.stringify(summary);
+  await prisma.$executeRaw`
+    UPDATE "SchoolSettings"
+    SET "importSummary" = ${payload}
+    WHERE "schoolId" = ${schoolId}
+  `.catch(() => undefined);
+}
+
+export async function loadImportSummary(schoolId: string) {
+  await ensureImportSummaryColumn();
+  const rows = await prisma.$queryRaw<Array<{ importSummary: string }>>`
+    SELECT "importSummary" FROM "SchoolSettings" WHERE "schoolId" = ${schoolId}
+  `.catch(() => []);
+  const raw = rows[0]?.importSummary || "";
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ImportSummary;
+  } catch {
+    return null;
+  }
+}
+
 export function teachersForGrade(
   grade: string,
   students: GateStudent[],

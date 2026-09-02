@@ -12,6 +12,7 @@ import {
   ensureGateTables,
   normAddress,
   normName,
+  saveImportSummary,
   usablePhone,
 } from "@/lib/gate";
 
@@ -115,12 +116,17 @@ function normalizeGrade(value: string) {
 }
 
 function slugStudentId(first: string, last: string, familyKey: string, index: number) {
-  const slug = `${last}-${first}`
+  const slug = `${familyKey || "STU"}-${last}-${first}-${index + 1}`
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 36);
-  return slug || `${familyKey || "STU"}-${index + 1}`;
+    .slice(0, 40);
+  return slug || `stu-${index + 1}`;
+}
+
+function isNotReturning(value: string) {
+  const v = value.toLowerCase();
+  return v.includes("not returning") || v.includes("withdrawn") || v.includes("inactive");
 }
 
 function parsePlan(value: string) {
@@ -219,7 +225,16 @@ export async function importStudents(formData: FormData) {
 
   let created = 0;
   let updated = 0;
+  let excludedNotReturning = 0;
+  let excludedNoName = 0;
+  let duplicateNameRows = 0;
+  const seenNames = new Map<string, number>();
   const errors: string[] = [];
+  const sourceFamilies = new Set(
+    rows
+      .map((row) => cell(row, "family id", "family_id", "family"))
+      .filter(Boolean),
+  );
   const isFamilyMaster = Boolean(
     cell(rows[0] || {}, "family id", "family_id") ||
       cell(rows[0] || {}, "student first name"),
@@ -238,14 +253,28 @@ export async function importStudents(formData: FormData) {
       cell(row, "student_id", "id", "student id") ||
       slugStudentId(firstName, lastName, familyKey, index);
     if (!firstName || !lastName) {
+      excludedNoName += 1;
       errors.push(`Row ${index + 2}: Student first and last name are required.`);
       continue;
     }
 
-    const rowSource = parseEnrollment(
-      cell(row, "enrollment status", "source", "enrollment", "enrollment source"),
-      enrollmentSource,
+    const enrollmentRaw = cell(
+      row,
+      "enrollment status",
+      "source",
+      "enrollment",
+      "enrollment source",
     );
+    if (isNotReturning(enrollmentRaw)) {
+      excludedNotReturning += 1;
+      continue;
+    }
+
+    const nameKey = `${normName(firstName)}|${normName(lastName)}`;
+    seenNames.set(nameKey, (seenNames.get(nameKey) || 0) + 1);
+    if ((seenNames.get(nameKey) || 0) > 1) duplicateNameRows += 1;
+
+    const rowSource = parseEnrollment(enrollmentRaw, enrollmentSource);
     const grade = normalizeGrade(cell(row, "grade") || "—");
     const room = cell(row, "classroom", "room", "teacher/class");
     const classroomName = room
@@ -465,11 +494,41 @@ export async function importStudents(formData: FormData) {
 
   await assignMissingFamilies(user.schoolId).catch(() => undefined);
 
+  const rosterStudents = await prisma.student.count({
+    where: { schoolId: user.schoolId },
+  });
+  const familyRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(DISTINCT COALESCE("familyId", "id"))::bigint AS count
+    FROM "Student"
+    WHERE "schoolId" = ${user.schoolId}
+  `.catch(() => [{ count: BigInt(0) }]);
+  await saveImportSummary(user.schoolId, {
+    fileName: file.name,
+    sourceStudents: rows.length,
+    sourceFamilies: sourceFamilies.size,
+    created,
+    updated,
+    excludedNotReturning,
+    excludedNoName,
+    duplicateNameRows,
+    errors: errors.length,
+    rosterStudents,
+    rosterFamilies: Number(familyRows[0]?.count || 0),
+    at: new Date().toISOString(),
+  }).catch(() => undefined);
+
   revalidatePath("/students");
   revalidatePath("/dashboard");
   revalidatePath("/gate");
   revalidatePath("/first-day");
-  return { ok: true, created, updated, errors };
+  return {
+    ok: true,
+    created,
+    updated,
+    errors,
+    excludedNotReturning,
+    sourceStudents: rows.length,
+  };
 }
 
 export type ImportPreviewRow = {
@@ -504,8 +563,11 @@ export type ImportPreview = {
 
 function parseEnrollment(value: string, fallback: "RETURNING" | "NEW_APPLICATION") {
   const v = value.toLowerCase();
+  if (isNotReturning(v)) return "RETURNING";
   if (v.includes("new") || v.includes("application")) return "NEW_APPLICATION";
-  if (v.includes("return") || v.includes("retention")) return "RETURNING";
+  if (v.includes("return") || v.includes("retention") || v.includes("pending")) {
+    return "RETURNING";
+  }
   return fallback;
 }
 

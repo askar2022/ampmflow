@@ -5,6 +5,7 @@ import {
   ensureGateTables,
   lastUpdatedStamp,
   loadGateRoster,
+  loadImportSummary,
 } from "@/lib/gate";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { GateBoard } from "./GateBoard";
@@ -23,27 +24,29 @@ export default async function GatePage() {
   }
 
   await ensureGateTables();
-  const students = await loadGateRoster(session.schoolId);
+  const [students, importSummary] = await Promise.all([
+    loadGateRoster(session.schoolId),
+    loadImportSummary(session.schoolId),
+  ]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <p className="text-sm text-muted">{formatLongDate(schoolNow())}</p>
-          <h1 className="font-serif text-4xl">
+          <p className="text-xs text-muted">{formatLongDate(schoolNow())}</p>
+          <h1 className="font-serif text-3xl">
             The Gate: AM Arrival and PM Dismissal
           </h1>
-          <p className="mt-2 max-w-3xl text-muted">
-            Search a student or parent, confirm the family, then set arrival and
-            dismissal. Parent Pickup Today Only—Bus Needed Tomorrow is pickup
-            today, not a bus ride today.
-          </p>
         </div>
-        <div className="no-print text-right">
+        <div className="no-print">
           <LiveRefresh seconds={8} />
         </div>
       </div>
-      <GateBoard students={students} lastUpdated={lastUpdatedStamp(students)} />
+      <GateBoard
+        students={students}
+        lastUpdated={lastUpdatedStamp(students)}
+        importSummary={importSummary}
+      />
     </div>
   );
 }

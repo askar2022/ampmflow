@@ -151,14 +151,19 @@ textarea {
 .row-red { background: #fff1f0; }
 .row-blue { background: #f0f7fd; }
 
+.gate-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
 .gate-select {
-  min-height: 3rem;
+  min-height: 2.25rem;
   width: 100%;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   border: 1px solid var(--line);
-  padding: 0 0.75rem;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
   color: var(--ink);
   background: #fff;
 }
