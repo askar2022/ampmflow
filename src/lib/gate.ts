@@ -1108,6 +1108,47 @@ export async function loadGateHistory(schoolId: string, studentId: string) {
   `;
 }
 
+export function parentPickupToday(students: GateStudent[]) {
+  return students
+    .filter(
+      (s) =>
+        s.pmDismissal === "PARENT_PICKUP_CONFIRMED" ||
+        s.pmDismissal === "PARENT_PICKUP_TODAY_BUS_TOMORROW",
+    )
+    .sort(
+      (a, b) =>
+        a.lastName.localeCompare(b.lastName) ||
+        a.firstName.localeCompare(b.firstName),
+    );
+}
+
+export function groupConfirmedBus(students: GateStudent[]) {
+  const map = new Map<string, GateStudent[]>();
+  for (const student of students.filter((s) => s.pmDismissal === "CONFIRMED_BUS")) {
+    const assigned =
+      student.tempVehicleName.trim() ||
+      (student.vehicleName && student.vehicleName !== "Not Assigned"
+        ? student.vehicleName
+        : "");
+    const key = assigned || "Not Assigned";
+    const list = map.get(key) ?? [];
+    list.push(student);
+    map.set(key, list);
+  }
+  for (const list of map.values()) {
+    list.sort(
+      (a, b) =>
+        a.lastName.localeCompare(b.lastName) ||
+        a.firstName.localeCompare(b.firstName),
+    );
+  }
+  return [...map.entries()].sort(([a], [b]) => {
+    if (a === "Not Assigned") return 1;
+    if (b === "Not Assigned") return -1;
+    return a.localeCompare(b);
+  });
+}
+
 export function busTomorrowFamilies(students: GateStudent[]) {
   const needed = students.filter(
     (s) => s.pmDismissal === "PARENT_PICKUP_TODAY_BUS_TOMORROW",

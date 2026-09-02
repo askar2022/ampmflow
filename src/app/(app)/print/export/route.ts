@@ -5,9 +5,15 @@ import { loadCheckInSummary } from "@/lib/operations";
 import {
   checkInWorkbook,
   excelFileName,
+  gateDismissalWorkbook,
   studentsWorkbook,
   workbookBytes,
 } from "@/lib/excel";
+import {
+  groupConfirmedBus,
+  loadGateRoster,
+  parentPickupToday,
+} from "@/lib/gate";
 import type { ReportKind } from "@/lib/reports";
 
 const KINDS: ReportKind[] = [
@@ -53,10 +59,21 @@ export async function GET(request: Request) {
     );
   }
 
-  const workbook =
-    kind === "checkin"
-      ? checkInWorkbook(await loadCheckInSummary(session.schoolId))
+  let workbook;
+  if (kind === "checkin") {
+    workbook = checkInWorkbook(await loadCheckInSummary(session.schoolId));
+  } else if (kind === "bus" || kind === "pickup") {
+    const roster = await loadGateRoster(session.schoolId);
+    const useGate =
+      kind === "pickup"
+        ? parentPickupToday(roster).length > 0
+        : groupConfirmedBus(roster).length > 0;
+    workbook = useGate
+      ? gateDismissalWorkbook(kind, roster)
       : studentsWorkbook(kind, students);
+  } else {
+    workbook = studentsWorkbook(kind, students);
+  }
   const bytes = workbookBytes(workbook);
   const name = excelFileName(kind);
 

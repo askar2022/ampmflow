@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { emailLeadershipAction } from "@/app/actions/gate";
 import { LiveRefresh } from "@/components/LiveRefresh";
@@ -94,7 +94,8 @@ export function FirstDayDashboard({
   wakandaCount: number;
 }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const sendingRef = useRef(false);
+  const [sending, setSending] = useState(false);
   const [emailTo, setEmailTo] = useState("");
   const [message, setMessage] = useState("");
   const [showAllAttention, setShowAllAttention] = useState(false);
@@ -236,19 +237,27 @@ export function FirstDayDashboard({
           <button
             type="button"
             className="lead-btn lead-btn-on"
-            disabled={pending}
-            onClick={() => {
-              start(async () => {
+            disabled={sending}
+            onClick={async () => {
+              if (sendingRef.current) return;
+              sendingRef.current = true;
+              setSending(true);
+              try {
                 const result = await emailLeadershipAction(emailTo);
                 setMessage(
                   result.ok
-                    ? `Emailed leadership: ${result.to.join(", ")}.`
+                    ? result.alreadySent
+                      ? `Already emailed leadership a moment ago${result.to.length ? `: ${result.to.join(", ")}` : "."}`
+                      : `Emailed leadership: ${result.to.join(", ")}.`
                     : result.error || "Email failed.",
                 );
-              });
+              } finally {
+                sendingRef.current = false;
+                setSending(false);
+              }
             }}
           >
-            Email Leadership
+            {sending ? "Sending…" : "Email Leadership"}
           </button>
         </div>
       </header>

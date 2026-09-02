@@ -31,8 +31,10 @@ import {
   type GradeConfirm,
   type PmDismissal,
 } from "@/lib/gate";
+import { writeAudit } from "@/lib/audit";
 import { loadSavedOpsEmails, usableOpsEmail } from "@/lib/ops-change-emails";
 import { prisma } from "@/lib/prisma";
+import type { SessionUser } from "@/lib/types";
 
 function canUseGate(role: string) {
   return (
@@ -236,15 +238,47 @@ export async function emailGradeTeacherAction(grade: string, to?: string) {
   return { ok: true as const, to: emails };
 }
 
-export async function emailLeadershipAction(to?: string) {
-  const user = await getSession();
-  if (!user || !canLead(user.role)) {
-    return { ok: false as const, error: "Only admin or a coordinator can email leadership." };
+type LeadershipSend =
+  | { ok: true; to: string[]; alreadySent?: boolean }
+  | { ok: false; error: string };
+
+const leadershipSendInFlight = new Map<string, Promise<LeadershipSend>>();
+
+function parseAuditEmails(raw: string | null | undefined) {
+  try {
+    const payload = JSON.parse(raw || "{}") as { to?: string[] };
+    return Array.isArray(payload.to) ? payload.to.filter(Boolean) : [];
+  } catch {
+    return [];
   }
+}
+
+async function recentLeadershipSend(schoolId: string) {
+  const since = new Date(Date.now() - 45_000);
+  return prisma.auditLog.findFirst({
+    where: {
+      schoolId,
+      action: "EMAIL_LEADERSHIP_DASHBOARD",
+      createdAt: { gte: since },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+async function sendLeadershipDashboard(user: SessionUser, extraTo?: string) {
+  const recent = await recentLeadershipSend(user.schoolId);
+  if (recent) {
+    return {
+      ok: true as const,
+      to: parseAuditEmails(recent.newPlan),
+      alreadySent: true,
+    };
+  }
+
   const roster = await loadGateRoster(user.schoolId);
   const counts = gateCounts(roster);
   const school = await getSchoolIdentityById(user.schoolId);
-  const extra = usableOpsEmail(to || "");
+  const extra = usableOpsEmail(extraTo || "");
   const saved = await loadSavedOpsEmails(user.schoolId);
   const emails = [...new Set([extra, ...saved].filter(Boolean))];
   if (!emails.length) {
@@ -267,6 +301,12 @@ export async function emailLeadershipAction(to?: string) {
     dashboardUrl: leadershipDashboardUrl(),
   };
 
+  await writeAudit({
+    user,
+    action: "EMAIL_LEADERSHIP_DASHBOARD",
+    newPlan: { to: emails, subject: leadershipDashboardSubject(counts, report.schoolName) },
+  });
+
   const sent = await sendMail({
     to: emails,
     subject: leadershipDashboardSubject(counts, report.schoolName),
@@ -275,6 +315,23 @@ export async function emailLeadershipAction(to?: string) {
   });
   if (!sent.sent) return { ok: false as const, error: sent.reason };
   return { ok: true as const, to: emails };
+}
+
+export async function emailLeadershipAction(to?: string) {
+  const user = await getSession();
+  if (!user || !canLead(user.role)) {
+    return { ok: false as const, error: "Only admin or a coordinator can email leadership." };
+  }
+
+  const key = user.schoolId;
+  const existing = leadershipSendInFlight.get(key);
+  if (existing) return existing;
+
+  const work = sendLeadershipDashboard(user, to).finally(() => {
+    setTimeout(() => leadershipSendInFlight.delete(key), 8_000);
+  });
+  leadershipSendInFlight.set(key, work);
+  return work;
 }
 
 export async function emailBusTomorrowAction(familyIds: string[], to?: string) {

@@ -2,6 +2,14 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import {
+  AM_LABEL,
+  PM_LABEL,
+  groupConfirmedBus,
+  loadGateRoster,
+  parentPickupToday,
+  type GateStudent,
+} from "@/lib/gate";
+import {
   changeList,
   groupByBus,
   groupByTeacher,
@@ -42,6 +50,12 @@ export default async function PrintPage({
 
   const header = stamp();
   const selected = ((kind === "missing" ? "company" : kind) || "teacher") as ReportKind;
+  const gateRoster =
+    selected === "bus" || selected === "pickup"
+      ? await loadGateRoster(session.schoolId)
+      : [];
+  const gatePickup = parentPickupToday(gateRoster);
+  const gateBuses = groupConfirmedBus(gateRoster);
   const companyApproved = await loadCompanyApprovedBuses(session.schoolId);
   const checkIns = await loadCheckInSummary(session.schoolId);
   const lastEmail = session.role === "TEACHER" ? null : await lastTeacherEmail(session.schoolId);
@@ -94,15 +108,27 @@ export default async function PrintPage({
         <PrintTable title={reportTitle("master")} header={header} students={students} />
       ) : null}
       {selected === "bus" ? (
-        <PrintGroups
-          title="Bus lists"
-          header={header}
-          groups={groupByBus(students).map(([n, rows]) => [`Bus ${n}`, rows])}
-          companyApproved={companyApproved}
-        />
+        gateBuses.length ? (
+          <GatePrintGroups title="Confirmed Bus" header={header} groups={gateBuses} />
+        ) : (
+          <PrintGroups
+            title="Bus lists"
+            header={header}
+            groups={groupByBus(students).map(([n, rows]) => [`Bus ${n}`, rows])}
+            companyApproved={companyApproved}
+          />
+        )
       ) : null}
       {selected === "pickup" ? (
-        <PrintTable title={reportTitle("pickup")} header={header} students={pickupList(students)} />
+        gatePickup.length ? (
+          <GatePrintTable
+            title={reportTitle("pickup")}
+            header={header}
+            students={gatePickup}
+          />
+        ) : (
+          <PrintTable title={reportTitle("pickup")} header={header} students={pickupList(students)} />
+        )
       ) : null}
       {selected === "changes" ? (
         <PrintTable title={reportTitle("changes")} header={header} students={changeList(students)} />
@@ -313,6 +339,103 @@ function PrintGroups({
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function GatePrintTable({
+  title,
+  header,
+  students,
+}: {
+  title: string;
+  header: { generated: string; version: string };
+  students: GateStudent[];
+}) {
+  return (
+    <section className="print-sheet rounded-2xl border border-line bg-card p-5">
+      <PrintHeader title={title} header={header} />
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="text-muted">
+            <th className="py-2">Student</th>
+            <th>Grade</th>
+            <th>Teacher</th>
+            <th>Parent</th>
+            <th>Phone</th>
+            <th>AM</th>
+            <th>PM Dismissal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {students.map((student) => (
+            <tr key={student.id} className="border-t border-line">
+              <td className="py-1.5">{student.fullName}</td>
+              <td>{student.grade}</td>
+              <td>{student.teacherName}</td>
+              <td>{student.parentName}</td>
+              <td>{student.parentPhone}</td>
+              <td>{AM_LABEL[student.amArrival]}</td>
+              <td>
+                <StatusBadge
+                  tone={
+                    student.pmDismissal === "PARENT_PICKUP_TODAY_BUS_TOMORROW"
+                      ? "orange"
+                      : "blue"
+                  }
+                >
+                  {PM_LABEL[student.pmDismissal]}
+                </StatusBadge>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+function GatePrintGroups({
+  title,
+  header,
+  groups,
+}: {
+  title: string;
+  header: { generated: string; version: string };
+  groups: [string, GateStudent[]][];
+}) {
+  return (
+    <div className="space-y-6">
+      {groups.map(([name, rows]) => (
+        <section
+          key={name}
+          className="print-sheet break-after-page rounded-2xl border border-line bg-card p-5"
+        >
+          <PrintHeader title={`${title} — ${name}`} header={header} />
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="text-muted">
+                <th className="py-2">Student</th>
+                <th>Grade</th>
+                <th>Teacher</th>
+                <th>Parent</th>
+                <th>Phone</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((student) => (
+                <tr key={student.id} className="border-t border-line">
+                  <td className="py-1.5">{student.fullName}</td>
+                  <td>{student.grade}</td>
+                  <td>{student.teacherName}</td>
+                  <td>{student.parentName}</td>
+                  <td>{student.parentPhone}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </section>

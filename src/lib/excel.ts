@@ -13,6 +13,13 @@ import {
 } from "./reports";
 import type { CheckInBusSummary } from "./operations";
 import type { EffectiveStudent } from "./types";
+import {
+  AM_LABEL,
+  PM_LABEL,
+  groupConfirmedBus,
+  parentPickupToday,
+  type GateStudent,
+} from "./gate";
 
 function fileName(kind: ReportKind) {
   const slug = reportTitle(kind)
@@ -162,4 +169,44 @@ export function workbookBytes(wb: XLSX.WorkBook) {
 
 export function excelFileName(kind: ReportKind) {
   return fileName(kind);
+}
+
+function gateRow(student: GateStudent, extra: Record<string, string> = {}) {
+  return {
+    Student: student.fullName,
+    "Student ID": student.studentId,
+    Grade: student.grade,
+    Teacher: student.teacherName,
+    Family: student.familyKey,
+    Parent: student.parentName,
+    Phone: student.parentPhone,
+    "AM Arrival": AM_LABEL[student.amArrival],
+    "PM Dismissal": PM_LABEL[student.pmDismissal],
+    Vehicle: student.tempVehicleName || student.vehicleName,
+    Address: [student.address, student.city, student.zip].filter(Boolean).join(", "),
+    ...extra,
+  };
+}
+
+export function gateDismissalWorkbook(
+  kind: "bus" | "pickup",
+  students: GateStudent[],
+) {
+  const header = stamp();
+  const wb = XLSX.utils.book_new();
+  const note = { Generated: header.generated, Version: header.version };
+  if (kind === "bus") {
+    const groups = groupConfirmedBus(students);
+    if (!groups.length) sheet(wb, "Buses", []);
+    for (const [name, rows] of groups) {
+      sheet(wb, name, rows.map((student) => gateRow(student, note)));
+    }
+    return wb;
+  }
+  sheet(
+    wb,
+    "Parent Pickup",
+    parentPickupToday(students).map((student) => gateRow(student, note)),
+  );
+  return wb;
 }
