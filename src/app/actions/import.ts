@@ -583,37 +583,33 @@ export async function importStudents(formData: FormData) {
   });
 
   if (done) {
-    await writeAudit({
-      user,
-      action: "IMPORT_STUDENTS",
-      newPlan: { created, updated, errors: errors.length },
-    });
-    if (![...sourceFamilies].length) {
-      await assignMissingFamilies(user.schoolId).catch(() => undefined);
-    }
-    const familyRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(DISTINCT COALESCE("familyId", "id"))::bigint AS count
-      FROM "Student"
-      WHERE "schoolId" = ${user.schoolId}
-    `.catch(() => [{ count: BigInt(0) }]);
-    await saveImportSummary(user.schoolId, {
-      fileName: file.name,
-      sourceStudents: rows.length,
-      sourceFamilies: sourceFamilies.size,
-      created,
-      updated,
-      excludedNotReturning,
-      excludedNoName,
-      duplicateNameRows,
-      errors: errors.length,
-      rosterStudents,
-      rosterFamilies: Number(familyRows[0]?.count || 0),
-      at: new Date().toISOString(),
-    }).catch(() => undefined);
-    revalidatePath("/students");
-    revalidatePath("/dashboard");
-    revalidatePath("/gate");
-    revalidatePath("/first-day");
+    void Promise.resolve()
+      .then(async () => {
+        await writeAudit({
+          user,
+          action: "IMPORT_STUDENTS",
+          newPlan: { created, updated, errors: errors.length },
+        });
+        await saveImportSummary(user.schoolId, {
+          fileName: file.name,
+          sourceStudents: rows.length,
+          sourceFamilies: sourceFamilies.size,
+          created,
+          updated,
+          excludedNotReturning,
+          excludedNoName,
+          duplicateNameRows,
+          errors: errors.length,
+          rosterStudents,
+          rosterFamilies: 0,
+          at: new Date().toISOString(),
+        });
+        revalidatePath("/students");
+        revalidatePath("/dashboard");
+        revalidatePath("/gate");
+        revalidatePath("/first-day");
+      })
+      .catch(() => undefined);
   }
 
   return {
