@@ -12,16 +12,28 @@ export function SetupForm({
 }: {
   error?: string;
   showSchoolName?: boolean;
-  mode?: "first-admin" | "request";
+  mode?: "first-admin" | "request" | "new-school";
 }) {
   const [showPassword, setShowPassword] = useState(false);
+  const intent =
+    mode === "new-school" ? "new-school" : mode === "request" ? "join" : "join";
 
   return (
     <form action={createAccount} className="space-y-3 short-h:space-y-2.5">
+      <input type="hidden" name="intent" value={mode === "new-school" ? "new-school" : intent} />
       {showSchoolName ? (
         <label className="block text-left text-sm font-medium text-navy">
           School name
-          <input name="schoolName" required className={fieldClass} />
+          <input
+            name="schoolName"
+            required
+            className={fieldClass}
+            placeholder={
+              mode === "new-school"
+                ? "Your school name"
+                : "Type the school name exactly"
+            }
+          />
         </label>
       ) : null}
       <label className="block text-left text-sm font-medium text-navy">
@@ -65,9 +77,19 @@ export function SetupForm({
         {error || "\u00a0"}
       </p>
       <SubmitButton
-        pendingLabel={mode === "request" ? "Sending request…" : "Creating account…"}
+        pendingLabel={
+          mode === "request"
+            ? "Sending request…"
+            : mode === "new-school"
+              ? "Creating school…"
+              : "Creating account…"
+        }
       >
-        {mode === "request" ? "Request account" : "Create account"}
+        {mode === "request"
+          ? "Request to join this school"
+          : mode === "new-school"
+            ? "Create my school"
+            : "Create account"}
       </SubmitButton>
     </form>
   );

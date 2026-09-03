@@ -93,7 +93,11 @@ export function SignInForm({
       <p className="text-center text-sm text-navy">
         Need an account?{" "}
         <Link href="/login/create" className="font-medium text-teal hover:text-teal-deep">
-          Request an account
+          Join a school
+        </Link>
+        {" · "}
+        <Link href="/login/create?kind=new" className="font-medium text-teal hover:text-teal-deep">
+          Start a new school
         </Link>
       </p>
     </form>

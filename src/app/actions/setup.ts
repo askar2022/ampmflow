@@ -9,6 +9,19 @@ import { PENDING_ROLE } from "@/lib/types";
 
 const FIRST_ADMIN_ROLE = "ADMINISTRATOR" as const;
 
+function normSchoolName(value: string) {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+async function findSchoolByName(name: string) {
+  const wanted = normSchoolName(name);
+  if (!wanted) return null;
+  const schools = await prisma.school.findMany({
+    select: { id: true, name: true },
+  });
+  return schools.find((row) => normSchoolName(row.name) === wanted) || null;
+}
+
 function isNextRedirect(error: unknown) {
   return (
     typeof error === "object" &&
@@ -70,20 +83,36 @@ export async function createAccount(formData: FormData) {
 
   const passwordHash = await hashPassword(password);
 
-  if (existingUsers === 0) {
+  const intent = String(formData.get("intent") || "join");
+
+  if (existingUsers === 0 || intent === "new-school") {
+    if (!schoolName) {
+      redirect("/login/create?error=setup");
+    }
+    if (intent === "new-school") {
+      const taken = await findSchoolByName(schoolName);
+      if (taken) {
+        redirect("/login/create?error=school-exists&kind=new");
+      }
+    }
     await createFirstAdministrator({
-      school,
+      school: existingUsers === 0 ? school : null,
       schoolName,
       name,
       email,
       passwordHash,
+      forceNewSchool: existingUsers > 0,
     });
-    redirect("/admin/users");
+    redirect(existingUsers === 0 ? "/admin/users" : "/students");
   }
 
-  if (!school) {
-    redirect("/login/create?error=db");
+  const joinSchool = schoolName
+    ? await findSchoolByName(schoolName)
+    : school;
+  if (!joinSchool) {
+    redirect("/login/create?error=no-school");
   }
+  school = joinSchool;
 
   try {
     await prisma.user.create({
@@ -134,21 +163,25 @@ async function createFirstAdministrator({
   name,
   email,
   passwordHash,
+  forceNewSchool = false,
 }: {
   school: { id: string; name: string } | null;
   schoolName: string;
   name: string;
   email: string;
   passwordHash: string;
+  forceNewSchool?: boolean;
 }) {
   if (!school && !schoolName) {
     redirect("/login/create?error=setup");
   }
 
   try {
-    const stillEmpty = await prisma.user.count();
-    if (stillEmpty > 0) {
-      redirect("/login");
+    if (!forceNewSchool) {
+      const stillEmpty = await prisma.user.count();
+      if (stillEmpty > 0) {
+        redirect("/login");
+      }
     }
 
     if (!school) {
@@ -208,9 +241,11 @@ async function createFirstAdministrator({
     }
 
     try {
-      const stillEmpty = await prisma.user.count();
-      if (stillEmpty > 0) {
-        redirect("/login");
+      if (!forceNewSchool) {
+        const stillEmpty = await prisma.user.count();
+        if (stillEmpty > 0) {
+          redirect("/login");
+        }
       }
       const userId = randomUUID().replace(/-/g, "").slice(0, 24);
       await prisma.$executeRaw`
