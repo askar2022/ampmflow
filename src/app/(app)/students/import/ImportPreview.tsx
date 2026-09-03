@@ -1,11 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import {
-  importStudents,
-  previewStudentImport,
-  type ImportPreview,
-} from "@/app/actions/import";
+import { previewStudentImport, type ImportPreview } from "@/app/actions/import";
+import { runStudentImport } from "@/lib/run-student-import";
 
 export function ImportPreviewForm() {
   const returningRef = useRef<HTMLInputElement>(null);
@@ -167,18 +164,20 @@ export function ImportPreviewForm() {
                 const errors: string[] = [];
                 for (const [file, source] of files) {
                   if (!file) continue;
-                  const data = new FormData();
-                  data.set("file", file);
-                  data.set("enrollmentSource", source);
-                  if (overwrite) data.set("overwrite", "on");
-                  const result = await importStudents(data);
+                  const result = await runStudentImport({
+                    file,
+                    overwrite,
+                    enrollmentSource: source,
+                  });
                   if (!result.ok) {
                     errors.push(result.error || "Import failed.");
+                    created += result.progress.created;
+                    updated += result.progress.updated;
                     continue;
                   }
-                  created += result.created ?? 0;
-                  updated += result.updated ?? 0;
-                  errors.push(...(result.errors || []));
+                  created += result.created;
+                  updated += result.updated;
+                  errors.push(...result.errors);
                 }
                 setMessage(
                   `Imported ${created} new students and updated ${updated}. ${errors.length ? `${errors.length} rows need review.` : ""}`,

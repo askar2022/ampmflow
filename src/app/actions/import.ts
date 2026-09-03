@@ -16,6 +16,8 @@ import {
   usablePhone,
 } from "@/lib/gate";
 
+export const maxDuration = 60;
+
 type Row = Record<string, string>;
 
 function cell(row: Row, ...keys: string[]) {
@@ -101,8 +103,17 @@ function rowsFromSheet(sheet: XLSX.WorkSheet): Row[] {
     .filter((line) => line.some(Boolean));
   if (!lines.length) return [];
 
-  const first = lines[0].map((value) => value.toLowerCase());
-  if (first.some((value) => HEADER_ALIASES.has(value))) {
+  const first = lines[0].map((value) => value.trim().toLowerCase());
+  const hasHeader = first.some(
+    (value) =>
+      HEADER_ALIASES.has(value) ||
+      value.includes("first name") ||
+      value.includes("last name") ||
+      value.includes("family id") ||
+      value.includes("enrollment") ||
+      value.includes("parent"),
+  );
+  if (hasHeader) {
     return XLSX.utils.sheet_to_json<Row>(sheet, { defval: "", raw: false });
   }
 
@@ -222,7 +233,7 @@ export async function importStudents(formData: FormData) {
       : "RETURNING";
   const batched = formData.has("batchStart");
   const batchStart = Math.max(0, Number(formData.get("batchStart") || 0) || 0);
-  const batchSize = 15;
+  const batchSize = 6;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -284,7 +295,7 @@ export async function importStudents(formData: FormData) {
     const lastName =
       cell(row, "student last name", "last_name", "last name") || names.last;
     const familyKey = cell(row, "family id", "family_id", "family");
-    const studentId =
+    let studentId =
       cell(row, "student_id", "id", "student id") ||
       slugStudentId(firstName, lastName, familyKey, index);
     if (!firstName || !lastName) {
@@ -338,12 +349,21 @@ export async function importStudents(formData: FormData) {
     try {
     const nameMatches = existingByName.get(`${normName(firstName)}|${normName(lastName)}`) || [];
     const phone = usablePhone(parentPhone);
+    const byCode = existingByCode.get(studentId);
+    const codeIsSamePerson = Boolean(
+      byCode &&
+        normName(byCode.firstName) === normName(firstName) &&
+        normName(byCode.lastName) === normName(lastName),
+    );
     const existingEarly =
-      existingByCode.get(studentId) ||
+      (codeIsSamePerson ? byCode : null) ||
       (nameMatches.length === 1
         ? nameMatches[0]
         : nameMatches.find((row) => usablePhone(row.parentPhone) === phone) ||
           null);
+    if (!existingEarly && existingByCode.has(studentId)) {
+      studentId = `${studentId}`.slice(0, 36) + `-${index + 1}`;
+    }
     if (existingEarly && !canUpdate) {
       skipped += 1;
       continue;

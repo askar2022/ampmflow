@@ -1,15 +1,15 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { importStudents } from "@/app/actions/import";
+import Link from "next/link";
+import { runStudentImport } from "@/lib/run-student-import";
 
 export function ImportForm() {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
+  const [doneCount, setDoneCount] = useState<number | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
 
   return (
@@ -26,49 +26,32 @@ export function ImportForm() {
           event.currentTarget.overwrite instanceof HTMLInputElement &&
           event.currentTarget.overwrite.checked;
         setPending(true);
+        setDoneCount(null);
         setErrors([]);
-        setMessage("Adding missing students. Stay on this page. Do not click again.");
+        setMessage("Loading the full list in small groups. Stay on this page.");
         void (async () => {
-          let created = 0;
-          let updated = 0;
-          let skipped = 0;
-          let next = 0;
-          let done = false;
-          const allErrors: string[] = [];
-          try {
-            while (!done) {
-              const data = new FormData();
-              data.set("file", file);
-              data.set("enrollmentSource", "RETURNING");
-              data.set("batchStart", String(next));
-              if (overwrite) data.set("overwrite", "on");
-              const result = await importStudents(data);
-              if (!result?.ok) {
-                setPending(false);
-                setMessage(result?.error || "Import failed. Try the upload again.");
-                return;
-              }
-              created += result.created ?? 0;
-              updated += result.updated ?? 0;
-              skipped += result.skipped ?? 0;
-              allErrors.push(...(result.errors || []));
-              next = result.next ?? next + 15;
-              done = Boolean(result.done);
-              const total = result.sourceStudents || next;
+          const result = await runStudentImport({
+            file,
+            overwrite,
+            onProgress: (progress) => {
               setMessage(
-                `Uploading ${next} of ${total}. Added ${created} new. ${skipped} already on the list.`,
+                `Loading ${Math.min(progress.processed, progress.total || progress.processed)} of ${progress.total || "…"}. Added ${progress.created} new. ${progress.skipped} already on the list. ${progress.excludedNotReturning} Not Returning skipped.`,
               );
-            }
-            router.push(
-              `/students?imported=${created}&updated=${updated}&issues=${allErrors.length}`,
-            );
-          } catch {
-            setPending(false);
-            setErrors(allErrors.slice(0, 8));
+            },
+          });
+          setPending(false);
+          if (!result.ok) {
+            setErrors(result.progress.errors.slice(0, 8));
             setMessage(
-              `The upload paused after adding ${created} new student${created === 1 ? "" : "s"}. Stay on this page and click Upload file again. Already-listed names are skipped.`,
+              `${result.error} Added ${result.progress.created} so far. Keep the same file selected and click Upload file again. Names already on the list are skipped.`,
             );
+            return;
           }
+          setErrors(result.errors.slice(0, 8));
+          setDoneCount(result.rosterStudents);
+          setMessage(
+            `Finished. ${result.rosterStudents} students are on the roster. Added ${result.created} new${result.updated ? `, updated ${result.updated}` : ""}. ${result.excludedNotReturning} Not Returning were left out on purpose.`,
+          );
         })();
       }}
     >
@@ -94,7 +77,7 @@ export function ImportForm() {
           disabled={pending || !fileName}
           className="action-button inline-flex min-h-12 items-center justify-center rounded-xl px-6 text-lg font-bold disabled:opacity-60"
         >
-          {pending ? "Uploading…" : "2. Upload file"}
+          {pending ? "Loading students…" : "2. Load all students"}
         </button>
       </div>
       <p className="mt-3 text-sm font-medium text-navy">
@@ -108,6 +91,13 @@ export function ImportForm() {
       {message ? (
         <p className="mt-3 rounded-xl border border-green bg-green-50 px-4 py-3 text-base font-semibold text-green">
           {message}
+        </p>
+      ) : null}
+      {doneCount != null ? (
+        <p className="mt-3 text-base font-semibold">
+          <Link href="/gate" className="text-navy underline">
+            Open The Gate ({doneCount} students)
+          </Link>
         </p>
       ) : null}
       {errors.length ? (

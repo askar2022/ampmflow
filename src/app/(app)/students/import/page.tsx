@@ -15,23 +15,22 @@ export default async function ImportPage() {
       <div>
         <h1 className="font-serif text-4xl">Upload students</h1>
         <p className="mt-2 text-muted">
-          Preview returning and new-application files together first. Existing
-          students are not overwritten unless you confirm. Columns can include
-          ID, Student, Grade, Teacher, Parent, Phone, Address, City, ZIP, AM,
-          and PM.
+          Use the Sankofa Family Master Excel file. Leave overwrite unchecked
+          unless you mean to change names already on the list. The file loads
+          in small groups so the full school list can finish. Stay on this
+          page until you see “Finished.” Do not run any reset SQL.
         </p>
       </div>
-      <ImportPreviewForm />
       <div>
-        <h2 className="font-serif text-2xl">Quick single-file upload</h2>
+        <h2 className="font-serif text-2xl">Load the family master</h2>
         <p className="mt-1 text-sm text-muted">
-          Use this only for one file. Stay on this page until you see the
-          student count. A full Sankofa list can take up to one minute. Check
-          the overwrite box only if you intend to update students already in
-          the system.
+          Choose Sankofa_Family_Master and click Load all students. About 12
+          Not Returning rows are left out on purpose. The Gate should then
+          show about 103 students.
         </p>
       </div>
       <ImportForm />
+      <ImportPreviewForm />
       <a
         href="/sample-import.csv"
         className="inline-block text-sm font-semibold text-blue"
