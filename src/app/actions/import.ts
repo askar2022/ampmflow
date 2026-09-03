@@ -261,6 +261,7 @@ export async function importStudents(formData: FormData) {
 
   let created = 0;
   let updated = 0;
+  let skipped = 0;
   let excludedNotReturning = 0;
   let excludedNoName = 0;
   let duplicateNameRows = 0;
@@ -271,11 +272,7 @@ export async function importStudents(formData: FormData) {
       .map((row) => cell(row, "family id", "family_id", "family"))
       .filter(Boolean),
   );
-  const isFamilyMaster = Boolean(
-    cell(rows[0] || {}, "family id", "family_id") ||
-      cell(rows[0] || {}, "student first name"),
-  );
-  const canUpdate = overwrite || isFamilyMaster;
+  const canUpdate = overwrite;
   const workRows = batched ? rows.slice(batchStart, batchStart + batchSize) : rows;
 
   for (const [offset, row] of workRows.entries()) {
@@ -348,9 +345,7 @@ export async function importStudents(formData: FormData) {
         : nameMatches.find((row) => usablePhone(row.parentPhone) === phone) ||
           null);
     if (existingEarly && !canUpdate) {
-      errors.push(
-        `Row ${index + 2}: ${firstName} ${lastName} already exists. Check “Update existing students” to overwrite.`,
-      );
+      skipped += 1;
       continue;
     }
 
@@ -605,6 +600,7 @@ export async function importStudents(formData: FormData) {
     ok: true,
     created,
     updated,
+    skipped,
     errors,
     excludedNotReturning,
     sourceStudents: rows.length,

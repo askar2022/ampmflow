@@ -17,33 +17,59 @@ export function ImportForm() {
       className="rounded-2xl border border-line bg-card p-6"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!inputRef.current?.files?.length) {
+        const file = inputRef.current?.files?.[0];
+        if (!file) {
           setMessage("First click Choose file, then click Upload file.");
           return;
         }
-        const data = new FormData(event.currentTarget);
+        const overwrite =
+          event.currentTarget.overwrite instanceof HTMLInputElement &&
+          event.currentTarget.overwrite.checked;
         setPending(true);
-        setMessage(
-          "Uploading the full list. Stay on this page. A Sankofa file can take up to one minute. Do not click again.",
-        );
-        void importStudents(data)
-          .then((result) => {
-            if (!result?.ok) {
-              setPending(false);
-              setMessage(result?.error || "Import failed. Try the upload again.");
-              setErrors([]);
-              return;
+        setErrors([]);
+        setMessage("Adding missing students. Stay on this page. Do not click again.");
+        void (async () => {
+          let created = 0;
+          let updated = 0;
+          let skipped = 0;
+          let next = 0;
+          let done = false;
+          const allErrors: string[] = [];
+          try {
+            while (!done) {
+              const data = new FormData();
+              data.set("file", file);
+              data.set("enrollmentSource", "RETURNING");
+              data.set("batchStart", String(next));
+              if (overwrite) data.set("overwrite", "on");
+              const result = await importStudents(data);
+              if (!result?.ok) {
+                setPending(false);
+                setMessage(result?.error || "Import failed. Try the upload again.");
+                return;
+              }
+              created += result.created ?? 0;
+              updated += result.updated ?? 0;
+              skipped += result.skipped ?? 0;
+              allErrors.push(...(result.errors || []));
+              next = result.next ?? next + 15;
+              done = Boolean(result.done);
+              const total = result.sourceStudents || next;
+              setMessage(
+                `Uploading ${next} of ${total}. Added ${created} new. ${skipped} already on the list.`,
+              );
             }
             router.push(
-              `/students?imported=${result.created ?? 0}&updated=${result.updated ?? 0}&issues=${result.errors?.length ?? 0}`,
+              `/students?imported=${created}&updated=${updated}&issues=${allErrors.length}`,
             );
-          })
-          .catch(() => {
+          } catch {
             setPending(false);
+            setErrors(allErrors.slice(0, 8));
             setMessage(
-              "The upload did not finish. Stay on this page and click Upload file again.",
+              `The upload paused after adding ${created} new student${created === 1 ? "" : "s"}. Stay on this page and click Upload file again. Already-listed names are skipped.`,
             );
-          });
+          }
+        })();
       }}
     >
       <input
