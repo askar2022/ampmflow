@@ -3,6 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { applyFamilyGate, updateGateField } from "@/app/actions/gate";
+import { ParentChangeCard } from "@/components/ParentChangeCard";
+import type { EffectiveStudent } from "@/lib/types";
 import {
   AM_ARRIVAL,
   AM_FOLLOW_UP,
@@ -51,14 +53,57 @@ function StatusSelect<T extends string>({
   );
 }
 
+function asChangeStudent(row: GateStudent, plan?: EffectiveStudent): EffectiveStudent {
+  if (plan) return plan;
+  const missing = (trip: "AM" | "PM"): EffectiveStudent["am"] => ({
+    trip,
+    type: null,
+    destination: null,
+    busNumber: null,
+    daycareName: null,
+    customAddress: null,
+    waitingForAssignment: false,
+    notes: "",
+    source: "MISSING",
+    location: "",
+  });
+  return {
+    id: row.id,
+    studentId: row.studentId,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    fullName: row.fullName,
+    grade: row.grade,
+    parentName: row.parentName,
+    parentPhone: row.parentPhone,
+    homeAddress: [row.address, row.city, row.zip].filter(Boolean).join(", "),
+    daycareName: null,
+    daycareAddress: null,
+    classroomId: "",
+    classroomName: "",
+    teacherName: row.teacherName,
+    notes: row.transportNotes,
+    am: missing("AM"),
+    pm: missing("PM"),
+    lastUpdatedBy: null,
+    lastUpdatedAt: null,
+  };
+}
+
 export function GateBoard({
   students,
   lastUpdated,
   importSummary,
+  plans = [],
+  buses = [],
+  allowPermanent = false,
 }: {
   students: GateStudent[];
   lastUpdated: string;
   importSummary: ImportSummary | null;
+  plans?: EffectiveStudent[];
+  buses?: string[];
+  allowPermanent?: boolean;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -68,6 +113,17 @@ export function GateBoard({
   const [summaryOpen, setSummaryOpen] = useState(!importSummary);
   const [openNote, setOpenNote] = useState<string | null>(null);
   const [openFollowUp, setOpenFollowUp] = useState<Record<string, boolean>>({});
+  const [changeFor, setChangeFor] = useState<string | null>(null);
+  const planById = useMemo(
+    () => new Map(plans.map((row) => [row.id, row])),
+    [plans],
+  );
+  const changeStudent = changeFor
+    ? asChangeStudent(
+        students.find((row) => row.id === changeFor) || students[0],
+        planById.get(changeFor),
+      )
+    : null;
   const [identityFor, setIdentityFor] = useState<string | null>(null);
   const [pendingChange, setPendingChange] = useState<{
     studentId: string;
@@ -356,6 +412,7 @@ export function GateBoard({
                     router.refresh();
                   });
                 }}
+                onParentChange={(id) => setChangeFor(id)}
               />
             );
           })}
@@ -368,6 +425,14 @@ export function GateBoard({
             ? "No student or parent matches that search."
             : "No students match this filter."}
         </p>
+      ) : null}
+      {changeStudent ? (
+        <ParentChangeCard
+          student={changeStudent}
+          buses={buses}
+          allowPermanent={allowPermanent}
+          onClose={() => setChangeFor(null)}
+        />
       ) : null}
     </div>
   );
@@ -389,6 +454,7 @@ function FamilyBlock({
   onConfirmBus,
   onKeepPickup,
   onSaveNote,
+  onParentChange,
 }: {
   family: ReturnType<typeof groupFamilies>[number];
   first: GateStudent;
@@ -413,6 +479,7 @@ function FamilyBlock({
   onConfirmBus: (student: GateStudent) => void;
   onKeepPickup: () => void;
   onSaveNote: (notes: string) => void;
+  onParentChange: (studentId: string) => void;
 }) {
   return (
     <>
@@ -500,6 +567,14 @@ function FamilyBlock({
                 onClick={() => onToggleFollowUp(student.id)}
               >
                 Follow-Up
+              </button>
+              <button
+                type="button"
+                className="gate-icon-btn"
+                title="Parent change: home pickup, address, or daycare"
+                onClick={() => onParentChange(student.id)}
+              >
+                Change
               </button>
               <button
                 type="button"

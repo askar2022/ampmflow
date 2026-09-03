@@ -7,6 +7,8 @@ import {
   loadGateRoster,
   loadImportSummary,
 } from "@/lib/gate";
+import { listBusNumbers } from "@/app/actions/plans";
+import { loadStudents } from "@/lib/transportation";
 import { LiveRefresh } from "@/components/LiveRefresh";
 import { GateBoard } from "./GateBoard";
 
@@ -24,9 +26,11 @@ export default async function GatePage() {
   }
 
   await ensureGateTables();
-  const [students, importSummary] = await Promise.all([
+  const [students, importSummary, plans, listed] = await Promise.all([
     loadGateRoster(session.schoolId),
     loadImportSummary(session.schoolId),
+    loadStudents(session.schoolId),
+    listBusNumbers(session.schoolId),
   ]);
 
   return (
@@ -44,6 +48,11 @@ export default async function GatePage() {
         students={students}
         lastUpdated={lastUpdatedStamp(students)}
         importSummary={importSummary}
+        plans={plans}
+        buses={listed.numbers}
+        allowPermanent={
+          session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"
+        }
       />
     </div>
   );
