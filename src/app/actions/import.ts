@@ -7,7 +7,6 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import {
-  assignMissingFamilies,
   digitsPhone,
   ensureGateTables,
   normAddress,
