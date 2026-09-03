@@ -12,6 +12,7 @@ import {
   ENROLL_LABEL,
   FOLLOW_LABEL,
   PM_LABEL,
+  familyGroupKey,
   loadGateHistory,
   loadGateRoster,
 } from "@/lib/gate";
@@ -41,7 +42,9 @@ export default async function StudentPage({
   ]);
   const gateStudent = roster.find((row) => row.id === id);
   const siblings = roster.filter(
-    (row) => gateStudent?.familyId && row.familyId === gateStudent.familyId,
+    (row) =>
+      Boolean(gateStudent) &&
+      familyGroupKey(row) === familyGroupKey(gateStudent!),
   );
 
   const canUndo = audits.some(

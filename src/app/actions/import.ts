@@ -19,10 +19,19 @@ import {
 type Row = Record<string, string>;
 
 function cell(row: Row, ...keys: string[]) {
+  const headers = Object.keys(row);
   for (const key of keys) {
-    const match = Object.keys(row).find(
-      (k) => k.trim().toLowerCase() === key.toLowerCase(),
-    );
+    const wanted = key.toLowerCase();
+    const match = headers.find((k) => k.trim().toLowerCase() === wanted);
+    if (match && row[match] != null && String(row[match]).trim()) {
+      return String(row[match]).trim();
+    }
+  }
+  if (keys.some((key) => key.toLowerCase() === "family id")) {
+    const match = headers.find((k) => {
+      const h = k.trim().toLowerCase();
+      return h.includes("family id") || h === "fam id" || h === "famid";
+    });
     if (match && row[match] != null && String(row[match]).trim()) {
       return String(row[match]).trim();
     }
@@ -211,6 +220,9 @@ export async function importStudents(formData: FormData) {
     String(formData.get("enrollmentSource") || "RETURNING") === "NEW_APPLICATION"
       ? "NEW_APPLICATION"
       : "RETURNING";
+  const batched = formData.has("batchStart");
+  const batchStart = Math.max(0, Number(formData.get("batchStart") || 0) || 0);
+  const batchSize = 15;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
@@ -264,8 +276,10 @@ export async function importStudents(formData: FormData) {
       cell(rows[0] || {}, "student first name"),
   );
   const canUpdate = overwrite || isFamilyMaster;
+  const workRows = batched ? rows.slice(batchStart, batchStart + batchSize) : rows;
 
-  for (const [index, row] of rows.entries()) {
+  for (const [offset, row] of workRows.entries()) {
+    const index = batched ? batchStart + offset : offset;
     const fullName = cell(row, "student", "name", "full name");
     const names = splitName(fullName);
     const firstName =
@@ -546,43 +560,47 @@ export async function importStudents(formData: FormData) {
     }
   }
 
-  await writeAudit({
-    user,
-    action: "IMPORT_STUDENTS",
-    newPlan: { created, updated, errors: errors.length },
-  });
-
-  if (![...sourceFamilies].length) {
-    await assignMissingFamilies(user.schoolId).catch(() => undefined);
-  }
+  const next = batched ? batchStart + workRows.length : rows.length;
+  const done = next >= rows.length;
 
   const rosterStudents = await prisma.student.count({
     where: { schoolId: user.schoolId },
   });
-  const familyRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
-    SELECT COUNT(DISTINCT COALESCE("familyId", "id"))::bigint AS count
-    FROM "Student"
-    WHERE "schoolId" = ${user.schoolId}
-  `.catch(() => [{ count: BigInt(0) }]);
-  await saveImportSummary(user.schoolId, {
-    fileName: file.name,
-    sourceStudents: rows.length,
-    sourceFamilies: sourceFamilies.size,
-    created,
-    updated,
-    excludedNotReturning,
-    excludedNoName,
-    duplicateNameRows,
-    errors: errors.length,
-    rosterStudents,
-    rosterFamilies: Number(familyRows[0]?.count || 0),
-    at: new Date().toISOString(),
-  }).catch(() => undefined);
 
-  revalidatePath("/students");
-  revalidatePath("/dashboard");
-  revalidatePath("/gate");
-  revalidatePath("/first-day");
+  if (done) {
+    await writeAudit({
+      user,
+      action: "IMPORT_STUDENTS",
+      newPlan: { created, updated, errors: errors.length },
+    });
+    if (![...sourceFamilies].length) {
+      await assignMissingFamilies(user.schoolId).catch(() => undefined);
+    }
+    const familyRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(DISTINCT COALESCE("familyId", "id"))::bigint AS count
+      FROM "Student"
+      WHERE "schoolId" = ${user.schoolId}
+    `.catch(() => [{ count: BigInt(0) }]);
+    await saveImportSummary(user.schoolId, {
+      fileName: file.name,
+      sourceStudents: rows.length,
+      sourceFamilies: sourceFamilies.size,
+      created,
+      updated,
+      excludedNotReturning,
+      excludedNoName,
+      duplicateNameRows,
+      errors: errors.length,
+      rosterStudents,
+      rosterFamilies: Number(familyRows[0]?.count || 0),
+      at: new Date().toISOString(),
+    }).catch(() => undefined);
+    revalidatePath("/students");
+    revalidatePath("/dashboard");
+    revalidatePath("/gate");
+    revalidatePath("/first-day");
+  }
+
   return {
     ok: true,
     created,
@@ -590,6 +608,9 @@ export async function importStudents(formData: FormData) {
     errors,
     excludedNotReturning,
     sourceStudents: rows.length,
+    rosterStudents,
+    next,
+    done,
   };
 }
 

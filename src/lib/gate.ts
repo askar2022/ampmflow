@@ -581,18 +581,53 @@ export async function loadGateRoster(
   });
 }
 
+/** Shared household key. Auto FAM-1001-style IDs are unique per student and must not split siblings. */
+export function familyGroupKey(student: {
+  id: string;
+  familyId?: string | null;
+  familyKey?: string | null;
+  parentPhone?: string | null;
+  parentName?: string | null;
+  lastName?: string | null;
+  address?: string | null;
+  zip?: string | null;
+}) {
+  const phone = usablePhone(student.parentPhone || "");
+  if (phone) return `phone:${phone}`;
+  const excelKey = (student.familyKey || "").trim();
+  if (excelKey && excelKey !== "—" && !/^FAM-\d+$/i.test(excelKey)) {
+    return `xlsx:${excelKey}`;
+  }
+  const last = normName(student.lastName || "");
+  const house = normAddress(`${student.address || ""} ${student.zip || ""}`);
+  if (last && house) return `house:${last}|${house}`;
+  const parent = normName(student.parentName || "");
+  if (parent && parent !== "—" && house) return `parent:${parent}|${house}`;
+  if (student.familyId) return `fid:${student.familyId}`;
+  return student.id;
+}
+
+function displayFamilyKey(student: GateStudent) {
+  const key = (student.familyKey || "").trim();
+  if (key && key !== "—" && !/^FAM-\d+$/i.test(key)) return key;
+  return student.familyKey || "—";
+}
+
 export function groupFamilies(students: GateStudent[]): GateFamily[] {
   const groups = new Map<string, GateFamily>();
   for (const student of students) {
-    const key = student.familyId || student.id;
+    const key = familyGroupKey(student);
     const existing = groups.get(key);
     if (existing) {
       existing.students.push(student);
+      if (displayFamilyKey(student) !== "—" && /^FAM-\d+$/i.test(existing.familyKey || "")) {
+        existing.familyKey = displayFamilyKey(student);
+      }
       continue;
     }
     groups.set(key, {
-      familyId: student.familyId || student.id,
-      familyKey: student.familyKey,
+      familyId: key,
+      familyKey: displayFamilyKey(student),
       parentName: student.parentName,
       parentPhone: student.parentPhone,
       address: student.address,
@@ -647,14 +682,14 @@ export function searchGateStudents(students: GateStudent[], query: string) {
     const phoneHit = qDigits.length >= 4 && digitsPhone(student.parentPhone).includes(qDigits);
     if (nameQueryHits(hay, q) || phoneHit) {
       matchedIds.add(student.id);
-      if (student.familyId) matchedFamilies.add(student.familyId);
+      matchedFamilies.add(familyGroupKey(student));
     }
   }
 
   return students.filter(
     (student) =>
       matchedIds.has(student.id) ||
-      (student.familyId && matchedFamilies.has(student.familyId)),
+      matchedFamilies.has(familyGroupKey(student)),
   );
 }
 
@@ -691,7 +726,7 @@ export type GateCounts = {
 };
 
 function familyCount(students: GateStudent[], test: (s: GateStudent) => boolean) {
-  return new Set(students.filter(test).map((s) => s.familyId || s.id)).size;
+  return new Set(students.filter(test).map(familyGroupKey)).size;
 }
 
 export function gateCounts(students: GateStudent[]): GateCounts {
@@ -701,7 +736,7 @@ export function gateCounts(students: GateStudent[]): GateCounts {
   });
   return {
     totalStudents: students.length,
-    totalFamilies: new Set(students.map((s) => s.familyId || s.id)).size,
+    totalFamilies: new Set(students.map(familyGroupKey)).size,
     returning: students.filter((s) => s.enrollmentSource === "RETURNING").length,
     newApplication: students.filter((s) => s.enrollmentSource === "NEW_APPLICATION")
       .length,
@@ -779,7 +814,7 @@ export async function upsertGateStatus(args: {
   }
 
   const members = args.applyFamily
-    ? roster.filter((s) => s.familyId && s.familyId === target.familyId)
+    ? roster.filter((s) => familyGroupKey(s) === familyGroupKey(target))
     : [target];
 
   const results: Array<{
@@ -946,7 +981,7 @@ export async function applyFamilyStatuses(args: {
   const target = roster.find((s) => s.id === args.studentId);
   if (!target) return { ok: false as const, error: "Student not found." };
   const members = roster.filter(
-    (s) => s.familyId && s.familyId === target.familyId,
+    (s) => familyGroupKey(s) === familyGroupKey(target),
   );
   for (const student of members) {
     if (args.amArrival) {
@@ -1084,7 +1119,7 @@ export async function assignTempVehicleToFamilies(args: {
   const wanted = new Set(args.familyIds);
   const students = roster.filter(
     (s) =>
-      wanted.has(s.familyId) &&
+      wanted.has(familyGroupKey(s)) &&
       s.pmDismissal === "PARENT_PICKUP_TODAY_BUS_TOMORROW",
   );
   for (const student of students) {

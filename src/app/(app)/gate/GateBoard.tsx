@@ -265,10 +265,12 @@ export function GateBoard({
             </p>
           ) : (
             <p>
-              This board has {students.length} students and {allFamilies.length}{" "}
-              families. The Sankofa master workbook has 115 students and 69
-              families. 12 are Not Returning. Upload the Excel file again if
-              students are still missing.
+              This board has {students.length} active students in{" "}
+              {allFamilies.length} families. The Excel file has 115 records and
+              about 69 families. About 12 are Not Returning, so The Gate should
+              show about 103 students — not 115. {students.length < 100
+                ? "Upload the same Excel again and stay on the page until it finishes. Do not run the reset SQL."
+                : ""}
             </p>
           )}
           <p>Last updated {lastUpdated}</p>
