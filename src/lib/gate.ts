@@ -332,12 +332,12 @@ async function loadRawStudents(schoolId: string): Promise<RawStudent[]> {
         ORDER BY t."name"
         LIMIT 1
       ) AS "teacherName",
-      a."line1",
-      a."city",
-      a."state",
-      a."zip"
+      COALESCE(a."line1", '') AS "line1",
+      COALESCE(a."city", '') AS "city",
+      COALESCE(a."state", '') AS "state",
+      COALESCE(a."zip", '') AS "zip"
     FROM "Student" s
-    JOIN "Address" a ON a."id" = s."homeAddressId"
+    LEFT JOIN "Address" a ON a."id" = s."homeAddressId"
     WHERE s."schoolId" = ${schoolId}
     ORDER BY s."lastName", s."firstName"
   `;
@@ -501,7 +501,6 @@ export async function loadGateRoster(
   date = todayKey(),
 ): Promise<GateStudent[]> {
   await ensureGateTables();
-  await assignMissingFamilies(schoolId);
 
   const students = await loadRawStudents(schoolId);
   const [statuses, vehicles, families] = await Promise.all([
