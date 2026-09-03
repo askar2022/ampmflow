@@ -15,8 +15,6 @@ import {
   usablePhone,
 } from "@/lib/gate";
 
-export const maxDuration = 60;
-
 type Row = Record<string, string>;
 
 function cell(row: Row, ...keys: string[]) {
