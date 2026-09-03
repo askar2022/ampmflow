@@ -39,8 +39,8 @@ export default async function StudentsPage({
           Upload complete. Imported {imported} new students
           {updated && updated !== "0" ? ` and updated ${updated}` : ""}.
           {issues && issues !== "0" ? ` ${issues} rows need review.` : ""}{" "}
-          {students.length} students are on the list. Open The Gate to start AM
-          arrival.
+          {students.length} students are on the list. Open AM & PM Plans to set
+          regular buses and parent pickup.
         </p>
       ) : null}
       {uploaded === "1" && !(imported != null && imported !== "") ? (

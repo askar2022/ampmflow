@@ -19,6 +19,7 @@ const tiles = [
   { href: "/bus-tomorrow", title: "Bus Needed Tomorrow", copy: "Families who need transportation the next school day." },
   { href: "/first-day", title: "First-Day Dashboard", copy: "Leadership counts for arrival, absence, and dismissal." },
   { href: "/changes", title: "Today’s Changes", copy: "Live exceptions teachers must see first." },
+  { href: "/plans", title: "AM & PM Plans", copy: "Set regular morning and afternoon: parent, home bus, or daycare bus." },
   { href: "/buses", title: "Buses", copy: "Full printable roster. Red line = changed today." },
   { href: "/pickup", title: "Parent Pickup", copy: "Students going home with a parent." },
   { href: "/waiting", title: "Waiting for Route", copy: "New address or daycare — not final until assigned." },
