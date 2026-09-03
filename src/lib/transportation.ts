@@ -199,8 +199,9 @@ export async function loadStudent(id: string, day = todayKey()) {
 }
 
 export function searchStudents(students: EffectiveStudent[], query: string) {
-  const q = query.trim().toLowerCase();
+  const q = query.trim().toLowerCase().replace(/\s+/g, " ");
   if (!q) return students;
+  const tokens = q.split(" ").filter(Boolean);
   return students.filter((student) => {
     const hay = [
       student.fullName,
@@ -217,8 +218,9 @@ export function searchStudents(students: EffectiveStudent[], query: string) {
     ]
       .filter(Boolean)
       .join(" ")
-      .toLowerCase();
-    return hay.includes(q);
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+    return hay.includes(q) || tokens.every((part) => hay.includes(part));
   });
 }
 

@@ -25,8 +25,10 @@ export default async function ImportPage() {
       <div>
         <h2 className="font-serif text-2xl">Quick single-file upload</h2>
         <p className="mt-1 text-sm text-muted">
-          Use this only for one file. Check the overwrite box if you intend to
-          update students already in the system.
+          Use this only for one file. Stay on this page until you see the
+          student count. A full Sankofa list can take up to one minute. Check
+          the overwrite box only if you intend to update students already in
+          the system.
         </p>
       </div>
       <ImportForm />

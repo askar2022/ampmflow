@@ -23,16 +23,14 @@ export function ImportForm() {
         }
         const data = new FormData(event.currentTarget);
         setPending(true);
-        setMessage("Uploading. You will be taken to Students when it is done.");
-        const watchdog = window.setTimeout(() => {
-          router.push("/students?uploaded=1");
-        }, 12000);
+        setMessage(
+          "Uploading the full list. Stay on this page. A Sankofa file can take up to one minute. Do not click again.",
+        );
         void importStudents(data)
           .then((result) => {
-            window.clearTimeout(watchdog);
             if (!result?.ok) {
               setPending(false);
-              setMessage(result?.error || "Import failed.");
+              setMessage(result?.error || "Import failed. Try the upload again.");
               setErrors([]);
               return;
             }
@@ -41,8 +39,10 @@ export function ImportForm() {
             );
           })
           .catch(() => {
-            window.clearTimeout(watchdog);
-            router.push("/students?uploaded=1");
+            setPending(false);
+            setMessage(
+              "The upload did not finish. Stay on this page and click Upload file again.",
+            );
           });
       }}
     >

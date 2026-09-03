@@ -244,6 +244,8 @@ export async function importStudents(formData: FormData) {
   const classroomCache = new Map<string, { id: string }>();
   const teacherDone = new Set<string>();
   const familyCache = new Map<string, string>();
+  const addressCache = new Map<string, string>();
+  const daycareCache = new Map<string, string>();
 
   let created = 0;
   let updated = 0;
@@ -369,45 +371,61 @@ export async function importStudents(formData: FormData) {
       teacherDone.add(classroom.id);
     }
 
-    const home = await prisma.address.create({
-      data: {
-        schoolId: user.schoolId,
-        line1: homeLine,
-        city,
-        state,
-        zip,
-        label: "home",
-      },
-    });
+    const addressKey = familyKey || `${homeLine}|${city}|${zip}`;
+    let homeId = addressCache.get(addressKey);
+    if (!homeId) {
+      const home = await prisma.address.create({
+        data: {
+          schoolId: user.schoolId,
+          line1: homeLine,
+          city,
+          state,
+          zip,
+          label: "home",
+        },
+      });
+      homeId = home.id;
+      addressCache.set(addressKey, homeId);
+    }
 
     let daycareId: string | undefined;
     if (daycareName) {
-      let daycare = await prisma.daycare.findFirst({
-        where: { schoolId: user.schoolId, name: daycareName },
-      });
-      if (!daycare) {
-        const addr = await prisma.address.create({
-          data: {
-            schoolId: user.schoolId,
-            line1: daycareAddress || "Address pending",
-            city,
-            state,
-            zip,
-            label: "daycare",
-          },
+      daycareId = daycareCache.get(daycareName);
+      if (!daycareId) {
+        let daycare = await prisma.daycare.findFirst({
+          where: { schoolId: user.schoolId, name: daycareName },
         });
-        daycare = await prisma.daycare.create({
-          data: {
-            schoolId: user.schoolId,
-            name: daycareName,
-            addressId: addr.id,
-          },
-        });
+        if (!daycare) {
+          const addr = await prisma.address.create({
+            data: {
+              schoolId: user.schoolId,
+              line1: daycareAddress || "Address pending",
+              city,
+              state,
+              zip,
+              label: "daycare",
+            },
+          });
+          daycare = await prisma.daycare.create({
+            data: {
+              schoolId: user.schoolId,
+              name: daycareName,
+              addressId: addr.id,
+            },
+          });
+        }
+        daycareId = daycare.id;
+        daycareCache.set(daycareName, daycareId);
       }
-      daycareId = daycare.id;
     }
 
     const existing = existingEarly;
+
+    let familyId = familyKey ? familyCache.get(familyKey) || null : null;
+    if (familyKey && !familyId) {
+      familyId = await ensureNamedFamily(user.schoolId, familyKey);
+      familyCache.set(familyKey, familyId);
+    }
 
     const student = existing
       ? await prisma.student.update({
@@ -419,9 +437,11 @@ export async function importStudents(formData: FormData) {
             classroomId: classroom.id,
             parentName,
             parentPhone,
-            homeAddressId: home.id,
+            homeAddressId: homeId,
             daycareId,
             notes,
+            familyId: familyId || undefined,
+            enrollmentSource: rowSource,
           },
         })
       : await prisma.student.create({
@@ -434,9 +454,11 @@ export async function importStudents(formData: FormData) {
             classroomId: classroom.id,
             parentName,
             parentPhone,
-            homeAddressId: home.id,
+            homeAddressId: homeId,
             daycareId,
             notes,
+            familyId,
+            enrollmentSource: rowSource,
           },
         });
 
@@ -449,19 +471,17 @@ export async function importStudents(formData: FormData) {
       lastName,
       parentPhone,
     });
-
-    let familyId = familyKey ? familyCache.get(familyKey) || null : null;
-    if (familyKey && !familyId) {
-      familyId = await ensureNamedFamily(user.schoolId, familyKey);
-      familyCache.set(familyKey, familyId);
+    const nameList = existingByName.get(`${normName(firstName)}|${normName(lastName)}`) || [];
+    if (!nameList.some((row) => row.id === student.id)) {
+      nameList.push({
+        id: student.id,
+        studentId,
+        firstName,
+        lastName,
+        parentPhone,
+      });
+      existingByName.set(`${normName(firstName)}|${normName(lastName)}`, nameList);
     }
-    await prisma.$executeRaw`
-      UPDATE "Student"
-      SET
-        "enrollmentSource" = ${rowSource},
-        "familyId" = COALESCE(${familyId}, "familyId")
-      WHERE "id" = ${student.id}
-    `;
 
     const amType = parseType(cell(row, "am_type")) || amPlan.type;
     const pmType = parseType(cell(row, "pm_type")) || pmPlan.type;

@@ -609,6 +609,22 @@ export function groupFamilies(students: GateStudent[]): GateFamily[] {
   );
 }
 
+function searchHaystack(parts: Array<string | null | undefined>) {
+  return parts
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function nameQueryHits(hay: string, query: string) {
+  const q = query.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!q) return true;
+  if (hay.includes(q)) return true;
+  return q.split(" ").every((part) => part.length > 0 && hay.includes(part));
+}
+
 export function searchGateStudents(students: GateStudent[], query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return students;
@@ -617,7 +633,7 @@ export function searchGateStudents(students: GateStudent[], query: string) {
   const matchedFamilies = new Set<string>();
 
   for (const student of students) {
-    const hay = [
+    const hay = searchHaystack([
       student.firstName,
       student.lastName,
       student.fullName,
@@ -628,11 +644,9 @@ export function searchGateStudents(students: GateStudent[], query: string) {
       student.city,
       student.zip,
       student.studentId,
-    ]
-      .join(" ")
-      .toLowerCase();
+    ]);
     const phoneHit = qDigits.length >= 4 && digitsPhone(student.parentPhone).includes(qDigits);
-    if (hay.includes(q) || phoneHit) {
+    if (nameQueryHits(hay, q) || phoneHit) {
       matchedIds.add(student.id);
       if (student.familyId) matchedFamilies.add(student.familyId);
     }
