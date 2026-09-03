@@ -689,6 +689,29 @@ textarea {
 .lead-defs dd { margin: 0; font-weight: 700; }
 .lead-defs p { margin: 0.75rem 0 0; font-size: 0.8rem; color: #5b6d7e; }
 
+.change-card-back {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  padding: 1.25rem 1rem 2rem;
+  background: rgba(16, 32, 48, 0.45);
+}
+.change-card {
+  width: min(36rem, 100%);
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  background: #fff;
+  padding: 1.25rem 1.35rem 1.4rem;
+  box-shadow: 0 16px 40px rgba(16, 32, 48, 0.18);
+}
+
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }

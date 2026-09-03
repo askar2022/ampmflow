@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addSchoolBus, setRegularPlan } from "@/app/actions/plans";
+import { ParentChangeButton } from "@/components/ParentChangeCard";
 import { usablePhone } from "@/lib/gate";
 import { choiceFromSnapshot, encodePlanChoice, planChoiceLabel } from "@/lib/plans";
 import { searchStudents } from "@/lib/transportation";
@@ -256,6 +257,13 @@ export function PlanBoard({
                   ) : (
                     <span className="text-xs text-muted">1 child</span>
                   )}
+                  <div className="mt-1">
+                    <ParentChangeButton
+                      student={student}
+                      buses={buses}
+                      allowPermanent
+                    />
+                  </div>
                 </td>
               </tr>
             );

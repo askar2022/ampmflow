@@ -7,6 +7,8 @@ import { formatDateTime } from "@/lib/dates";
 import { destinationLabel, durationLabel, planSummary, planTone, typeLabel } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UndoLastChangeButton } from "./UndoLastChangeButton";
+import { ParentChangeButton } from "@/components/ParentChangeCard";
+import { listBusNumbers } from "@/app/actions/plans";
 import {
   AM_LABEL,
   ENROLL_LABEL,
@@ -36,9 +38,10 @@ export default async function StudentPage({
     take: 20,
   });
 
-  const [gateHistory, roster] = await Promise.all([
+  const [gateHistory, roster, listed] = await Promise.all([
     loadGateHistory(session.schoolId, id),
     loadGateRoster(session.schoolId),
+    listBusNumbers(session.schoolId),
   ]);
   const gateStudent = roster.find((row) => row.id === id);
   const siblings = roster.filter(
@@ -68,12 +71,22 @@ export default async function StudentPage({
           {session.role === "COORDINATOR" ||
           session.role === "ADMINISTRATOR" ||
           session.role === "FRONT_DESK" ? (
-            <Link
-              href={`/students/${id}/update`}
-              className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"
-            >
-              Update Transportation
-            </Link>
+            <>
+              <ParentChangeButton
+                student={student}
+                buses={listed.numbers}
+                allowPermanent={
+                  session.role === "COORDINATOR" ||
+                  session.role === "ADMINISTRATOR"
+                }
+              />
+              <Link
+                href={`/students/${id}/update`}
+                className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"
+              >
+                Full form
+              </Link>
+            </>
           ) : null}
           {(session.role === "COORDINATOR" || session.role === "ADMINISTRATOR") &&
           canUndo ? (

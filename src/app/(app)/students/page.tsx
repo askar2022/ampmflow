@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { listBusNumbers } from "@/app/actions/plans";
 import { loadStudents, searchStudents } from "@/lib/transportation";
-import { planSummary, planTone } from "@/lib/format";
-import { StatusBadge } from "@/components/StatusBadge";
+import { StudentsTable } from "./StudentsTable";
 
 export default async function StudentsPage({
   searchParams,
@@ -18,7 +18,11 @@ export default async function StudentsPage({
   const session = await getSession();
   if (!session) return null;
   const { q = "", imported, updated, issues, uploaded } = await searchParams;
-  const students = searchStudents(await loadStudents(session.schoolId), q);
+  const [roster, listed] = await Promise.all([
+    loadStudents(session.schoolId),
+    listBusNumbers(session.schoolId),
+  ]);
+  const students = searchStudents(roster, q);
   const canImport =
     session.role === "COORDINATOR" || session.role === "ADMINISTRATOR";
   const empty = students.length === 0 && !q;
@@ -55,7 +59,8 @@ export default async function StudentsPage({
         <div>
           <h1 className="font-serif text-4xl">Students</h1>
           <p className="mt-1 text-muted">
-            Search by name, student ID, grade, teacher, bus, or parent phone.
+            Search a child, then click Parent change to save home pickup, a
+            different address, or daycare — no Excel note needed.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -107,60 +112,18 @@ export default async function StudentsPage({
           ) : null}
         </div>
       ) : (
-        <>
-          <div className="overflow-hidden rounded-2xl border border-line bg-card">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-paper text-muted">
-                <tr>
-                  <th className="px-4 py-3">Student</th>
-                  <th>ID</th>
-                  <th>Grade</th>
-                  <th>Teacher</th>
-                  <th>AM plan</th>
-                  <th>PM plan</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((student) => (
-                  <tr key={student.id} className="border-t border-line">
-                    <td className="px-4 py-3 font-medium">
-                      <Link href={`/students/${student.id}`} className="hover:underline">
-                        {student.fullName}
-                      </Link>
-                    </td>
-                    <td>{student.studentId}</td>
-                    <td>{student.grade}</td>
-                    <td>{student.teacherName}</td>
-                    <td>
-                      <StatusBadge tone={planTone(student.am)}>
-                        {planSummary(student.am, "AM")}
-                      </StatusBadge>
-                    </td>
-                    <td>
-                      <StatusBadge tone={planTone(student.pm)}>
-                        {planSummary(student.pm, "PM")}
-                      </StatusBadge>
-                    </td>
-                    <td className="px-4">
-                      {session.role === "COORDINATOR" ||
-                      session.role === "ADMINISTRATOR" ||
-                      session.role === "FRONT_DESK" ? (
-                        <Link
-                          href={`/students/${student.id}/update`}
-                          className="font-semibold text-navy underline"
-                        >
-                          Record change
-                        </Link>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-sm text-muted">{students.length} students</p>
-        </>
+        <StudentsTable
+          students={students}
+          buses={listed.numbers}
+          allowPermanent={
+            session.role === "COORDINATOR" || session.role === "ADMINISTRATOR"
+          }
+          canChange={
+            session.role === "COORDINATOR" ||
+            session.role === "ADMINISTRATOR" ||
+            session.role === "FRONT_DESK"
+          }
+        />
       )}
     </div>
   );
