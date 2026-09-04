@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { canManageUsers, getSession } from "@/lib/auth";
+import { canManageUsers, getSession, isPlatformAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   approveUser,
@@ -16,9 +16,10 @@ import { AddUserFields } from "./AddUserFields";
 export default async function UsersPage() {
   const session = await getSession();
   if (!session || !canManageUsers(session.role)) redirect("/dashboard");
+  const platform = await isPlatformAdmin(session);
   const users = await prisma.user.findMany({
-    where: { schoolId: session.schoolId },
-    include: { teacher: true },
+    where: platform ? undefined : { schoolId: session.schoolId },
+    include: { teacher: true, school: { select: { name: true } } },
     orderBy: { name: "asc" },
   });
   const teachers = await prisma.teacher.findMany({
@@ -27,7 +28,9 @@ export default async function UsersPage() {
     orderBy: { name: "asc" },
   });
   const pending = users.filter((user) => user.role === PENDING_ROLE);
-  const staff = users.filter((user) => user.role !== PENDING_ROLE);
+  const staff = users.filter(
+    (user) => user.role !== PENDING_ROLE && user.schoolId === session.schoolId,
+  );
   const school = await prisma.school
     .findUnique({
       where: { id: session.schoolId },
@@ -82,6 +85,9 @@ export default async function UsersPage() {
           <p className="mt-1 text-sm text-muted">
             These people requested an account. They cannot sign in until you
             approve them and choose a role.
+            {platform
+              ? " New schools stay locked until you approve the first admin."
+              : ""}
           </p>
           <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
             <ul className="divide-y divide-line">
@@ -92,7 +98,10 @@ export default async function UsersPage() {
                 >
                   <div>
                     <div className="font-medium">{user.name}</div>
-                    <div className="text-sm text-muted">{user.email}</div>
+                    <div className="text-sm text-muted">
+                      {user.email}
+                      {platform ? ` · ${user.school.name}` : ""}
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-end gap-2">
                     <form action={approveUser} className="flex flex-wrap items-end gap-2">
@@ -103,7 +112,11 @@ export default async function UsersPage() {
                           name="role"
                           required
                           className="rounded-xl border border-line px-3 py-2"
-                          defaultValue="TEACHER"
+                          defaultValue={
+                            platform && user.schoolId !== session.schoolId
+                              ? "ADMINISTRATOR"
+                              : "TEACHER"
+                          }
                         >
                           <option value="TEACHER">Teacher</option>
                           <option value="FRONT_DESK">Reception</option>

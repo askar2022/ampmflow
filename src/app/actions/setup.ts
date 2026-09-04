@@ -85,25 +85,57 @@ export async function createAccount(formData: FormData) {
 
   const intent = String(formData.get("intent") || "join");
 
-  if (existingUsers === 0 || intent === "new-school") {
+  if (existingUsers === 0) {
     if (!schoolName) {
       redirect("/login/create?error=setup");
     }
-    if (intent === "new-school") {
-      const taken = await findSchoolByName(schoolName);
-      if (taken) {
-        redirect("/login/create?error=school-exists&kind=new");
-      }
-    }
     await createFirstAdministrator({
-      school: existingUsers === 0 ? school : null,
+      school,
       schoolName,
       name,
       email,
       passwordHash,
-      forceNewSchool: existingUsers > 0,
     });
-    redirect(existingUsers === 0 ? "/admin/users" : "/students");
+    redirect("/admin/users");
+  }
+
+  if (intent === "new-school") {
+    if (!schoolName) {
+      redirect("/login/create?error=setup&kind=new");
+    }
+    const taken = await findSchoolByName(schoolName);
+    if (taken) {
+      redirect("/login/create?error=school-exists&kind=new");
+    }
+    const created = await prisma.school.create({
+      data: { name: schoolName, timezone: "America/Chicago" },
+      select: { id: true, name: true },
+    });
+    await prisma.schoolSettings
+      .create({ data: { id: randomUUID(), schoolId: created.id } })
+      .catch(() => undefined);
+    await prisma.user.create({
+      data: {
+        schoolId: created.id,
+        name,
+        email,
+        role: PENDING_ROLE,
+        passwordHash,
+        active: false,
+      },
+    });
+    const home = await prisma.school.findFirst({
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (home) {
+      await notifyCoordinators(
+        home.id,
+        "New school request",
+        `${name} asked to open ${created.name}. Approve them under Users before they can sign in.`,
+      ).catch(() => undefined);
+    }
+    redirect("/login?requested=1");
   }
 
   const joinSchool = schoolName
@@ -163,25 +195,21 @@ async function createFirstAdministrator({
   name,
   email,
   passwordHash,
-  forceNewSchool = false,
 }: {
   school: { id: string; name: string } | null;
   schoolName: string;
   name: string;
   email: string;
   passwordHash: string;
-  forceNewSchool?: boolean;
 }) {
   if (!school && !schoolName) {
     redirect("/login/create?error=setup");
   }
 
   try {
-    if (!forceNewSchool) {
-      const stillEmpty = await prisma.user.count();
-      if (stillEmpty > 0) {
-        redirect("/login");
-      }
+    const stillEmpty = await prisma.user.count();
+    if (stillEmpty > 0) {
+      redirect("/login");
     }
 
     if (!school) {
@@ -241,11 +269,9 @@ async function createFirstAdministrator({
     }
 
     try {
-      if (!forceNewSchool) {
-        const stillEmpty = await prisma.user.count();
-        if (stillEmpty > 0) {
-          redirect("/login");
-        }
+      const stillEmpty = await prisma.user.count();
+      if (stillEmpty > 0) {
+        redirect("/login");
       }
       const userId = randomUUID().replace(/-/g, "").slice(0, 24);
       await prisma.$executeRaw`

@@ -102,6 +102,15 @@ export function canManageUsers(role: Role) {
   return role === "ADMINISTRATOR";
 }
 
+export async function isPlatformAdmin(user: SessionUser) {
+  if (user.role !== "ADMINISTRATOR") return false;
+  const first = await prisma.school.findFirst({
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  return Boolean(first && first.id === user.schoolId);
+}
+
 export function canViewAll(role: Role) {
   return (
     role === "COORDINATOR" ||

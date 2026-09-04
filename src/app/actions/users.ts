@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { canManageUsers, getSession, hashPassword } from "@/lib/auth";
+import { canManageUsers, getSession, hashPassword, isPlatformAdmin } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { PENDING_ROLE, ROLES, type Role } from "@/lib/types";
 
@@ -115,8 +115,11 @@ export async function approveUser(formData: FormData) {
     return;
   }
 
+  const platform = await isPlatformAdmin(session);
   const user = await prisma.user.findFirst({
-    where: { id, schoolId: session.schoolId, role: PENDING_ROLE },
+    where: platform
+      ? { id, role: PENDING_ROLE }
+      : { id, schoolId: session.schoolId, role: PENDING_ROLE },
   });
   if (!user) {
     return;
@@ -152,14 +155,22 @@ export async function rejectUser(formData: FormData) {
     return;
   }
 
+  const platform = await isPlatformAdmin(session);
   const user = await prisma.user.findFirst({
-    where: { id, schoolId: session.schoolId, role: PENDING_ROLE },
+    where: platform
+      ? { id, role: PENDING_ROLE }
+      : { id, schoolId: session.schoolId, role: PENDING_ROLE },
   });
   if (!user) {
     return;
   }
 
+  const schoolId = user.schoolId;
   await prisma.user.delete({ where: { id } });
+  const leftover = await prisma.user.count({ where: { schoolId } });
+  if (leftover === 0 && schoolId !== session.schoolId) {
+    await prisma.school.delete({ where: { id: schoolId } }).catch(() => undefined);
+  }
 
   await writeAudit({
     user: session,

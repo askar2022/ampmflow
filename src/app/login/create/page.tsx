@@ -53,8 +53,8 @@ export default async function CreateAccountPage({
           {firstAdmin
             ? "Create your AMPM Flow administrator account."
             : startNew
-              ? "This creates a separate school. You will not see Sankofa students, and they will not see yours."
-              : "Ask to join a school that is already on AMPM Flow. That school’s administrator must approve you."}
+              ? "This sends a request for a separate school. You cannot sign in until the AMPM Flow administrator approves you."
+              : "Ask to join a school that is already on AMPM Flow. An administrator must approve you before you can sign in."}
         </p>
         {!firstAdmin ? (
           <div className="mt-3 flex gap-2 text-sm font-semibold">
