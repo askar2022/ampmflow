@@ -244,9 +244,11 @@ export function PlanBoard({
                           setMessage(
                             am.ok && pm.ok
                               ? `Saved AM and PM for ${pm.count} children.`
-                              : am.ok
-                                ? am.error || pm.error || "Could not save the family PM plan."
-                                : am.error,
+                              : !pm.ok
+                                ? pm.error
+                                : !am.ok
+                                  ? am.error
+                                  : "Could not save the family plan.",
                           );
                           router.refresh();
                         });
