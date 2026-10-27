@@ -16,11 +16,11 @@ export default async function WaitingPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-serif text-4xl">Waiting for Route</h1>
+      <h1 className="font-serif text-4xl">Request for Route</h1>
       <p className="max-w-2xl text-muted">
-        A new address or daycare never silently becomes a bus assignment. Status
-        stays <strong>Waiting for Bus Company Assignment</strong> until the
-        company proposes a number and the coordinator confirms it.
+        New students, or students with no bus or van yet, wait here until a
+        route is assigned. Front Desk can open the student and add the bus or
+        van number when the company confirms it.
       </p>
       <a
         href="/print/export?kind=missing"
@@ -43,7 +43,7 @@ export default async function WaitingPage() {
             {waiting.map((student) => (
               <tr key={student.id} className="row-red border-t border-line">
                 <td className="px-4 py-3 font-medium">
-                  <Link href={`/students/${student.id}`} className="hover:underline">
+                  <Link href={`/dashboard?student=${student.id}`} className="hover:underline">
                     {student.fullName}
                   </Link>
                 </td>

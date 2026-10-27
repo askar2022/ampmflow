@@ -17,7 +17,7 @@ export default async function BusesPage() {
     <div className="space-y-6">
       <div>
         <p className="text-sm text-muted">{formatLongDate(schoolNow())}</p>
-        <h1 className="font-serif text-4xl">Buses</h1>
+        <h1 className="font-serif text-4xl">Buses-Vans</h1>
         <p className="mt-1 max-w-2xl text-muted">
           Students who ride each bus or van today — not parent pickup. Print a
           list and give it to the driver if they did not get the email from the

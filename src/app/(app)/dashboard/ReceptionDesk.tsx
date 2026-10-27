@@ -341,7 +341,7 @@ export function ReceptionDesk({
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
               <option value="">All buses</option>
-              <option value="waiting">Waiting for route</option>
+              <option value="waiting">Request for route</option>
               {busChoices.map((item) => (
                 <option key={item} value={item}>
                   Bus {item}
@@ -631,7 +631,7 @@ export function ReceptionDesk({
               </datalist>
               {!busNumber.trim() ? (
                 <p className="text-sm text-orange-800">
-                  No bus number yet — this student will be marked Waiting for Route.
+                  No bus number yet — this student will be on Request for Route.
                 </p>
               ) : null}
 
