@@ -1,5 +1,4 @@
 import { getSession } from "@/lib/auth";
-import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { ReceptionDesk } from "./ReceptionDesk";
@@ -20,14 +19,12 @@ export default async function DashboardPage({
     orderBy: { number: "asc" },
   });
   const buses = [...new Set(routes.map((route) => route.number))];
-  const busCompanyEmail = await defaultBusCompanyEmail(session.schoolId);
 
   return (
     <div>
       <ReceptionDesk
         students={students}
         buses={buses}
-        busCompanyEmail={busCompanyEmail}
         initialStudentId={selectedId}
         canPermanent={session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"}
         canSeeEmergency={

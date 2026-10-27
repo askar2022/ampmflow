@@ -79,18 +79,6 @@ function changeNoticeHtml(text: string) {
 </html>`;
 }
 
-async function busCompanyEmails(schoolId: string, extra?: string) {
-  const users = await prisma.user.findMany({
-    where: { schoolId, active: true, role: "BUS_COMPANY" },
-    select: { email: true },
-  });
-  return uniqueEmails([
-    extra,
-    process.env.BUS_COMPANY_EMAIL,
-    ...users.map((user) => user.email),
-  ]);
-}
-
 async function teacherEmails(classroomId: string, extra?: string) {
   const teachers = await prisma.teacher.findMany({
     where: { classroomId },
@@ -102,22 +90,24 @@ async function teacherEmails(classroomId: string, extra?: string) {
   ]);
 }
 
-async function leadershipEmails(schoolId: string, already: string[]) {
+async function opsEmails(schoolId: string, already: string[]) {
   const [saved, users] = await Promise.all([
     loadSavedOpsEmails(schoolId),
     prisma.user.findMany({
       where: {
         schoolId,
         active: true,
-        role: { in: ["COORDINATOR", "ADMINISTRATOR"] },
+        role: { in: ["BUS_COMPANY", "COORDINATOR", "ADMINISTRATOR"] },
       },
       select: { email: true },
     }),
   ]);
   const used = new Set(already);
-  return uniqueEmails([...saved, ...users.map((user) => user.email)]).filter(
-    (email) => !used.has(email),
-  );
+  return uniqueEmails([
+    ...saved,
+    process.env.BUS_COMPANY_EMAIL,
+    ...users.map((user) => user.email),
+  ]).filter((email) => !used.has(email));
 }
 
 export async function notifyTransportationChange(args: {
@@ -130,7 +120,6 @@ export async function notifyTransportationChange(args: {
   note: string;
   waiting: boolean;
   teacherEmail?: string;
-  busCompanyEmail?: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
@@ -147,20 +136,16 @@ export async function notifyTransportationChange(args: {
   const html = changeNoticeHtml(text);
   const subject = `Transportation change — ${args.student.fullName}`;
 
-  const [teachers, buses] = await Promise.all([
-    teacherEmails(args.student.classroomId, args.teacherEmail),
-    busCompanyEmails(args.user.schoolId, args.busCompanyEmail),
-  ]);
+  const teachers = await teacherEmails(
+    args.student.classroomId,
+    args.teacherEmail,
+  );
   const parent = uniqueEmails([args.student.parentEmail]);
-  const leadership = await leadershipEmails(args.user.schoolId, [
-    ...parent,
-    ...teachers,
-    ...buses,
-  ]);
+  const ops = await opsEmails(args.user.schoolId, [...parent, ...teachers]);
 
   if (!parent.length) skipped.push("parent (required)");
   if (!teachers.length) skipped.push("teacher (required)");
-  if (!buses.length) skipped.push("bus company (required)");
+  if (!ops.length) skipped.push("bus coordinator / leadership (add on Today’s Changes)");
 
   if (!smtpConfigured()) {
     return {
@@ -173,8 +158,7 @@ export async function notifyTransportationChange(args: {
   const groups = [
     { label: "parent", to: parent },
     { label: "teacher", to: teachers },
-    { label: "bus", to: buses },
-    { label: "leadership", to: leadership },
+    { label: "bus / leadership", to: ops },
   ];
 
   for (const group of groups) {

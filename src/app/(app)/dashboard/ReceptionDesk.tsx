@@ -143,14 +143,12 @@ function formFromStudent(student: DeskStudent | undefined) {
 export function ReceptionDesk({
   students,
   buses,
-  busCompanyEmail = "",
   canPermanent,
   canSeeEmergency,
   initialStudentId = "",
 }: {
   students: DeskStudent[];
   buses: string[];
-  busCompanyEmail?: string;
   canPermanent: boolean;
   canSeeEmergency: boolean;
   initialStudentId?: string;
@@ -175,7 +173,6 @@ export function ReceptionDesk({
   const [daycarePhone, setDaycarePhone] = useState(initial.daycarePhone);
   const [parentEmail, setParentEmail] = useState(initial.parentEmail);
   const [teacherEmail, setTeacherEmail] = useState(initial.teacherEmail);
-  const [busEmail, setBusEmail] = useState(busCompanyEmail);
   const [note, setNote] = useState("");
   const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [message, setMessage] = useState("");
@@ -224,7 +221,6 @@ export function ReceptionDesk({
     setDaycarePhone(next.daycarePhone);
     setParentEmail(next.parentEmail);
     setTeacherEmail(next.teacherEmail);
-    setBusEmail(busCompanyEmail);
     setNote("");
     setConfirmPermanent(false);
   }
@@ -240,8 +236,8 @@ export function ReceptionDesk({
 
   function save() {
     if (!selected) return;
-    if (!parentEmail.trim() || !teacherEmail.trim() || !busEmail.trim()) {
-      setError("Parent, teacher, and bus company emails are required.");
+    if (!parentEmail.trim() || !teacherEmail.trim()) {
+      setError("Parent and teacher emails are required.");
       return;
     }
     setError("");
@@ -261,7 +257,6 @@ export function ReceptionDesk({
         daycarePhone,
         parentEmail,
         teacherEmail,
-        busCompanyEmail: busEmail,
         note,
         confirmPermanent,
       });
@@ -681,7 +676,7 @@ export function ReceptionDesk({
                 </div>
               ) : null}
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-semibold">
                   Parent email
                   <input
@@ -704,24 +699,11 @@ export function ReceptionDesk({
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
-                <label className="block text-sm font-semibold">
-                  Bus company email
-                  <input
-                    type="email"
-                    required
-                    value={busEmail}
-                    onChange={(event) => setBusEmail(event.target.value)}
-                    placeholder="Required"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
               </div>
               <p className="text-sm text-muted">
-                These three must get this change now. Anyone you add on Today’s
-                Changes (bus coordinator or leadership) also gets it if they
-                want to know. At 2:30 p.m. one list of all today’s changes goes
-                again to the bus, those teachers, and leadership — only if
-                someone changed.
+                Parent and teacher get this change now. Add bus coordinator and
+                leadership emails on Today’s Changes — they also get each
+                change, and the 2:30 list if anyone changed.
               </p>
 
               <label className="block text-sm font-semibold">

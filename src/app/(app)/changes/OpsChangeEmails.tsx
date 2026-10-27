@@ -24,12 +24,13 @@ export function OpsChangeEmails({
 
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
-      <h2 className="text-xl font-semibold text-navy">Daily change emails</h2>
+      <h2 className="text-xl font-semibold text-navy">
+        Leadership and bus coordinator
+      </h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Add a bus coordinator or leadership email here if they want to know
-        when a change happens. They get each change now, and the {sendAt} list
-        if anyone changed. Parent, teacher, and bus company are required on
-        Front Desk and are always emailed.
+        Add emails here — not on the Front Desk change form. These people get
+        each change when it is saved, and the {sendAt} list if anyone changed.
+        Parent and teacher stay on the change form.
       </p>
       {emails.length ? (
         <ul className="mt-4 space-y-2">
