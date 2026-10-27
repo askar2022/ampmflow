@@ -12,7 +12,7 @@ export default async function Home({
   const session = await getSession();
   if (session) {
     if (session.role === "ADMINISTRATOR" && (await isPlatformAdmin(session))) {
-      redirect("/admin/schools");
+      redirect("/platform");
     }
     redirect(homePath(session.role));
   }

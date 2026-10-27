@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { authenticate, clearSession, createSession, homePath } from "@/lib/auth";
+import { authenticate, clearSession, createSession, homePath, isPlatformAdmin } from "@/lib/auth";
 import { isDatabaseConfigured } from "@/lib/prisma";
 import { findSchoolBySlug, schoolLoginPath } from "@/lib/school-slug";
 
@@ -42,13 +42,13 @@ export async function loginAction(formData: FormData) {
   await createSession(result.user, {
     remember: formData.get("remember") === "1",
   });
-  if (goToSchools && result.user.role === "ADMINISTRATOR") {
-    redirect("/admin/schools");
+  if (goToSchools && (await isPlatformAdmin(result.user))) {
+    redirect("/platform");
   }
   redirect(homePath(result.user.role));
 }
 
-export async function logoutAction() {
+export async function logoutAction(formData: FormData) {
   await clearSession();
-  redirect("/login");
+  redirect(String(formData.get("next") || "") === "landing" ? "/" : "/login");
 }

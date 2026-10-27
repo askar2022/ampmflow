@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isPublicPath(pathname)) {
-    if (role) {
+    if (role && pathname !== "/") {
       const url = request.nextUrl.clone();
       url.pathname =
         role === "TEACHER"
@@ -48,9 +48,7 @@ export async function middleware(request: NextRequest) {
             ? "/company"
             : role === "BUS_ASSISTANT"
               ? "/checkin"
-              : role === "ADMINISTRATOR" && pathname === "/"
-                ? "/admin/schools"
-                : "/dashboard";
+              : "/dashboard";
       return NextResponse.redirect(url);
     }
     return NextResponse.next();
@@ -58,7 +56,7 @@ export async function middleware(request: NextRequest) {
 
   if (!role) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = pathname.startsWith("/platform") ? "/" : "/login";
     return NextResponse.redirect(url);
   }
 
