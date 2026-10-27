@@ -208,7 +208,7 @@ export async function createSchoolForDemo(formData: FormData) {
       email,
       loginUrl: schoolLoginUrl(slug),
     }).catch(() => undefined);
-    revalidatePath("/admin/users");
+    revalidatePath("/admin/schools");
     return;
   }
 
@@ -241,7 +241,7 @@ export async function createSchoolForDemo(formData: FormData) {
     email,
     loginUrl: schoolLoginUrl(slug),
   }).catch(() => undefined);
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/schools");
 }
 
 export async function rejectUser(formData: FormData) {

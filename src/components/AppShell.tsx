@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
   { href: "/buses", label: "Roster", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK", "TEACHER"] },
   { href: "/company", label: "Bus Company", roles: ["BUS_COMPANY"] },
+  { href: "/admin/schools", label: "Schools", roles: ["ADMINISTRATOR"] },
   { href: "/admin/users", label: "Users", roles: ["ADMINISTRATOR"] },
   { href: "/teacher", label: "My Classroom", roles: ["TEACHER"] },
   { href: "/checkin", label: "Bus Check-In", roles: ["BUS_ASSISTANT"] },

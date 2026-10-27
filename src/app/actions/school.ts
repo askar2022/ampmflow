@@ -26,5 +26,5 @@ export async function updateSchoolIdentity(formData: FormData): Promise<void> {
 
   revalidatePath("/");
   revalidatePath("/login");
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/schools");
 }
