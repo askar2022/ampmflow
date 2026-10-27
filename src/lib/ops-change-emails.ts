@@ -356,7 +356,13 @@ export async function lastOpsChangeEmail(schoolId: string) {
 }
 
 export type OpsDigestResult =
-  | { ok: true; sent: number; recipients: string[]; alreadySent?: boolean }
+  | {
+      ok: true;
+      sent: number;
+      recipients: string[];
+      alreadySent?: boolean;
+      skippedEmpty?: boolean;
+    }
   | { ok: false; sent: number; recipients: string[]; error: string };
 
 export async function sendOpsChangeDigest(args: {
@@ -372,6 +378,9 @@ export async function sendOpsChangeDigest(args: {
   const students = await loadStudents(args.schoolId);
   const groups = classroomGroups(students);
   const changed = groups.flatMap(([, rows]) => rows);
+  if (!changed.length) {
+    return { ok: true, sent: 0, recipients: [], skippedEmpty: true };
+  }
   const recipients = await digestRecipients(args.schoolId, changed);
   if (!recipients.length) {
     return {

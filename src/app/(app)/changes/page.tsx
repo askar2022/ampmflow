@@ -28,10 +28,11 @@ export default async function ChangesPage() {
         </p>
         <h1 className="font-serif text-4xl">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Reception does not send this list by hand. Saving a change on the desk
-          emails the teacher, parent, and bus company right away. This page is
-          the same-day list. At {opsChangesClockLabel()} it goes out again so
-          nobody has to remember.
+          Keep this page. Front Desk already emails that student’s parent,
+          teacher, and bus when a change is saved. This list is the backup — if
+          reception is out, the {opsChangesClockLabel()} reminder still goes
+          automatically. It only emails when someone actually changed. Quiet
+          days stay quiet.
         </p>
         <a
           href="/print/export?kind=changes"
@@ -98,7 +99,8 @@ export default async function ChangesPage() {
         ))
       ) : (
         <div className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-          No today-only or date-range changes right now.
+          No changes today. The {opsChangesClockLabel()} reminder will not
+          send an email.
         </div>
       )}
     </div>

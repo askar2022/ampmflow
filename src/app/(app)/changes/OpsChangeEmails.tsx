@@ -26,9 +26,10 @@ export function OpsChangeEmails({
     <section className="rounded-2xl border border-line bg-card p-5">
       <h2 className="text-xl font-semibold text-navy">Daily change emails</h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        These people also get the 2:30 reminder of only today’s changes,
-        grouped by class. The desk already emailed teacher, parent, and the bus
-        company when the change was saved. Friday reminder is 11:30 AM.
+        Extra people for the {sendAt} reminder (leadership or a backup
+        coordinator). The bus company and the teachers of students who changed
+        are added automatically. If nobody changed, no email goes out — not to
+        the bus company, not to parents.
       </p>
       {emails.length ? (
         <ul className="mt-4 space-y-2">
@@ -100,6 +101,10 @@ export function OpsChangeEmails({
                 const result = await emailOpsChangeListNow();
                 if (!result.ok) {
                   setMessage(result.error || "Could not send.");
+                  return;
+                }
+                if (result.skippedEmpty) {
+                  setMessage("No students changed today, so no email was sent.");
                   return;
                 }
                 const sentTo = result.recipients.join(", ");
