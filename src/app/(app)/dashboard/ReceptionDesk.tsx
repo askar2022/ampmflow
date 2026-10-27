@@ -49,7 +49,9 @@ function deskRows(
     .filter((student) => {
       if (grade && student.grade !== grade) return false;
       if (teacher && teacherLabel(student) !== teacher) return false;
-      if (ride === "waiting") {
+      if (ride === "none") {
+        if (studentBuses(student).length || studentVanId[student.id]) return false;
+      } else if (ride === "waiting") {
         if (
           !student.am.waitingForAssignment &&
           !student.pm.waitingForAssignment &&
@@ -356,6 +358,7 @@ export function ReceptionDesk({
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
               <option value="">All buses and vans</option>
+              <option value="none">No bus or van</option>
               <option value="waiting">Request for route</option>
               {busChoices.map((item) => (
                 <option key={`bus-${item}`} value={item}>

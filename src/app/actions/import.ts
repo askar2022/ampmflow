@@ -22,7 +22,11 @@ function cell(row: Row, ...keys: string[]) {
   const headers = Object.keys(row);
   for (const key of keys) {
     const wanted = key.toLowerCase();
-    const match = headers.find((k) => k.trim().toLowerCase() === wanted);
+    const match = headers.find((k) => {
+      const header = k.trim().toLowerCase();
+      if (header === wanted) return true;
+      return wanted.length >= 4 && header.includes(wanted);
+    });
     if (match && row[match] != null && String(row[match]).trim()) {
       return String(row[match]).trim();
     }
@@ -434,7 +438,14 @@ export async function importStudents(formData: FormData) {
         ? `Room ${room}`
         : room
       : `${grade} classroom`;
-    const teacherName = cell(row, "teacher") || "Unassigned";
+    const teacherName =
+      cell(
+        row,
+        "teacher",
+        "teacher name",
+        "homeroom teacher",
+        "classroom teacher",
+      ) || "Unassigned";
     const parentName =
       cell(row, "parent/guardian", "parent_name", "parent") || "—";
     const parentPhone =
@@ -445,8 +456,13 @@ export async function importStudents(formData: FormData) {
     const city = cell(row, "home_city", "city") || "Minneapolis";
     const state = cell(row, "home_state", "state") || "MN";
     const zip = cell(row, "home_zip", "zip code", "zip") || "";
-    const amPlan = parsePlan(cell(row, "am_type", "am"));
-    const pmPlan = parsePlan(cell(row, "pm_type", "pm"));
+    const sharedBus = cell(row, "bus number", "bus", "route");
+    const amPlan = parsePlan(
+      cell(row, "am_type", "am bus", "am route", "morning", "am") || sharedBus,
+    );
+    const pmPlan = parsePlan(
+      cell(row, "pm_type", "pm bus", "pm route", "afternoon", "pm") || sharedBus,
+    );
     let daycareName = cell(row, "daycare_name", "daycare");
     if (!daycareName && (amPlan.dest === "DAYCARE" || pmPlan.dest === "DAYCARE")) {
       daycareName = "Daycare";
@@ -454,7 +470,7 @@ export async function importStudents(formData: FormData) {
     const daycareAddress = cell(row, "daycare_address");
     const notes = cell(row, "notes");
     const vanName =
-      cell(row, "van", "van name", "vehicle") ||
+      cell(row, "van", "van name", "vehicle", "van number") ||
       (amPlan.type === "VAN" ? amPlan.van : "") ||
       (pmPlan.type === "VAN" ? pmPlan.van : "");
     const amType = amPlan.type === "VAN" ? "VAN" : parseType(cell(row, "am_type")) || amPlan.type;
@@ -540,6 +556,33 @@ export async function importStudents(formData: FormData) {
           }
         }
       }
+      if (teacherName && teacherName !== "Unassigned") {
+        const current = await prisma.student.findUnique({
+          where: { id: existingEarly.id },
+          select: { classroomId: true },
+        });
+        if (current?.classroomId) {
+          const teacher = await prisma.teacher.findFirst({
+            where: { classroomId: current.classroomId },
+            select: { id: true },
+          });
+          if (teacher) {
+            await prisma.teacher.update({
+              where: { id: teacher.id },
+              data: { name: teacherName },
+            });
+          } else {
+            await prisma.teacher.create({
+              data: {
+                schoolId: user.schoolId,
+                classroomId: current.classroomId,
+                name: teacherName,
+                email: "",
+              },
+            });
+          }
+        }
+      }
       await applyStudentPlans({
         schoolId: user.schoolId,
         userId: user.id,
@@ -582,6 +625,11 @@ export async function importStudents(formData: FormData) {
             name: teacherName,
             email: "",
           },
+        });
+      } else if (teacherName && teacherName !== "Unassigned") {
+        await prisma.teacher.update({
+          where: { id: existingTeacher.id },
+          data: { name: teacherName },
         });
       }
       teacherDone.add(classroom.id);
