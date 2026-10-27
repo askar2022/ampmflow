@@ -8,21 +8,24 @@ export default async function Home() {
   if (session) redirect(homePath(session.role));
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#f3f4f6] px-4 py-8">
-      <div className="w-full max-w-3xl">
-        <div className="text-center">
+    <div className="min-h-dvh bg-[#f3f4f6] px-4 py-6 sm:py-8">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="overflow-hidden rounded-[24px] border border-[#e8e8ea] bg-white shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
           <img
-            src="/front_image.png"
+            src="/landingimage.png"
             alt=""
-            className="mx-auto h-auto w-[140px] object-contain mix-blend-multiply"
+            className="h-56 w-full object-cover object-center sm:h-72 md:h-96"
           />
-          <h1 className="mt-2 text-[32px] font-semibold leading-none tracking-tight text-navy">
+        </div>
+
+        <div className="mx-auto mt-6 max-w-3xl text-center">
+          <h1 className="text-[32px] font-semibold leading-none tracking-tight text-navy">
             {APP_NAME}
           </h1>
           <p className="mt-2 text-sm font-medium text-[#4b5563]">{APP_SUBTITLE}</p>
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <div className="mx-auto mt-6 grid max-w-3xl gap-4 sm:grid-cols-2">
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-semibold text-navy">Already at a school</h2>
             <p className="mt-2 text-sm leading-6 text-[#4b5563]">
