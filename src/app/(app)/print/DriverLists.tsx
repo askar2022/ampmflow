@@ -218,25 +218,23 @@ export function DriverLists({
               return (
                 <li
                   key={rider.id}
-                  className="flex flex-wrap items-start justify-between gap-3 py-2 text-sm"
+                  className="grid gap-2 py-3 text-sm sm:grid-cols-[minmax(0,1.2fr)_minmax(9rem,1fr)_auto] sm:items-center"
                 >
+                  <span className="font-semibold">{rider.name}</span>
                   <span>
-                    <span className="font-semibold">{rider.name}</span>
-                    <span className="mt-0.5 block">
-                      {hasParentPhone(rider.parentPhone) && call ? (
-                        <a
-                          href={call}
-                          className="font-semibold text-navy underline-offset-2 hover:underline"
-                        >
-                          {rider.parentPhone}
-                        </a>
-                      ) : (
-                        <span className="text-muted">No parent phone</span>
-                      )}
-                      {rider.parentName && rider.parentName !== "—" ? (
-                        <span className="ml-2 text-muted">{rider.parentName}</span>
-                      ) : null}
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      Parent phone
                     </span>
+                    {hasParentPhone(rider.parentPhone) && call ? (
+                      <a
+                        href={call}
+                        className="font-semibold text-navy underline-offset-2 hover:underline"
+                      >
+                        {rider.parentPhone}
+                      </a>
+                    ) : (
+                      <span className="text-muted">Not on file</span>
+                    )}
                   </span>
                   <span className="text-muted">
                     Grade {rider.grade}
