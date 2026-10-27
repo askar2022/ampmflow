@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { saveReceptionChange } from "@/app/actions/reception";
 import { planSummary, planTone } from "@/lib/format";
 import type { Destination, DurationType, EffectiveStudent, Trip } from "@/lib/types";
@@ -145,14 +144,12 @@ export function ReceptionDesk({
   buses,
   canPermanent,
   canSeeEmergency,
-  changeCount = 0,
   initialStudentId = "",
 }: {
   students: DeskStudent[];
   buses: string[];
   canPermanent: boolean;
   canSeeEmergency: boolean;
-  changeCount?: number;
   initialStudentId?: string;
 }) {
   const router = useRouter();
@@ -344,12 +341,6 @@ export function ReceptionDesk({
               ))}
             </select>
           </label>
-          <Link
-            href="/changes"
-            className="rounded-xl bg-navy px-4 py-2.5 text-center text-sm font-semibold text-white lg:whitespace-nowrap"
-          >
-            Today’s Changes{changeCount ? ` (${changeCount})` : ""}
-          </Link>
         </div>
       </section>
 
