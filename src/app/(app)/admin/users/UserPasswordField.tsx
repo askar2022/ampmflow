@@ -10,7 +10,7 @@ export function UserPasswordField({ id }: { id: string }) {
 
   return (
     <form
-      className="flex min-w-[14rem] flex-col gap-1"
+      className="space-y-2"
       onSubmit={(event) => {
         event.preventDefault();
         const data = new FormData();
@@ -23,7 +23,8 @@ export function UserPasswordField({ id }: { id: string }) {
         });
       }}
     >
-      <div className="flex flex-wrap gap-2">
+      <label className="block text-sm font-semibold text-navy">
+        Change password
         <input
           type="password"
           value={password}
@@ -33,18 +34,18 @@ export function UserPasswordField({ id }: { id: string }) {
           }}
           required
           minLength={4}
-          placeholder="New password"
-          className="w-36 rounded-xl border border-line px-3 py-2"
+          placeholder="Type a new password"
+          className="mt-1 w-full rounded-xl border border-line px-3 py-2.5 text-base font-normal"
         />
-        <button
-          type="submit"
-          disabled={pending || password.length < 4}
-          className="rounded-full bg-navy px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {pending ? "Saving…" : "Set password"}
-        </button>
-      </div>
-      {message ? <p className="text-xs text-muted">{message}</p> : null}
+      </label>
+      <button
+        type="submit"
+        disabled={pending || password.length < 4}
+        className="min-h-11 w-full rounded-xl bg-navy px-4 py-2.5 text-base font-semibold text-white disabled:opacity-50 sm:w-auto"
+      >
+        {pending ? "Saving…" : "Save new password"}
+      </button>
+      {message ? <p className="text-sm font-medium text-teal-deep">{message}</p> : null}
     </form>
   );
 }

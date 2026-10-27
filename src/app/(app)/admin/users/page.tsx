@@ -234,47 +234,35 @@ export default async function UsersPage() {
       <section>
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
-          Add staff for this school only. Type a temporary password, tell that
-          person, and they sign in. AMPM Flow does not email a password. To
-          change a password, type the new one on that row and click Set
-          password.
+          Each person is listed below. To change a password, type it on their
+          card and tap Save new password. Tell them the new password. AMPM Flow
+          does not email it.
         </p>
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-paper text-muted">
-                <tr>
-                <th className="px-4 py-3">Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th className="px-4">Password</th>
-                <th className="px-4">Remove</th>
-              </tr>
-            </thead>
-            <tbody>
-              {staff.map((user) => (
-                <tr key={user.id} className="border-t border-line">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{user.name}</div>
-                  </td>
-                  <td className="text-muted">{user.email}</td>
-                  <td>{roleLabel(user.role)}</td>
-                  <td>{user.active ? "Active" : "Removed"}</td>
-                  <td className="px-4 py-3">
-                    <UserPasswordField id={user.id} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {user.id !== session.id ? (
-                      <UserRemoveButton id={user.id} active={user.active} />
-                    ) : (
-                      <span className="text-xs text-muted">You</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="mt-4 space-y-4">
+          {staff.map((user) => (
+            <li
+              key={user.id}
+              className="rounded-2xl border border-line bg-card p-5"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xl font-semibold text-navy">{user.name}</div>
+                  <div className="mt-1 text-base text-navy">{user.email}</div>
+                  <div className="mt-1 text-sm text-muted">
+                    {roleLabel(user.role)} · {user.active ? "Active" : "Removed"}
+                    {user.id === session.id ? " · You" : ""}
+                  </div>
+                </div>
+                {user.id !== session.id ? (
+                  <UserRemoveButton id={user.id} active={user.active} />
+                ) : null}
+              </div>
+              <div className="mt-4 border-t border-line pt-4">
+                <UserPasswordField id={user.id} />
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
       <form action={createUser} className="rounded-2xl border border-line bg-card p-6">
         <h2 className="font-serif text-2xl">Add staff for this school</h2>
