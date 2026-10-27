@@ -1,445 +1,235 @@
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
-import {
-  AM_LABEL,
-  PM_LABEL,
-  groupConfirmedBus,
-  loadGateRoster,
-  parentPickupToday,
-  type GateStudent,
-} from "@/lib/gate";
-import {
-  changeList,
-  groupByBus,
-  groupByTeacher,
-  missingList,
-  pickupList,
-  reportTitle,
-  stamp,
-  type ReportKind,
-} from "@/lib/reports";
-import { planSummary, planTone, rosterChangeLabel } from "@/lib/format";
-import { loadCheckInSummary, loadCompanyApprovedBuses } from "@/lib/operations";
-import type { CheckInBusSummary } from "@/lib/operations";
-import { lastTeacherEmail, teacherEmailPlan } from "@/lib/teacher-snapshot";
-import { formatDateTime } from "@/lib/dates";
-import { StatusBadge } from "@/components/StatusBadge";
-import { Suspense } from "react";
-import { PrintActions } from "./PrintActions";
-import type { EffectiveStudent } from "@/lib/types";
+import { loadVehicles } from "@/lib/gate";
+import { groupByBus, stamp } from "@/lib/reports";
+import { planSummary } from "@/lib/format";
+import { saveVehicleAction } from "@/app/actions/gate";
+import { getSchoolIdentityById } from "@/lib/school";
+import { WelcomeBanner } from "@/components/WelcomeBanner";
 
 export default async function PrintPage({
   searchParams,
 }: {
-  searchParams: Promise<{ kind?: string; group?: string }>;
+  searchParams: Promise<{ bus?: string; van?: string }>;
 }) {
   const session = await getSession();
   if (!session) return null;
-  const { kind = "", group = "" } = await searchParams;
-  const all = await loadStudents(session.schoolId);
-  let students = all;
-  if (session.role === "TEACHER" && session.teacherId) {
-    const teacher = await prisma.teacher.findUnique({
-      where: { id: session.teacherId },
-    });
-    if (teacher) {
-      students = all.filter((s) => s.classroomId === teacher.classroomId);
-    }
-  }
+  const { bus = "", van = "" } = await searchParams;
 
-  const header = stamp();
-  const selected = ((kind === "missing" ? "company" : kind) || "teacher") as ReportKind;
-  const gateRoster =
-    selected === "bus" || selected === "pickup"
-      ? await loadGateRoster(session.schoolId)
-      : [];
-  const gatePickup = parentPickupToday(gateRoster);
-  const gateBuses = groupConfirmedBus(gateRoster);
-  const companyApproved = await loadCompanyApprovedBuses(session.schoolId);
-  const checkIns = await loadCheckInSummary(session.schoolId);
-  const lastEmail = session.role === "TEACHER" ? null : await lastTeacherEmail(session.schoolId);
-  const emailPlan =
-    session.role === "TEACHER"
-      ? { ready: [], missing: [] }
-      : await teacherEmailPlan(session.schoolId, selected === "teacher" ? group : "");
+  const [students, routes, vehicles, school] = await Promise.all([
+    loadStudents(session.schoolId),
+    prisma.busRoute.findMany({
+      where: { schoolId: session.schoolId },
+      select: { number: true },
+      orderBy: { number: "asc" },
+    }),
+    loadVehicles(session.schoolId).catch(() => []),
+    getSchoolIdentityById(session.schoolId),
+  ]);
+
+  const pmBuses = groupByBus(students, "PM");
+  const busMap = new Map(pmBuses);
+  for (const route of routes) {
+    if (!busMap.has(route.number)) busMap.set(route.number, []);
+  }
+  const busCards = [...busMap.entries()].sort(([a], [b]) =>
+    a.localeCompare(b, undefined, { numeric: true }),
+  );
+  const busRiders = students.filter(
+    (student) => student.pm.type === "BUS" && student.pm.busNumber,
+  ).length;
+
+  const vans = vehicles.filter(
+    (vehicle) =>
+      vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
+  );
+  const vanIds = vans.map((vehicle) => vehicle.id);
+  const vanStudents = vanIds.length
+    ? await prisma.student.findMany({
+        where: { schoolId: session.schoolId, vehicleId: { in: vanIds } },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          grade: true,
+          vehicleId: true,
+        },
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      })
+    : [];
+  const vanCards = vans.map((vehicle) => ({
+    ...vehicle,
+    riders: vanStudents.filter((student) => student.vehicleId === vehicle.id),
+  }));
+  const selectedBus = bus ? busMap.get(bus) || [] : [];
+  const selectedVan = vanCards.find((item) => item.id === van);
 
   return (
     <div className="space-y-6">
       <div className="no-print">
-        <h1 className="font-serif text-4xl">
-          {selected === "teacher" && group ? `Class list — ${group}` : "Reports"}
-        </h1>
-        <p className="mt-2 max-w-2xl text-muted">
-          {selected === "teacher" && group
-            ? "This is one class only. Email this teacher here, or go back to Teachers to email everyone."
-            : "Print a roster or email teachers and the bus company. Daily change control stays on the student desk."}
+        <WelcomeBanner
+          schoolName={school?.name}
+          copy="How many students ride each bus today, plus vans for special students."
+        />
+      </div>
+
+      <section className="rounded-3xl border border-line bg-card p-6">
+        <p className="text-sm font-semibold uppercase tracking-wider text-muted">
+          Bus riders today
         </p>
-        {lastEmail && selected === "teacher" ? (
-          <p className="mt-2 text-sm text-muted">
-            Last emailed {formatDateTime(lastEmail.createdAt)}.
+        <p className="mt-2 font-serif text-5xl">{busRiders}</p>
+        <p className="mt-1 text-muted">
+          {students.length} student{students.length === 1 ? "" : "s"} on the
+          roster
+        </p>
+      </section>
+
+      <section>
+        <h2 className="mb-3 font-serif text-2xl">Buses</h2>
+        {busCards.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {busCards.map(([number, riders]) => (
+              <Link
+                key={number}
+                href={`/print?bus=${encodeURIComponent(number)}`}
+                className="rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-gold"
+              >
+                <p className="text-sm text-muted">Bus {number}</p>
+                <p className="mt-2 font-serif text-4xl">{riders.length}</p>
+                <p className="mt-1 text-sm text-muted">
+                  student{riders.length === 1 ? "" : "s"}
+                </p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
+            No buses yet. Save a bus number on the desk and it will appear here.
           </p>
-        ) : null}
-        <Suspense>
-          <PrintActions
-            isTeacher={session.role === "TEACHER"}
-            canEmail={
-              session.role === "COORDINATOR" || session.role === "ADMINISTRATOR"
-            }
-            ready={emailPlan.ready}
-            missing={emailPlan.missing}
-            group={selected === "teacher" ? group : ""}
-          />
-        </Suspense>
-      </div>
+        )}
+      </section>
 
-      {selected === "teacher" ? (
-        <PrintGroups
-          title="Classroom lists"
-          header={header}
-          groups={
-            group
-              ? groupByTeacher(students).filter(([name]) => name === group)
-              : groupByTeacher(students)
-          }
-        />
-      ) : null}
-      {selected === "master" ? (
-        <PrintTable title={reportTitle("master")} header={header} students={students} />
-      ) : null}
-      {selected === "bus" ? (
-        gateBuses.length ? (
-          <GatePrintGroups title="Confirmed Bus" header={header} groups={gateBuses} />
-        ) : (
-          <PrintGroups
-            title="Bus lists"
-            header={header}
-            groups={groupByBus(students).map(([n, rows]) => [`Bus ${n}`, rows])}
-            companyApproved={companyApproved}
-          />
-        )
-      ) : null}
-      {selected === "pickup" ? (
-        gatePickup.length ? (
-          <GatePrintTable
-            title={reportTitle("pickup")}
-            header={header}
-            students={gatePickup}
-          />
-        ) : (
-          <PrintTable title={reportTitle("pickup")} header={header} students={pickupList(students)} />
-        )
-      ) : null}
-      {selected === "changes" ? (
-        <PrintTable title={reportTitle("changes")} header={header} students={changeList(students)} />
-      ) : null}
-      {selected === "missing" ? (
-        <PrintTable title={reportTitle("missing")} header={header} students={missingList(students)} />
-      ) : null}
-      {selected === "company" ? (
-        <PrintTable
-          title={reportTitle("company")}
-          header={header}
-          students={missingList(students)}
-        />
-      ) : null}
-      {selected === "checkin" ? (
-        <CheckInPrint title={reportTitle("checkin")} header={header} groups={checkIns} />
-      ) : null}
-    </div>
-  );
-}
-
-function CheckInPrint({
-  title,
-  header,
-  groups,
-}: {
-  title: string;
-  header: { generated: string; version: string };
-  groups: CheckInBusSummary[];
-}) {
-  return (
-    <section className="print-sheet rounded-2xl border border-line bg-card p-5">
-      <PrintHeader title={title} header={header} />
-      <p className="mb-3 text-sm text-muted">
-        Not selected yet means staff has not tapped On Bus, Missing, Not
-        assigned, or Left school for that student.
-      </p>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="text-muted">
-            <th className="py-2">Bus</th>
-            <th>On list</th>
-            <th>Rode</th>
-            <th>Missing</th>
-            <th>Not assigned</th>
-            <th>Left school</th>
-            <th>Not selected yet</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((row) => (
-            <tr key={row.busNumber} className="border-t border-line align-top">
-              <td className="py-2 font-medium">
-                {row.busNumber === "No bus yet" ? "Waiting" : `Bus ${row.busNumber}`}
-              </td>
-              <td className="py-2">{row.onList}</td>
-              <td className="py-2">
-                {row.onBus}
-                {row.onBusNames.length ? (
-                  <div className="text-xs">{row.onBusNames.join(", ")}</div>
-                ) : null}
-              </td>
-              <td className="py-2">
-                {row.missing}
-                {row.missingNames.length ? (
-                  <div className="text-xs">{row.missingNames.join(", ")}</div>
-                ) : null}
-              </td>
-              <td className="py-2">
-                {row.unassigned}
-                {row.unassignedNames.length ? (
-                  <div className="text-xs">{row.unassignedNames.join(", ")}</div>
-                ) : null}
-              </td>
-              <td className="py-2">
-                {row.leftSchool}
-                {row.leftSchoolNames.length ? (
-                  <div className="text-xs">{row.leftSchoolNames.join(", ")}</div>
-                ) : null}
-              </td>
-              <td className="py-2">
-                {row.notMarked}
-                {row.notMarkedNames.length ? (
-                  <div className="text-xs">{row.notMarkedNames.join(", ")}</div>
-                ) : null}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-function PrintHeader({
-  title,
-  header,
-}: {
-  title: string;
-  header: { generated: string; version: string };
-}) {
-  return (
-    <div className="mb-3 border-b border-line pb-2">
-      <div className="mb-2 text-center">
-        <div className="text-lg font-semibold tracking-tight">AMPM Flow</div>
-        <div className="text-xs tracking-[0.12em] text-muted uppercase">
-          Student Transportation & Dismissal
+      <section>
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-serif text-2xl">Special vans</h2>
+            <p className="text-sm text-muted">
+              Vans for special students, separate from the regular buses.
+            </p>
+          </div>
+          {session.role === "ADMINISTRATOR" || session.role === "COORDINATOR" ? (
+            <form action={saveVehicleAction} className="flex flex-wrap gap-2">
+              <input type="hidden" name="vehicleType" value="VAN" />
+              <input
+                name="name"
+                required
+                placeholder="Van 1"
+                className="rounded-xl border border-line bg-card px-3 py-2 text-sm"
+              />
+              <button className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white">
+                Add van
+              </button>
+            </form>
+          ) : null}
         </div>
+        {vanCards.length ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {vanCards.map((vehicle) => (
+              <Link
+                key={vehicle.id}
+                href={`/print?van=${vehicle.id}`}
+                className="rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-gold"
+              >
+                <p className="text-sm text-muted">{vehicle.name}</p>
+                <p className="mt-2 font-serif text-4xl">{vehicle.riders.length}</p>
+                <p className="mt-1 text-sm text-muted">
+                  special student{vehicle.riders.length === 1 ? "" : "s"}
+                </p>
+                {vehicle.driverName ? (
+                  <p className="mt-2 text-sm text-muted">{vehicle.driverName}</p>
+                ) : null}
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
+            No special vans yet. Add Van 1 for students who do not ride a
+            regular bus.
+          </p>
+        )}
+      </section>
+
+      {selectedBus.length || bus ? (
+        <RiderList
+          title={`Bus ${bus}`}
+          rows={selectedBus.map((student) => ({
+            id: student.id,
+            name: student.fullName,
+            detail: `Grade ${student.grade} · ${planSummary(student.pm, "PM")}`,
+          }))}
+        />
+      ) : null}
+
+      {selectedVan ? (
+        <RiderList
+          title={selectedVan.name}
+          rows={selectedVan.riders.map((student) => ({
+            id: student.id,
+            name: `${student.firstName} ${student.lastName}`,
+            detail: `Grade ${student.grade}`,
+          }))}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function RiderList({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { id: string; name: string; detail: string }[];
+}) {
+  const header = stamp();
+  return (
+    <section className="print-sheet rounded-2xl border border-line bg-card p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="font-serif text-2xl">{title}</h2>
+          <p className="text-sm text-muted">
+            {header.generated} · {rows.length} student{rows.length === 1 ? "" : "s"}
+          </p>
+        </div>
+        <Link href="/print" className="no-print text-sm font-semibold text-navy">
+          Back to cards
+        </Link>
       </div>
-      <h2 className="font-serif text-2xl">{title}</h2>
-      <p className="text-sm">
-        {header.generated} · {header.version}
-      </p>
-    </div>
-  );
-}
-
-function PrintTable({
-  title,
-  header,
-  students,
-}: {
-  title: string;
-  header: { generated: string; version: string };
-  students: EffectiveStudent[];
-}) {
-  return (
-    <section className="print-sheet rounded-2xl border border-line bg-card p-5">
-      <PrintHeader title={title} header={header} />
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="text-muted">
             <th className="py-2">Student</th>
-            <th>Teacher</th>
-            <th>Today’s PM plan</th>
-            <th>Location</th>
+            <th>Today</th>
           </tr>
         </thead>
         <tbody>
-          {students.map((student) => (
-            <tr key={student.id} className="border-t border-line">
-              <td className="py-1.5">{student.fullName}</td>
-              <td>{student.teacherName}</td>
-              <td>
-                <StatusBadge tone={planTone(student.pm)}>
-                  {planSummary(student.pm, "PM")}
-                </StatusBadge>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-t border-line">
+              <td className="py-2">
+                <Link href={`/dashboard?student=${row.id}`} className="font-medium hover:underline">
+                  {row.name}
+                </Link>
               </td>
-              <td>{student.pm.location}</td>
+              <td>{row.detail}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      {!rows.length ? (
+        <p className="mt-3 text-sm text-muted">No students on this vehicle yet.</p>
+      ) : null}
     </section>
-  );
-}
-
-function PrintGroups({
-  title,
-  header,
-  groups,
-  companyApproved,
-}: {
-  title: string;
-  header: { generated: string; version: string };
-  groups: [string, EffectiveStudent[]][];
-  companyApproved?: Map<string, string>;
-}) {
-  return (
-    <div className="space-y-6">
-      {groups.map(([name, rows]) => (
-        <section
-          key={name}
-          className="print-sheet break-after-page rounded-2xl border border-line bg-card p-5"
-        >
-          <PrintHeader title={`${title} — ${name}`} header={header} />
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-muted">
-                <th className="py-2">Student</th>
-                <th>Today’s PM plan</th>
-                <th>Location</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((student) => {
-                const change = rosterChangeLabel(
-                  student,
-                  companyApproved?.get(student.id),
-                );
-                return (
-                  <tr
-                    key={student.id}
-                    className={`border-t border-line ${change ? "row-red" : ""}`}
-                  >
-                    <td className="py-1.5">
-                      {student.fullName}
-                      {change ? (
-                        <div className="text-xs font-medium text-red">{change}</div>
-                      ) : null}
-                    </td>
-                    <td>
-                      <StatusBadge tone={planTone(student.pm)}>
-                        {planSummary(student.pm, "PM")}
-                      </StatusBadge>
-                    </td>
-                    <td>{student.pm.location}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function GatePrintTable({
-  title,
-  header,
-  students,
-}: {
-  title: string;
-  header: { generated: string; version: string };
-  students: GateStudent[];
-}) {
-  return (
-    <section className="print-sheet rounded-2xl border border-line bg-card p-5">
-      <PrintHeader title={title} header={header} />
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="text-muted">
-            <th className="py-2">Student</th>
-            <th>Grade</th>
-            <th>Teacher</th>
-            <th>Parent</th>
-            <th>Phone</th>
-            <th>AM</th>
-            <th>PM Dismissal</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((student) => (
-            <tr key={student.id} className="border-t border-line">
-              <td className="py-1.5">{student.fullName}</td>
-              <td>{student.grade}</td>
-              <td>{student.teacherName}</td>
-              <td>{student.parentName}</td>
-              <td>{student.parentPhone}</td>
-              <td>{AM_LABEL[student.amArrival]}</td>
-              <td>
-                <StatusBadge
-                  tone={
-                    student.pmDismissal === "PARENT_PICKUP_TODAY_BUS_TOMORROW"
-                      ? "orange"
-                      : "blue"
-                  }
-                >
-                  {PM_LABEL[student.pmDismissal]}
-                </StatusBadge>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-function GatePrintGroups({
-  title,
-  header,
-  groups,
-}: {
-  title: string;
-  header: { generated: string; version: string };
-  groups: [string, GateStudent[]][];
-}) {
-  return (
-    <div className="space-y-6">
-      {groups.map(([name, rows]) => (
-        <section
-          key={name}
-          className="print-sheet break-after-page rounded-2xl border border-line bg-card p-5"
-        >
-          <PrintHeader title={`${title} — ${name}`} header={header} />
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-muted">
-                <th className="py-2">Student</th>
-                <th>Grade</th>
-                <th>Teacher</th>
-                <th>Parent</th>
-                <th>Phone</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((student) => (
-                <tr key={student.id} className="border-t border-line">
-                  <td className="py-1.5">{student.fullName}</td>
-                  <td>{student.grade}</td>
-                  <td>{student.teacherName}</td>
-                  <td>{student.parentName}</td>
-                  <td>{student.parentPhone}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      ))}
-    </div>
   );
 }

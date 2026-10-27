@@ -60,8 +60,8 @@ export function SchoolChip({
         <img
           src={logoUrl}
           alt={name}
-          className={`rounded-xl object-contain ${
-            compact ? "h-9 w-9" : "h-14 w-14 bg-black/30 p-1"
+          className={`rounded-xl object-cover ${
+            compact ? "h-9 w-9" : "h-14 w-14"
           }`}
         />
       ) : (

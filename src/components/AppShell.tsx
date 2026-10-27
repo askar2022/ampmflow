@@ -1,9 +1,11 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
 import { roleLabel } from "@/lib/format";
 import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
 import { BrandMark } from "@/components/BrandMark";
 import { AppNav } from "@/components/AppNav";
+import { schoolTheme } from "@/lib/school";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
@@ -31,9 +33,18 @@ export function AppShell({
 }) {
   const now = schoolNow();
   const links = NAV.filter((item) => item.roles.includes(user.role));
+  const theme = schoolTheme(schoolName);
 
   return (
-    <div className="min-h-full">
+    <div
+      className="min-h-full"
+      style={
+        {
+          "--navy": theme.navy,
+          "--navy-deep": theme.navyDeep,
+        } as CSSProperties
+      }
+    >
       <header className="no-print bg-navy text-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
           <Link

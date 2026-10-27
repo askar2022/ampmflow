@@ -62,6 +62,7 @@ function refreshGate() {
   revalidatePath("/bus-tomorrow");
   revalidatePath("/first-day");
   revalidatePath("/vehicles");
+  revalidatePath("/print");
 }
 
 export async function updateGateField(input: {

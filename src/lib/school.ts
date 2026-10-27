@@ -10,6 +10,18 @@ export type SchoolIdentity = {
   logoUrl: string | null;
 };
 
+export type SchoolTheme = {
+  navy: string;
+  navyDeep: string;
+};
+
+export function schoolTheme(name?: string | null): SchoolTheme {
+  if (name && /aim/i.test(name)) {
+    return { navy: "#0f5f56", navyDeep: "#0a403a" };
+  }
+  return { navy: "#0b2942", navyDeep: "#081f33" };
+}
+
 export function schoolInitials(name: string) {
   return name
     .split(/\s+/)
@@ -39,7 +51,11 @@ function identityFromRecord(school: {
   }
   return {
     name,
-    logoUrl: /sankofa/i.test(name) ? DEFAULT_SCHOOL_LOGO : null,
+    logoUrl: /sankofa/i.test(name)
+      ? DEFAULT_SCHOOL_LOGO
+      : /aim/i.test(name)
+        ? "/demo-2.jpg"
+        : null,
   };
 }
 
