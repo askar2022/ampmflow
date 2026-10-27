@@ -6,8 +6,6 @@ import { loadVehicles } from "@/lib/gate";
 import { groupByBus, stamp } from "@/lib/reports";
 import { planSummary } from "@/lib/format";
 import { addSpecialVan } from "@/app/actions/gate";
-import { getSchoolIdentityById } from "@/lib/school";
-import { WelcomeBanner } from "@/components/WelcomeBanner";
 
 export default async function PrintPage({
   searchParams,
@@ -18,7 +16,7 @@ export default async function PrintPage({
   if (!session) return null;
   const { bus = "", van = "" } = await searchParams;
 
-  const [students, routes, vehicles, school] = await Promise.all([
+  const [students, routes, vehicles] = await Promise.all([
     loadStudents(session.schoolId),
     prisma.busRoute.findMany({
       where: { schoolId: session.schoolId },
@@ -26,7 +24,6 @@ export default async function PrintPage({
       orderBy: { number: "asc" },
     }),
     loadVehicles(session.schoolId).catch(() => []),
-    getSchoolIdentityById(session.schoolId),
   ]);
 
   const pmBuses = groupByBus(students, "PM");
@@ -68,13 +65,6 @@ export default async function PrintPage({
 
   return (
     <div className="space-y-6">
-      <div className="no-print">
-        <WelcomeBanner
-          schoolName={school?.name}
-          copy="How many students ride each bus today, plus vans for special students."
-        />
-      </div>
-
       <section className="rounded-3xl border border-line bg-card p-6">
         <p className="text-sm font-semibold uppercase tracking-wider text-muted">
           Bus riders today

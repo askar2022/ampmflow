@@ -3,8 +3,8 @@ import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
 import { roleLabel } from "@/lib/format";
 import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
-import { BrandMark } from "@/components/BrandMark";
 import { AppNav } from "@/components/AppNav";
+import { HeaderWelcome } from "@/components/WelcomeBanner";
 import { schoolTheme } from "@/lib/school";
 import type { SessionUser } from "@/lib/types";
 
@@ -23,7 +23,6 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
 export function AppShell({
   user,
   schoolName,
-  schoolLogoUrl,
   children,
 }: {
   user: SessionUser;
@@ -34,6 +33,12 @@ export function AppShell({
   const now = schoolNow();
   const links = NAV.filter((item) => item.roles.includes(user.role));
   const theme = schoolTheme(schoolName);
+  const home =
+    user.role === "TEACHER"
+      ? "/teacher"
+      : user.role === "BUS_ASSISTANT"
+        ? "/checkin"
+        : "/dashboard";
 
   return (
     <div
@@ -46,32 +51,13 @@ export function AppShell({
       }
     >
       <header className="no-print bg-navy text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link
-            href={
-              user.role === "TEACHER"
-                ? "/teacher"
-                : user.role === "BUS_ASSISTANT"
-                  ? "/checkin"
-                  : "/dashboard"
-            }
-          >
-            <BrandMark
-              light
-              compact
-              schoolName={schoolName}
-              schoolLogoUrl={schoolLogoUrl}
-            />
-          </Link>
-          <div className="text-right text-sm text-white/80">
-            <div className="font-medium text-white">{user.name}</div>
-            <div>{roleLabel(user.role)}</div>
-            <div>
-              {formatLongDate(now)} · {formatTime(now)}
-            </div>
-          </div>
-        </div>
-        <nav className="border-t border-white/10 bg-navy-deep">
+        <Link href={home} className="block">
+          <HeaderWelcome
+            schoolName={schoolName}
+            meta={`${user.name} · ${roleLabel(user.role)} · ${formatLongDate(now)} · ${formatTime(now)}`}
+          />
+        </Link>
+        <nav className="bg-navy-deep">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-3 py-2 sm:px-4">
             <AppNav links={links} />
             <form action={logoutAction} className="ml-auto">

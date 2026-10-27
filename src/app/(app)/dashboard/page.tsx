@@ -2,8 +2,6 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { changeList } from "@/lib/reports";
 import { loadStudents } from "@/lib/transportation";
-import { getSchoolIdentityById } from "@/lib/school";
-import { WelcomeBanner } from "@/components/WelcomeBanner";
 import { ReceptionDesk } from "./ReceptionDesk";
 
 export default async function DashboardPage({
@@ -15,7 +13,6 @@ export default async function DashboardPage({
   if (!session) return null;
   const { student: selectedId = "" } = await searchParams;
 
-  const school = await getSchoolIdentityById(session.schoolId);
   const students = await loadStudents(session.schoolId);
   const routes = await prisma.busRoute.findMany({
     where: { schoolId: session.schoolId },
@@ -27,7 +24,6 @@ export default async function DashboardPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <WelcomeBanner schoolName={school?.name} />
       <ReceptionDesk
         students={students}
         buses={buses}
