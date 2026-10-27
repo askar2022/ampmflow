@@ -11,6 +11,7 @@ export type VanRider = {
   id: string;
   name: string;
   grade: string;
+  parentName: string;
   parentPhone: string;
 };
 
@@ -88,6 +89,7 @@ export async function loadRidership(schoolId: string): Promise<Ridership> {
           firstName: true,
           lastName: true,
           grade: true,
+          parentName: true,
           parentPhone: true,
           vehicleId: true,
         },
@@ -105,6 +107,7 @@ export async function loadRidership(schoolId: string): Promise<Ridership> {
           id: student.id,
           name: `${student.firstName} ${student.lastName}`,
           grade: student.grade,
+          parentName: student.parentName,
           parentPhone: student.parentPhone,
         })),
     }))
@@ -134,7 +137,7 @@ export function ridershipText(list: Ridership) {
     lines.push(`Bus ${number} (${riders.length})`);
     for (const student of riders) {
       lines.push(
-        `  ${student.fullName}  Grade ${student.grade}  ${planSummary(student.pm, "PM")}  ${student.parentPhone || "—"}`,
+        `  ${student.fullName}  Parent: ${student.parentName && student.parentName !== "—" ? student.parentName : "—"}  ${student.parentPhone || "—"}  Grade ${student.grade}  ${planSummary(student.pm, "PM")}`,
       );
     }
     lines.push("");
@@ -143,7 +146,9 @@ export function ridershipText(list: Ridership) {
   for (const van of list.vans) {
     lines.push(`${van.name} (${van.riders.length})`);
     for (const student of van.riders) {
-      lines.push(`  ${student.name}  Grade ${student.grade}  ${student.parentPhone || "—"}`);
+      lines.push(
+        `  ${student.name}  Parent: ${student.parentName && student.parentName !== "—" ? student.parentName : "—"}  ${student.parentPhone || "—"}  Grade ${student.grade}`,
+      );
     }
     lines.push("");
   }
@@ -213,7 +218,7 @@ export function oneVehicleText(args: {
     "",
     ...rows.map(
       (rider) =>
-        `  ${rider.name}  Grade ${rider.grade}  ${rider.teacherName}  ${rider.parentPhone || "—"}`,
+        `  ${rider.name}  Parent: ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  ${rider.parentPhone || "—"}  Grade ${rider.grade}  ${rider.teacherName}`,
     ),
   ];
   if (!rows.length) lines.push("No students on this vehicle.");

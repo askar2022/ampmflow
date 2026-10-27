@@ -33,6 +33,7 @@ export default async function BusDriverPrintPage({
       ? busGroup[1].map((student) => ({
         id: student.id,
         name: student.fullName,
+        parent: student.parentName,
         phone: student.parentPhone,
         detail: `Grade ${student.grade} · ${student.teacherName}`,
       }))
@@ -40,6 +41,7 @@ export default async function BusDriverPrintPage({
       ? vanGroup.riders.map((student) => ({
           id: student.id,
           name: student.name,
+          parent: student.parentName,
           phone: student.parentPhone,
           detail: `Grade ${student.grade}`,
         }))
@@ -48,6 +50,7 @@ export default async function BusDriverPrintPage({
             riders.map((student) => ({
               id: `${number}-${student.id}`,
               name: student.fullName,
+              parent: student.parentName,
               phone: student.parentPhone,
               detail: `Bus ${number} · Grade ${student.grade}`,
             })),
@@ -56,6 +59,7 @@ export default async function BusDriverPrintPage({
             item.riders.map((student) => ({
               id: `${item.id}-${student.id}`,
               name: student.name,
+              parent: student.parentName,
               phone: student.parentPhone,
               detail: `${item.name} · Grade ${student.grade}`,
             })),
@@ -86,6 +90,7 @@ export default async function BusDriverPrintPage({
             <tr className="text-muted">
               <th className="py-2">#</th>
               <th>Student</th>
+              <th>Parent</th>
               <th>Parent phone</th>
               <th>Grade / class</th>
             </tr>
@@ -95,6 +100,7 @@ export default async function BusDriverPrintPage({
               <tr key={row.id} className="border-t border-line">
                 <td className="py-2">{index + 1}</td>
                 <td className="font-semibold">{row.name}</td>
+                <td>{row.parent && row.parent !== "—" ? row.parent : "—"}</td>
                 <td>{row.phone || "—"}</td>
                 <td>{row.detail}</td>
               </tr>

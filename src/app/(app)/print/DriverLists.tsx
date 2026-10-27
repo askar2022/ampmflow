@@ -213,16 +213,37 @@ export function DriverLists({
             <p className="no-print mt-3 text-sm text-muted">{message}</p>
           ) : null}
           <ul className="mt-4 divide-y divide-line">
+            <li className="hidden py-2 text-[11px] font-semibold uppercase tracking-wide text-muted sm:grid sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(8rem,0.9fr)_auto] sm:gap-3">
+              <span>Student</span>
+              <span>Parent</span>
+              <span>Parent phone</span>
+              <span>Grade</span>
+            </li>
             {rows.map((rider) => {
               const call = phoneHref(rider.parentPhone);
+              const parent =
+                rider.parentName && rider.parentName !== "—"
+                  ? rider.parentName
+                  : "Not on file";
               return (
                 <li
                   key={rider.id}
-                  className="grid gap-2 py-3 text-sm sm:grid-cols-[minmax(0,1.2fr)_minmax(9rem,1fr)_auto] sm:items-center"
+                  className="grid gap-2 py-3 text-sm sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(8rem,0.9fr)_auto] sm:items-center sm:gap-3"
                 >
-                  <span className="font-semibold">{rider.name}</span>
                   <span>
-                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted sm:hidden">
+                      Student
+                    </span>
+                    <span className="font-semibold">{rider.name}</span>
+                  </span>
+                  <span>
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted sm:hidden">
+                      Parent
+                    </span>
+                    <span className="font-medium">{parent}</span>
+                  </span>
+                  <span>
+                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted sm:hidden">
                       Parent phone
                     </span>
                     {hasParentPhone(rider.parentPhone) && call ? (
