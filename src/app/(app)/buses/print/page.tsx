@@ -61,8 +61,8 @@ export default async function BusDriverPrintPage({
   return (
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center gap-3">
-        <Link href="/buses" className="text-sm font-semibold text-navy">
-          Back to Buses
+        <Link href="/print" className="text-sm font-semibold text-navy">
+          Back to Reports
         </Link>
         <PrintOnce />
       </div>

@@ -3,9 +3,11 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { loadVehicles } from "@/lib/gate";
+import { loadSavedOpsEmails } from "@/lib/ops-change-emails";
 import { groupByBus, stamp } from "@/lib/reports";
 import { planSummary } from "@/lib/format";
 import { addSpecialVan } from "@/app/actions/gate";
+import { BusesToolbar } from "../buses/BusesToolbar";
 
 export default async function PrintPage({
   searchParams,
@@ -16,7 +18,7 @@ export default async function PrintPage({
   if (!session) return null;
   const { bus = "", van = "" } = await searchParams;
 
-  const [students, routes, vehicles] = await Promise.all([
+  const [students, routes, vehicles, suggested] = await Promise.all([
     loadStudents(session.schoolId),
     prisma.busRoute.findMany({
       where: { schoolId: session.schoolId },
@@ -24,6 +26,7 @@ export default async function PrintPage({
       orderBy: { number: "asc" },
     }),
     loadVehicles(session.schoolId).catch(() => []),
+    loadSavedOpsEmails(session.schoolId),
   ]);
 
   const pmBuses = groupByBus(students, "PM");
@@ -63,40 +66,52 @@ export default async function PrintPage({
   const selectedBus = bus ? busMap.get(bus) || [] : [];
   const selectedVan = vanCards.find((item) => item.id === van);
 
+  const driverBuses = busCards.filter(([, riders]) => riders.length);
+  const vanRiders = vanCards.reduce((sum, item) => sum + item.riders.length, 0);
+
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-line bg-card p-6">
-        <p className="text-sm font-semibold uppercase tracking-wider text-muted">
-          Bus riders today
+      <div>
+        <h1 className="font-serif text-4xl">Reports</h1>
+        <p className="mt-1 max-w-2xl text-muted">
+          Print each bus or van list and give it to the driver. Parent pickup
+          stays off these lists. Upload the student roster on Roster first.
         </p>
-        <p className="mt-2 font-serif text-5xl">{busRiders}</p>
-        <p className="mt-1 text-muted">
-          {students.length} student{students.length === 1 ? "" : "s"} on the
-          roster
+        <p className="mt-2 text-sm font-semibold text-navy">
+          {busRiders} on buses
+          {vanRiders ? ` · ${vanRiders} on vans` : ""}
+          {` · ${students.length} on the roster`}
         </p>
-      </section>
+        <BusesToolbar suggested={suggested} />
+      </div>
 
       <section>
         <h2 className="mb-3 font-serif text-2xl">Buses</h2>
-        {busCards.length ? (
+        {driverBuses.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {busCards.map(([number, riders]) => (
-              <Link
+            {driverBuses.map(([number, riders]) => (
+              <div
                 key={number}
-                href={`/print?bus=${encodeURIComponent(number)}`}
-                className="rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-gold"
+                className="rounded-2xl border border-line bg-card p-5 shadow-sm"
               >
                 <p className="text-sm text-muted">Bus {number}</p>
                 <p className="mt-2 font-serif text-4xl">{riders.length}</p>
                 <p className="mt-1 text-sm text-muted">
                   student{riders.length === 1 ? "" : "s"}
                 </p>
-              </Link>
+                <Link
+                  href={`/buses/print?bus=${encodeURIComponent(number)}`}
+                  className="mt-3 inline-block text-sm font-semibold text-navy"
+                >
+                  Print for driver
+                </Link>
+              </div>
             ))}
           </div>
         ) : (
           <p className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-            No buses yet. Save a bus number on the desk and it will appear here.
+            No bus students yet. Upload the roster, then save a bus number on
+            Front Desk.
           </p>
         )}
       </section>
@@ -127,10 +142,9 @@ export default async function PrintPage({
         {vanCards.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {vanCards.map((vehicle) => (
-              <Link
+              <div
                 key={vehicle.id}
-                href={`/print?van=${vehicle.id}`}
-                className="rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-gold"
+                className="rounded-2xl border border-line bg-card p-5 shadow-sm"
               >
                 <p className="text-sm text-muted">{vehicle.name}</p>
                 <p className="mt-2 font-serif text-4xl">{vehicle.riders.length}</p>
@@ -140,7 +154,13 @@ export default async function PrintPage({
                 {vehicle.driverName ? (
                   <p className="mt-2 text-sm text-muted">{vehicle.driverName}</p>
                 ) : null}
-              </Link>
+                <Link
+                  href={`/buses/print?van=${vehicle.id}`}
+                  className="mt-3 inline-block text-sm font-semibold text-navy"
+                >
+                  Print for driver
+                </Link>
+              </div>
             ))}
           </div>
         ) : (

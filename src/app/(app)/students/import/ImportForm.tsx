@@ -95,8 +95,8 @@ export function ImportForm() {
       ) : null}
       {doneCount != null ? (
         <p className="mt-3 text-base font-semibold">
-          <Link href="/gate" className="text-navy underline">
-            Open The Gate ({doneCount} students)
+          <Link href="/dashboard" className="text-navy underline">
+            Open Front Desk ({doneCount} students)
           </Link>
         </p>
       ) : null}
