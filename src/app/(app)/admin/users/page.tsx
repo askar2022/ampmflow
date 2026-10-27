@@ -176,7 +176,7 @@ export default async function UsersPage() {
               ? " New schools stay locked until you approve the first admin."
               : ""}
           </p>
-          <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-card">
             <ul className="divide-y divide-line">
               {pending.map((user) => (
                 <li
@@ -237,7 +237,7 @@ export default async function UsersPage() {
           person, and they sign in at the regular login page. AMPM Flow does
           not email a password. If login fails, set a new password here.
         </p>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-paper text-muted">
                 <tr>
