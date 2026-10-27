@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { formatLongDate, schoolNow } from "@/lib/dates";
 import { planSummary } from "@/lib/format";
+import { loadSavedOpsEmails } from "@/lib/ops-change-emails";
 import { loadRidership } from "@/lib/ridership";
 import { BusesToolbar } from "./BusesToolbar";
 
@@ -11,7 +12,10 @@ export default async function BusesPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const list = await loadRidership(session.schoolId);
+  const [list, suggested] = await Promise.all([
+    loadRidership(session.schoolId),
+    loadSavedOpsEmails(session.schoolId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -27,7 +31,7 @@ export default async function BusesPage() {
           {list.busRiders} on buses
           {list.vanRiders ? ` · ${list.vanRiders} on vans` : ""}
         </p>
-        <BusesToolbar />
+        <BusesToolbar suggested={suggested} />
       </div>
 
       {list.buses.length ? (

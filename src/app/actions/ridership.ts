@@ -4,9 +4,21 @@ import { getSession } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { formatLongDate, schoolNow } from "@/lib/dates";
 import { sendMail, smtpConfigured } from "@/lib/email";
-import { loadRidership, ridershipRecipients, ridershipText } from "@/lib/ridership";
+import { usableOpsEmail } from "@/lib/ops-change-emails";
+import { loadRidership, ridershipText } from "@/lib/ridership";
 
-export async function emailBusVanList() {
+function parseSendTo(raw: string) {
+  return [
+    ...new Set(
+      raw
+        .split(/[\s,;]+/)
+        .map((email) => usableOpsEmail(email))
+        .filter(Boolean),
+    ),
+  ];
+}
+
+export async function emailBusVanList(toRaw: string) {
   const user = await getSession();
   if (
     !user ||
@@ -17,11 +29,11 @@ export async function emailBusVanList() {
     return { ok: false as const, error: "You cannot email this list.", recipients: [] as string[] };
   }
 
-  const recipients = await ridershipRecipients(user.schoolId);
+  const recipients = parseSendTo(toRaw);
   if (!recipients.length) {
     return {
       ok: false as const,
-      error: "Add a bus coordinator or leadership email on Today’s Changes first.",
+      error: "Type the email of the bus company or driver first.",
       recipients,
     };
   }
