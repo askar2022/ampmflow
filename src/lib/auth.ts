@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import { isPlatformAdminEmail } from "./platform";
 import { prisma } from "./prisma";
 import { PENDING_ROLE, type Role, type SessionUser } from "./types";
 
@@ -104,6 +105,7 @@ export function canManageUsers(role: Role) {
 
 export async function isPlatformAdmin(user: SessionUser) {
   if (user.role !== "ADMINISTRATOR") return false;
+  if (isPlatformAdminEmail(user.email)) return true;
   const first = await prisma.school.findFirst({
     orderBy: { createdAt: "asc" },
     select: { id: true },

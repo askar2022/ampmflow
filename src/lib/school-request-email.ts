@@ -1,5 +1,6 @@
 import { sendMail, smtpConfigured } from "./email";
 import { usableOpsEmail } from "./ops-change-emails";
+import { PLATFORM_ADMIN_EMAIL } from "./platform";
 import { prisma } from "./prisma";
 
 function uniqueEmails(values: Array<string | null | undefined>) {
@@ -11,12 +12,15 @@ export async function platformAdminEmails() {
     orderBy: { createdAt: "asc" },
     select: { id: true },
   });
-  if (!first) return uniqueEmails([process.env.PLATFORM_ADMIN_EMAIL]);
+  if (!first) {
+    return uniqueEmails([PLATFORM_ADMIN_EMAIL, process.env.PLATFORM_ADMIN_EMAIL]);
+  }
   const admins = await prisma.user.findMany({
     where: { schoolId: first.id, active: true, role: "ADMINISTRATOR" },
     select: { email: true },
   });
   return uniqueEmails([
+    PLATFORM_ADMIN_EMAIL,
     process.env.PLATFORM_ADMIN_EMAIL,
     ...admins.map((admin) => admin.email),
   ]);
@@ -46,8 +50,8 @@ export async function emailNewSchoolRequest(args: {
     `Their email: ${args.email}`,
     args.note ? `Note: ${args.note}` : "",
     "",
-    "If you want this school on AMPM Flow, open Users and Set up a school.",
-    "https://www.ampmflow.com/admin/users",
+    "If you want this school on AMPM Flow, sign in on the landing page and add it.",
+    "https://www.ampmflow.com/",
   ]
     .filter((line, index, lines) => line !== "" || lines[index - 1] !== "")
     .join("\n");
