@@ -236,10 +236,7 @@ export async function notifyRouteRequest(args: {
   ].join("\n");
 
   const parent = uniqueEmails([args.parentEmail]);
-  const company = uniqueEmails([
-    args.busCompanyEmail,
-    ...(await opsEmails(args.user.schoolId, parent)),
-  ]);
+  const company = uniqueEmails([args.busCompanyEmail]);
   if (!parent.length) skipped.push("parent (email required)");
   if (!company.length) skipped.push("bus company (email required)");
   if (!smtpConfigured()) {

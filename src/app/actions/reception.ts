@@ -13,7 +13,7 @@ import {
   notifyTransportationChange,
   planLine,
 } from "@/lib/change-notify";
-import { addOpsEmail, usableOpsEmail } from "@/lib/ops-change-emails";
+import { usableOpsEmail } from "@/lib/ops-change-emails";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
 
@@ -285,8 +285,6 @@ export async function requestRoute(input: RouteRequestInput) {
     return { ok: false as const, error: "Enter the bus company email." };
   }
   if (!address) return { ok: false as const, error: "Enter the student address." };
-
-  await addOpsEmail(user.schoolId, busCompanyEmail).catch(() => undefined);
 
   let loaded = input.studentId
     ? await loadStudent(input.studentId)
