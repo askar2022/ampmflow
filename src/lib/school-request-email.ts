@@ -1,29 +1,13 @@
 import { sendMail, smtpConfigured } from "./email";
 import { usableOpsEmail } from "./ops-change-emails";
 import { PLATFORM_ADMIN_EMAIL } from "./platform";
-import { prisma } from "./prisma";
 
 function uniqueEmails(values: Array<string | null | undefined>) {
   return [...new Set(values.map((email) => usableOpsEmail(email || "")).filter(Boolean))];
 }
 
 export async function platformAdminEmails() {
-  const first = await prisma.school.findFirst({
-    orderBy: { createdAt: "asc" },
-    select: { id: true },
-  });
-  if (!first) {
-    return uniqueEmails([PLATFORM_ADMIN_EMAIL, process.env.PLATFORM_ADMIN_EMAIL]);
-  }
-  const admins = await prisma.user.findMany({
-    where: { schoolId: first.id, active: true, role: "ADMINISTRATOR" },
-    select: { email: true },
-  });
-  return uniqueEmails([
-    PLATFORM_ADMIN_EMAIL,
-    process.env.PLATFORM_ADMIN_EMAIL,
-    ...admins.map((admin) => admin.email),
-  ]);
+  return uniqueEmails([PLATFORM_ADMIN_EMAIL, process.env.PLATFORM_ADMIN_EMAIL]);
 }
 
 export async function emailNewSchoolRequest(args: {
@@ -56,11 +40,12 @@ export async function emailNewSchoolRequest(args: {
     .filter((line, index, lines) => line !== "" || lines[index - 1] !== "")
     .join("\n");
   const sent = await sendMail({
-    to: admins,
+    to: admins[0],
+    replyTo: args.email,
     subject: `AMPM Flow contact — ${args.schoolName}`,
     text,
   });
-  return { sent: sent.sent, recipients: sent.sent ? admins : [] };
+  return { sent: sent.sent, recipients: sent.sent ? [admins[0]] : [] };
 }
 
 export async function emailSchoolApproved(args: {

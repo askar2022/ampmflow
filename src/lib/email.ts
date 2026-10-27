@@ -20,6 +20,7 @@ export async function sendMail(args: {
   subject: string;
   text: string;
   html?: string;
+  replyTo?: string;
 }) {
   if (!emailConfigured()) {
     return {
@@ -32,6 +33,7 @@ export async function sendMail(args: {
   const { error } = await resend.emails.send({
     from: fromAddress(),
     to: args.to,
+    replyTo: args.replyTo,
     subject: args.subject,
     text: args.text,
     html: args.html ?? `<pre>${args.text}</pre>`,
