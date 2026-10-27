@@ -22,9 +22,8 @@ export default async function ContactPage({
           Contact AMPM Flow
         </h2>
         <p className="mt-0.5 text-sm text-[#7b8490]">
-          Leave a message for the AMPM Flow administrator at
-          askar@automationllc.com. Schools cannot add themselves. Only the
-          AMPM Flow administrator can add a school.
+          Leave a message for the AMPM Flow administrator. Schools cannot add
+          themselves. Only the AMPM Flow administrator can add a school.
         </p>
         {sent === "1" ? (
           <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-navy">
