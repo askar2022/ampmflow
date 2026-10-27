@@ -247,15 +247,15 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
 }
 
 export type RouteRequestInput = {
-  studentId: string;
-  vehicle: "BUS" | "VAN";
-  destination: Destination;
-  trips: Trip[];
-  customAddress?: string;
-  daycareName?: string;
-  daycareAddress?: string;
-  daycarePhone?: string;
-  note?: string;
+  studentId?: string;
+  firstName: string;
+  lastName: string;
+  grade: string;
+  teacherName: string;
+  parentPhone: string;
+  parentEmail: string;
+  address: string;
+  emergencyContact: string;
 };
 
 export async function requestRoute(input: RouteRequestInput) {
@@ -264,69 +264,88 @@ export async function requestRoute(input: RouteRequestInput) {
   if (!["FRONT_DESK", "COORDINATOR", "ADMINISTRATOR"].includes(user.role)) {
     return { ok: false as const, error: "You cannot request a route." };
   }
-  if (!input.trips.length) {
-    return { ok: false as const, error: "Choose morning, afternoon, or both." };
-  }
 
-  const loaded = await loadStudent(input.studentId);
+  const firstName = input.firstName.trim();
+  const lastName = input.lastName.trim();
+  const grade = input.grade.trim();
+  const teacherName = input.teacherName.trim();
+  const parentPhone = input.parentPhone.trim();
+  const parentEmail = usableOpsEmail(input.parentEmail || "");
+  const address = input.address.trim();
+  const emergency = input.emergencyContact.trim();
+
+  if (!firstName || !lastName) {
+    return { ok: false as const, error: "Enter the student’s first and last name." };
+  }
+  if (!grade) return { ok: false as const, error: "Enter the grade." };
+  if (!parentPhone) return { ok: false as const, error: "Enter the parent phone." };
+  if (!parentEmail) return { ok: false as const, error: "Enter the parent email." };
+  if (!address) return { ok: false as const, error: "Enter the student address." };
+
+  let loaded = input.studentId
+    ? await loadStudent(input.studentId)
+    : null;
   if (!loaded || loaded.record.schoolId !== user.schoolId) {
-    return { ok: false as const, error: "Student not found." };
-  }
-
-  const note = input.note?.trim() || "";
-  if (input.destination === "CUSTOM" && !input.customAddress?.trim()) {
-    return { ok: false as const, error: "Enter the drop-off address." };
-  }
-  if (input.destination === "DAYCARE") {
-    const hasDaycare =
-      loaded.record.daycareId ||
-      input.daycareName?.trim() ||
-      loaded.effective.daycareName;
-    if (!hasDaycare) {
-      return { ok: false as const, error: "Enter the daycare name." };
-    }
-    if (input.daycareName?.trim() || input.daycareAddress?.trim()) {
-      await attachDaycare(
-        user.schoolId,
-        input.studentId,
-        input.daycareName || loaded.effective.daycareName || "Daycare",
-        input.daycareAddress || loaded.effective.daycareAddress || "",
-        input.daycarePhone || "",
-      );
-    }
-  }
-
-  let customAddressId: string | undefined;
-  if (input.destination === "CUSTOM" && input.customAddress?.trim()) {
-    const created = await prisma.address.create({
-      data: {
+    const match = await prisma.student.findFirst({
+      where: {
         schoolId: user.schoolId,
-        line1: input.customAddress.trim(),
-        city: "Minneapolis",
-        state: "MN",
-        zip: "",
-        label: "custom",
+        firstName: { equals: firstName, mode: "insensitive" },
+        lastName: { equals: lastName, mode: "insensitive" },
       },
+      select: { id: true },
     });
-    customAddressId = created.id;
+    loaded = match ? await loadStudent(match.id) : null;
   }
-  const refreshed = await loadStudent(input.studentId);
-  const daycareId = refreshed?.record.daycareId || loaded.record.daycareId;
-  const reason =
-    note ||
-    `Request for ${input.vehicle === "VAN" ? "van" : "bus"} entered by ${user.name}.`;
+  if (!loaded || loaded.record.schoolId !== user.schoolId) {
+    return {
+      ok: false as const,
+      error: "Find this student on Front Desk first, then submit the request.",
+    };
+  }
 
-  for (const trip of input.trips) {
+  await prisma.student.update({
+    where: { id: loaded.record.id },
+    data: {
+      firstName,
+      lastName,
+      grade,
+      parentPhone,
+    },
+  });
+  await prisma.$executeRaw`
+    UPDATE "Student"
+    SET "parentEmail" = ${parentEmail},
+        "emergencyName" = ${emergency},
+        "emergencyPhone" = ${emergency}
+    WHERE "id" = ${loaded.record.id}
+  `.catch(() => undefined);
+  if (address) {
+    await prisma.address
+      .update({
+        where: { id: loaded.record.homeAddressId },
+        data: { line1: address },
+      })
+      .catch(() => undefined);
+  }
+  if (teacherName) {
+    await prisma.teacher
+      .updateMany({
+        where: { classroomId: loaded.effective.classroomId },
+        data: { name: teacherName },
+      })
+      .catch(() => undefined);
+  }
+
+  const reason = `Request for route entered by ${user.name}.`;
+  for (const trip of ["AM", "PM"] as const) {
     await prisma.transportationAssignment.upsert({
-      where: { studentId_trip: { studentId: input.studentId, trip } },
+      where: { studentId_trip: { studentId: loaded.record.id, trip } },
       create: {
-        studentId: input.studentId,
+        studentId: loaded.record.id,
         trip,
         type: "BUS",
-        destination: input.destination,
+        destination: "HOME",
         busRouteId: null,
-        daycareId: input.destination === "DAYCARE" ? daycareId : null,
-        customAddressId: customAddressId ?? null,
         waitingForAssignment: true,
         notes: reason,
         effectiveStart: new Date(),
@@ -334,10 +353,8 @@ export async function requestRoute(input: RouteRequestInput) {
       },
       update: {
         type: "BUS",
-        destination: input.destination,
+        destination: "HOME",
         busRouteId: null,
-        daycareId: input.destination === "DAYCARE" ? daycareId : null,
-        customAddressId: customAddressId ?? null,
         waitingForAssignment: true,
         notes: reason,
         updatedById: user.id,
@@ -345,40 +362,34 @@ export async function requestRoute(input: RouteRequestInput) {
     });
   }
 
-  const after = await loadStudent(input.studentId);
+  const after = await loadStudent(loaded.record.id);
   const student = after?.effective ?? loaded.effective;
-  const address =
-    input.destination === "CUSTOM"
-      ? input.customAddress?.trim() || student.homeAddress
-      : input.destination === "DAYCARE"
-        ? [student.daycareName, student.daycareAddress].filter(Boolean).join(" · ")
-        : student.homeAddress;
+  student.parentEmail = parentEmail;
+  student.parentPhone = parentPhone;
+  student.teacherName = teacherName || student.teacherName;
 
   await prisma.changeRequest
     .create({
       data: {
         schoolId: user.schoolId,
-        studentId: input.studentId,
-        trip: input.trips.join("+"),
+        studentId: loaded.record.id,
+        trip: "AM+PM",
         source: user.role,
-        title: `Request for ${input.vehicle === "VAN" ? "van" : "bus"} — ${student.fullName}`,
+        title: `Request for route — ${firstName} ${lastName}`,
         details: [
-          `Need: ${input.vehicle === "VAN" ? "van" : "bus"}`,
+          `Grade ${grade}`,
+          teacherName,
+          parentPhone,
+          parentEmail,
           address,
-          note,
-          "Stays on Request for Route until Front Desk enters the assigned number.",
+          emergency,
           `Entered by ${user.name}.`,
         ]
           .filter(Boolean)
-          .join(" "),
+          .join(" · "),
         status: "PENDING",
         busNumber: null,
-        payload: JSON.stringify({
-          kind: "ROUTE_REQUEST",
-          vehicle: input.vehicle,
-          destination: input.destination,
-          trips: input.trips,
-        }),
+        payload: JSON.stringify({ kind: "ROUTE_REQUEST" }),
         createdById: user.id,
       },
     })
@@ -391,21 +402,18 @@ export async function requestRoute(input: RouteRequestInput) {
   const notice = await notifyRouteRequest({
     user,
     student,
-    trips: input.trips,
-    vehicle: input.vehicle,
-    destination: input.destination,
     address,
-    note,
+    emergency,
   });
 
   return {
     ok: true as const,
     waiting: true,
     message: [
-      "Requested a route from the bus company.",
+      "Request sent.",
       notice.sent.length ? `Emailed ${notice.sent.join(", ")}.` : "",
       notice.skipped.length ? `Could not email ${notice.skipped.join(", ")}.` : "",
-      "The student stays on Request for Route until you enter the bus or van they assign.",
+      "The student stays here until Front Desk enters the assigned bus or van.",
     ]
       .filter(Boolean)
       .join(" "),

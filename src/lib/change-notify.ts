@@ -195,61 +195,83 @@ export async function notifyTransportationChange(args: {
 export async function notifyRouteRequest(args: {
   user: SessionUser;
   student: EffectiveStudent;
-  trips: Trip[];
-  vehicle: "BUS" | "VAN";
-  destination: string;
   address: string;
-  note: string;
+  emergency: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
-  const vehicle = args.vehicle === "VAN" ? "van" : "bus";
-  const text = [
+  const details = [
+    `Student: ${args.student.fullName} (${args.student.studentId})`,
+    `Grade ${args.student.grade}`,
+    `Teacher: ${args.student.teacherName}`,
+    `Parent phone: ${args.student.parentPhone || "—"}`,
+    `Parent email: ${args.student.parentEmail || "—"}`,
+    `Address: ${args.address || args.student.homeAddress || "—"}`,
+    args.emergency ? `Emergency contact: ${args.emergency}` : "",
+    `Requested by: ${args.user.name}`,
+  ].filter(Boolean);
+
+  const companyText = [
     "AMPM Flow — request for route",
     "",
-    `Please assign a ${vehicle} for this student and email or call the school with the number.`,
+    "Please assign a bus or van for this student, then email or call the school with the number.",
     "Front Desk will update the student after you confirm.",
     "",
-    `Student: ${args.student.fullName} (${args.student.studentId})`,
-    `Grade ${args.student.grade} · ${args.student.teacherName}`,
-    `Trip: ${args.trips.join(" and ")}`,
-    `Need: ${vehicle}`,
-    `Destination: ${args.destination}`,
-    args.address ? `Address: ${args.address}` : "",
-    args.student.parentName ? `Parent: ${args.student.parentName}` : "",
-    args.student.parentPhone ? `Parent phone: ${args.student.parentPhone}` : "",
-    args.student.parentEmail ? `Parent email: ${args.student.parentEmail}` : "",
-    args.note ? `Note: ${args.note}` : "",
-    `Requested by: ${args.user.name}`,
+    ...details,
+  ].join("\n");
+
+  const parentText = [
+    "AMPM Flow",
     "",
-    "The student stays on Request for Route until a bus or van is assigned.",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
-  const to = await opsEmails(args.user.schoolId, []);
-  if (!to.length) skipped.push("bus company (add an email on Today’s Changes)");
+    `We requested a bus or van for ${args.student.fullName}.`,
+    "The bus company will assign a route and the school will update you when the number is on file.",
+    "",
+    ...details,
+  ].join("\n");
+
+  const parent = uniqueEmails([args.student.parentEmail]);
+  const company = await opsEmails(args.user.schoolId, parent);
+  if (!parent.length) skipped.push("parent (email required)");
+  if (!company.length) skipped.push("bus company (add an email on Today’s Changes)");
   if (!smtpConfigured()) {
     return { sent, skipped: [...skipped, "email is not configured"], waiting: true };
   }
-  if (to.length) {
+
+  const groups = [
+    {
+      label: "parent",
+      to: parent,
+      subject: `Bus request for ${args.student.fullName}`,
+      text: parentText,
+    },
+    {
+      label: "bus company",
+      to: company,
+      subject: `Request for route — ${args.student.fullName}`,
+      text: companyText,
+    },
+  ];
+
+  for (const group of groups) {
+    if (!group.to.length) continue;
     const result = await sendMail({
-      to,
-      subject: `Request for ${vehicle} — ${args.student.fullName}`,
-      text,
-      html: changeNoticeHtml(text),
+      to: group.to,
+      subject: group.subject,
+      text: group.text,
+      html: changeNoticeHtml(group.text),
     });
     if (result.sent) {
-      sent.push(...to.map((email) => `bus company: ${email}`));
+      sent.push(...group.to.map((email) => `${group.label}: ${email}`));
     } else {
-      skipped.push(`bus company (${result.reason})`);
+      skipped.push(`${group.label} (${result.reason})`);
     }
   }
+
   await writeAudit({
     user: args.user,
     studentId: args.student.id,
     action: "EMAIL_ROUTE_REQUEST",
-    trip: args.trips.join("+"),
-    newPlan: { sent, skipped, vehicle: args.vehicle },
+    newPlan: { sent, skipped },
   }).catch(() => undefined);
   return { sent, skipped, waiting: true };
 }

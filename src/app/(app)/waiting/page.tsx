@@ -1,74 +1,107 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
-import { planSummary } from "@/lib/format";
+import { RouteRequestForm } from "./RouteRequestForm";
 
-export default async function WaitingPage() {
+export default async function WaitingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ student?: string }>;
+}) {
   const session = await getSession();
   if (!session) return null;
-  const waiting = (await loadStudents(session.schoolId)).filter(
-    (s) =>
-      s.am.waitingForAssignment ||
-      s.pm.waitingForAssignment ||
-      s.am.source === "MISSING" ||
-      s.pm.source === "MISSING" ||
-      (s.am.type === "BUS" && !s.am.busNumber) ||
-      (s.pm.type === "BUS" && !s.pm.busNumber),
-  );
+  const { student: selectedId = "" } = await searchParams;
+  const students = await loadStudents(session.schoolId);
+  const pending = await prisma.changeRequest.findMany({
+    where: {
+      schoolId: session.schoolId,
+      status: "PENDING",
+      title: { contains: "Request for route" },
+    },
+    include: {
+      student: {
+        select: { id: true, firstName: true, lastName: true, grade: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
 
   return (
-    <div className="space-y-4">
-      <h1 className="font-serif text-4xl">Request for Route</h1>
-      <p className="max-w-2xl text-muted">
-        Students waiting for a bus or van. Front Desk emails the company from
-        the student card. When the company emails or calls with the number,
-        open the student and enter it. They stay here until that happens.
-      </p>
-      <a
-        href="/print/export?kind=missing"
-        className="inline-block rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold"
-      >
-        Download Excel
-      </a>
-      {waiting.length ? (
-        <div className="overflow-hidden rounded-2xl border border-line bg-card">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-paper text-muted">
-              <tr>
-                <th className="px-4 py-3">Student</th>
-                <th>Teacher</th>
-                <th>AM</th>
-                <th>PM</th>
-                <th>Address</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {waiting.map((student) => (
-                <tr key={student.id} className="row-red border-t border-line">
-                  <td className="px-4 py-3 font-medium">{student.fullName}</td>
-                  <td>{student.teacherName}</td>
-                  <td>{planSummary(student.am, "AM")}</td>
-                  <td>{planSummary(student.pm, "PM")}</td>
-                  <td>{student.homeAddress}</td>
-                  <td className="px-4">
-                    <Link
-                      href={`/dashboard?student=${student.id}`}
-                      className="font-semibold text-blue"
-                    >
-                      Open / assign
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-          No route requests right now.
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-serif text-4xl">Request for Route</h1>
+        <p className="mt-2 max-w-2xl text-muted">
+          Submit a student to the bus company. The parent is emailed now. The
+          student stays on this list until the company emails or calls with a
+          bus or van, then Front Desk enters it.
         </p>
-      )}
+      </div>
+
+      <RouteRequestForm
+        initialId={selectedId}
+        students={students.map((student) => ({
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          grade: student.grade,
+          teacherName: student.teacherName,
+          parentPhone: student.parentPhone,
+          parentEmail: student.parentEmail,
+          address: student.homeAddress,
+          emergencyContact: [student.emergencyName, student.emergencyPhone]
+            .filter(Boolean)
+            .join(" · "),
+        }))}
+      />
+
+      <section>
+        <h2 className="font-serif text-2xl">Waiting for a bus or van</h2>
+        {pending.length ? (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-paper text-muted">
+                <tr>
+                  <th className="px-4 py-3">Student</th>
+                  <th>Details</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {pending.map((row) => (
+                  <tr key={row.id} className="row-red border-t border-line">
+                    <td className="px-4 py-3 font-medium">
+                      {row.student
+                        ? `${row.student.firstName} ${row.student.lastName}`
+                        : row.title}
+                      {row.student ? (
+                        <div className="text-xs text-muted">
+                          Grade {row.student.grade}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="max-w-md text-muted">{row.details}</td>
+                    <td className="px-4">
+                      {row.studentId ? (
+                        <Link
+                          href={`/dashboard?student=${row.studentId}`}
+                          className="font-semibold text-blue"
+                        >
+                          Assign bus
+                        </Link>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
+            No submitted requests yet.
+          </p>
+        )}
+      </section>
     </div>
   );
 }
