@@ -18,22 +18,25 @@ export default async function ContactPage({
   return (
     <LoginFrame variant="signup">
       <div>
-        <h2 className="text-lg font-semibold text-navy short-h:text-base">
-          Contact AMPM Flow
-        </h2>
-        <p className="mt-0.5 text-sm text-[#7b8490]">
-          Leave a message for the AMPM Flow administrator. Schools cannot add
-          themselves. Only the AMPM Flow administrator can add a school.
-        </p>
         {sent === "1" ? (
-          <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-navy">
-            Your message was sent to AMPM Flow. The administrator will follow
-            up if a school should be set up.
-          </p>
+          <>
+            <h2 className="text-lg font-semibold text-navy short-h:text-base">
+              Thank you
+            </h2>
+            <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-navy">
+              Thank you for submitting the form. We will review and contact
+              you.
+            </p>
+          </>
         ) : (
-          <div className="mt-3">
-            <ContactForm error={message} />
-          </div>
+          <>
+            <h2 className="text-lg font-semibold text-navy short-h:text-base">
+              Contact AMPM Flow
+            </h2>
+            <div className="mt-3">
+              <ContactForm error={message} />
+            </div>
+          </>
         )}
         <p className="mt-3 text-center text-sm text-navy">
           Already set up?{" "}
