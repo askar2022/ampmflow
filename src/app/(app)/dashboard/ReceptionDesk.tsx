@@ -15,8 +15,8 @@ function gradeRank(grade: string) {
   return Number.isFinite(number) ? number : 99;
 }
 
-function classLabel(student: EffectiveStudent) {
-  return student.classroomName || student.teacherName || "Unassigned";
+function teacherLabel(student: EffectiveStudent) {
+  return student.teacherName || "No teacher";
 }
 
 function studentBuses(student: EffectiveStudent): string[] {
@@ -39,25 +39,29 @@ function deskRows(
   students: EffectiveStudent[],
   query: string,
   grade: string,
-  classroom: string,
-  bus: string,
+  teacher: string,
+  ride: string,
+  studentVanId: Record<string, string>,
 ) {
   const q = query.trim().toLowerCase().replace(/\s+/g, " ");
   const tokens = q.split(" ").filter(Boolean);
   return students
     .filter((student) => {
       if (grade && student.grade !== grade) return false;
-      if (classroom && classLabel(student) !== classroom) return false;
-      if (bus === "waiting") {
+      if (teacher && teacherLabel(student) !== teacher) return false;
+      if (ride === "waiting") {
         if (
           !student.am.waitingForAssignment &&
           !student.pm.waitingForAssignment &&
           student.am.busNumber &&
-          student.pm.busNumber
+          student.pm.busNumber &&
+          !studentVanId[student.id]
         ) {
           return false;
         }
-      } else if (bus && !studentBuses(student).includes(bus)) {
+      } else if (ride.startsWith("van:")) {
+        if (studentVanId[student.id] !== ride.slice(4)) return false;
+      } else if (ride && !studentBuses(student).includes(ride)) {
         return false;
       }
       if (!q) return true;
@@ -76,8 +80,8 @@ function deskRows(
     .sort((a, b) => {
       const byGrade = gradeRank(a.grade) - gradeRank(b.grade);
       if (byGrade) return byGrade;
-      const byClass = classLabel(a).localeCompare(classLabel(b));
-      if (byClass) return byClass;
+      const byTeacher = teacherLabel(a).localeCompare(teacherLabel(b));
+      if (byTeacher) return byTeacher;
       const busA = studentBuses(a)[0] || "";
       const busB = studentBuses(b)[0] || "";
       const byBus = busA.localeCompare(busB, undefined, { numeric: true });
@@ -144,12 +148,16 @@ function formFromStudent(student: DeskStudent | undefined) {
 export function ReceptionDesk({
   students,
   buses,
+  vans = [],
+  studentVanId = {},
   canPermanent,
   canSeeEmergency,
   initialStudentId = "",
 }: {
   students: DeskStudent[];
   buses: string[];
+  vans?: { id: string; name: string }[];
+  studentVanId?: Record<string, string>;
   canPermanent: boolean;
   canSeeEmergency: boolean;
   initialStudentId?: string;
@@ -158,8 +166,8 @@ export function ReceptionDesk({
   const initial = formFromStudent(students.find((row) => row.id === initialStudentId));
   const [query, setQuery] = useState(() => startingQuery(students, initialStudentId));
   const [grade, setGrade] = useState("");
-  const [classroom, setClassroom] = useState("");
-  const [bus, setBus] = useState("");
+  const [teacher, setTeacher] = useState("");
+  const [ride, setRide] = useState("");
   const [selectedId, setSelectedId] = useState(initialStudentId);
   const [openForm, setOpenForm] = useState(false);
   const [destination, setDestination] = useState<Destination>(initial.destination);
@@ -187,8 +195,8 @@ export function ReceptionDesk({
       ),
     [students],
   );
-  const classes = useMemo(
-    () => uniqueSorted(students.map((student) => classLabel(student))),
+  const teachers = useMemo(
+    () => uniqueSorted(students.map((student) => teacherLabel(student))),
     [students],
   );
   const busChoices = useMemo(
@@ -200,10 +208,10 @@ export function ReceptionDesk({
     [buses, students],
   );
   const filtered = useMemo(
-    () => deskRows(students, query, grade, classroom, bus),
-    [students, query, grade, classroom, bus],
+    () => deskRows(students, query, grade, teacher, ride, studentVanId),
+    [students, query, grade, teacher, ride, studentVanId],
   );
-  const browsing = Boolean(query.trim() || grade || classroom || bus);
+  const browsing = Boolean(query.trim() || grade || teacher || ride);
   const matches = browsing ? filtered.slice(0, 80) : [];
   const selected = students.find((student) => student.id === selectedId) || null;
 
@@ -311,41 +319,46 @@ export function ReceptionDesk({
               ))}
             </select>
           </label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-44">
-            Class
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-48">
+            Teacher
             <select
-              value={classroom}
+              value={teacher}
               onChange={(event) => {
-                setClassroom(event.target.value);
+                setTeacher(event.target.value);
                 setSelectedId("");
                 setOpenForm(false);
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
-              <option value="">All classes</option>
-              {classes.map((item) => (
+              <option value="">All teachers</option>
+              {teachers.map((item) => (
                 <option key={item} value={item}>
                   {item}
                 </option>
               ))}
             </select>
           </label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-40">
-            Bus
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-44">
+            Bus or van
             <select
-              value={bus}
+              value={ride}
               onChange={(event) => {
-                setBus(event.target.value);
+                setRide(event.target.value);
                 setSelectedId("");
                 setOpenForm(false);
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
-              <option value="">All buses</option>
+              <option value="">All buses and vans</option>
               <option value="waiting">Request for route</option>
               {busChoices.map((item) => (
-                <option key={item} value={item}>
+                <option key={`bus-${item}`} value={item}>
                   Bus {item}
+                </option>
+              ))}
+              {vans.map((van) => (
+                <option key={van.id} value={`van:${van.id}`}>
+                  {van.name}
                 </option>
               ))}
             </select>
@@ -365,13 +378,16 @@ export function ReceptionDesk({
                 <span>
                   <span className="font-semibold">{student.fullName}</span>
                   <span className="ml-2 text-sm text-muted">
-                    Grade {student.grade} · {classLabel(student)}
+                    Grade {student.grade} · {teacherLabel(student)}
                   </span>
                 </span>
                 <span className="text-sm text-muted">
-                  {studentBuses(student).length
-                    ? studentBuses(student).map((number) => `Bus ${number}`).join(" · ")
-                    : "No bus"}
+                  {[
+                    ...studentBuses(student).map((number) => `Bus ${number}`),
+                    vans.find((van) => van.id === studentVanId[student.id])?.name,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "No bus or van"}
                 </span>
               </button>
             </li>
@@ -396,8 +412,8 @@ export function ReceptionDesk({
             <div>
               <h2 className="font-serif text-3xl">{selected.fullName}</h2>
               <p className="mt-1 text-muted">
-                {selected.studentId} · Grade {selected.grade} · {selected.teacherName}
-                {selected.classroomName ? ` · ${selected.classroomName}` : ""}
+                {selected.studentId} · Grade {selected.grade}
+                {selected.teacherName ? ` · ${selected.teacherName}` : ""}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
