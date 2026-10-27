@@ -240,6 +240,10 @@ export function ReceptionDesk({
 
   function save() {
     if (!selected) return;
+    if (!parentEmail.trim() || !teacherEmail.trim() || !busEmail.trim()) {
+      setError("Parent, teacher, and bus company emails are required.");
+      return;
+    }
     setError("");
     setMessage("");
     startTransition(async () => {
@@ -682,9 +686,10 @@ export function ReceptionDesk({
                   Parent email
                   <input
                     type="email"
+                    required
                     value={parentEmail}
                     onChange={(event) => setParentEmail(event.target.value)}
-                    placeholder="Needed to email the parent now"
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
@@ -692,9 +697,10 @@ export function ReceptionDesk({
                   Teacher email
                   <input
                     type="email"
+                    required
                     value={teacherEmail}
                     onChange={(event) => setTeacherEmail(event.target.value)}
-                    placeholder="Needed to email the teacher now"
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
@@ -702,17 +708,20 @@ export function ReceptionDesk({
                   Bus company email
                   <input
                     type="email"
+                    required
                     value={busEmail}
                     onChange={(event) => setBusEmail(event.target.value)}
-                    placeholder="Needed to email the bus company now"
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
               </div>
               <p className="text-sm text-muted">
-                These three get this change now. At 2:30 p.m. one list of all
-                today’s changes goes again to the bus company, those teachers,
-                and leadership.
+                These three must get this change now. Anyone you add on Today’s
+                Changes (bus coordinator or leadership) also gets it if they
+                want to know. At 2:30 p.m. one list of all today’s changes goes
+                again to the bus, those teachers, and leadership — only if
+                someone changed.
               </p>
 
               <label className="block text-sm font-semibold">

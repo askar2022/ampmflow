@@ -11,7 +11,7 @@ import {
   notifyTransportationChange,
   planLine,
 } from "@/lib/change-notify";
-import { addOpsEmail } from "@/lib/ops-change-emails";
+import { addOpsEmail, usableOpsEmail } from "@/lib/ops-change-emails";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
 
@@ -116,10 +116,20 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   const busNumber = input.busNumber?.replace(/^Bus\s+/i, "").trim() || "";
   const waiting = !busNumber;
   const note = input.note?.trim() || "";
-  const parentEmail = input.parentEmail?.trim().toLowerCase() || "";
+  const parentEmail = usableOpsEmail(input.parentEmail || "");
   const teacherEmail = usableTeacherEmail(input.teacherEmail || "");
-  const busCompanyEmail = input.busCompanyEmail?.trim().toLowerCase() || "";
+  const busCompanyEmail = usableOpsEmail(input.busCompanyEmail || "");
   const previous = planLine(loaded.effective, input.trips);
+
+  if (!parentEmail) {
+    return { ok: false as const, error: "Parent email is required." };
+  }
+  if (!teacherEmail) {
+    return { ok: false as const, error: "Teacher email is required." };
+  }
+  if (!busCompanyEmail) {
+    return { ok: false as const, error: "Bus company email is required." };
+  }
 
   if (parentEmail) {
     await prisma.$executeRaw`

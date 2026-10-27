@@ -1,7 +1,7 @@
 import { writeAudit } from "./audit";
 import { sendMail, smtpConfigured } from "./email";
 import { planSummary } from "./format";
-import { usableOpsEmail } from "./ops-change-emails";
+import { loadSavedOpsEmails, usableOpsEmail } from "./ops-change-emails";
 import { prisma } from "./prisma";
 import { usableTeacherEmail } from "./teacher-snapshot";
 import type { EffectiveStudent, SessionUser, Trip } from "./types";
@@ -102,6 +102,24 @@ async function teacherEmails(classroomId: string, extra?: string) {
   ]);
 }
 
+async function leadershipEmails(schoolId: string, already: string[]) {
+  const [saved, users] = await Promise.all([
+    loadSavedOpsEmails(schoolId),
+    prisma.user.findMany({
+      where: {
+        schoolId,
+        active: true,
+        role: { in: ["COORDINATOR", "ADMINISTRATOR"] },
+      },
+      select: { email: true },
+    }),
+  ]);
+  const used = new Set(already);
+  return uniqueEmails([...saved, ...users.map((user) => user.email)]).filter(
+    (email) => !used.has(email),
+  );
+}
+
 export async function notifyTransportationChange(args: {
   user: SessionUser;
   student: EffectiveStudent;
@@ -134,10 +152,15 @@ export async function notifyTransportationChange(args: {
     busCompanyEmails(args.user.schoolId, args.busCompanyEmail),
   ]);
   const parent = uniqueEmails([args.student.parentEmail]);
+  const leadership = await leadershipEmails(args.user.schoolId, [
+    ...parent,
+    ...teachers,
+    ...buses,
+  ]);
 
-  if (!parent.length) skipped.push("parent (no email on file)");
-  if (!teachers.length) skipped.push("teacher (no email on file)");
-  if (!buses.length) skipped.push("bus company (no email on file)");
+  if (!parent.length) skipped.push("parent (required)");
+  if (!teachers.length) skipped.push("teacher (required)");
+  if (!buses.length) skipped.push("bus company (required)");
 
   if (!smtpConfigured()) {
     return {
@@ -151,6 +174,7 @@ export async function notifyTransportationChange(args: {
     { label: "parent", to: parent },
     { label: "teacher", to: teachers },
     { label: "bus", to: buses },
+    { label: "leadership", to: leadership },
   ];
 
   for (const group of groups) {

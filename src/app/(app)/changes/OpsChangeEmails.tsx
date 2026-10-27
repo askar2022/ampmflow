@@ -26,10 +26,10 @@ export function OpsChangeEmails({
     <section className="rounded-2xl border border-line bg-card p-5">
       <h2 className="text-xl font-semibold text-navy">Daily change emails</h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Extra people for the {sendAt} reminder (leadership or a backup
-        coordinator). The bus company and the teachers of students who changed
-        are added automatically. If nobody changed, no email goes out — not to
-        the bus company, not to parents.
+        Add a bus coordinator or leadership email here if they want to know
+        when a change happens. They get each change now, and the {sendAt} list
+        if anyone changed. Parent, teacher, and bus company are required on
+        Front Desk and are always emailed.
       </p>
       {emails.length ? (
         <ul className="mt-4 space-y-2">
