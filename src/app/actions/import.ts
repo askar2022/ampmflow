@@ -44,6 +44,10 @@ function cell(row: Row, ...keys: string[]) {
 }
 
 function parentNameFromRow(row: Row, email: string) {
+  const first = cell(row, "parent_first_name", "parent first name", "guardian first name");
+  const last = cell(row, "parent_last_name", "parent last name", "guardian last name");
+  if (first || last) return [first, last].filter(Boolean).join(" ");
+
   const headers = Object.keys(row);
   const wanted = [
     "parent/guardian",
@@ -55,7 +59,6 @@ function parentNameFromRow(row: Row, email: string) {
     "father name",
     "primary contact",
     "contact name",
-    "parent",
   ];
   for (const key of wanted) {
     const match = headers.find((header) => {
@@ -63,7 +66,9 @@ function parentNameFromRow(row: Row, email: string) {
       if (
         name.includes("email") ||
         name.includes("phone") ||
-        name.includes("address")
+        name.includes("address") ||
+        name.includes("first") ||
+        name.includes("last")
       ) {
         return false;
       }
@@ -73,6 +78,24 @@ function parentNameFromRow(row: Row, email: string) {
     if (value && !value.includes("@")) return value;
   }
   return parentNameFromEmail(email) || "—";
+}
+
+function splitHomeAddress(raw: string) {
+  const value = raw.trim();
+  const parts = value.split(",").map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 3) {
+    const tail = parts[parts.length - 1];
+    const stateZip = tail.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+    if (stateZip) {
+      return {
+        line1: parts.slice(0, -2).join(", "),
+        city: parts[parts.length - 2],
+        state: stateZip[1].toUpperCase(),
+        zip: stateZip[2],
+      };
+    }
+  }
+  return { line1: value || "Address pending", city: "", state: "", zip: "" };
 }
 
 function parseType(value: string): "BUS" | "PARENT" | null {
@@ -107,6 +130,15 @@ const HEADER_ALIASES = new Set([
   "student last name",
   "grade",
   "teacher",
+  "teacher_name",
+  "teacher name",
+  "transportation_type",
+  "vehicle_name",
+  "parent_first_name",
+  "parent_last_name",
+  "parent_email",
+  "parent_phone",
+  "home_address",
   "classroom",
   "room",
   "am",
@@ -473,26 +505,48 @@ export async function importStudents(formData: FormData) {
     const teacherName =
       cell(
         row,
-        "teacher",
+        "teacher_name",
         "teacher name",
+        "teacher",
         "homeroom teacher",
         "classroom teacher",
       ) || "Unassigned";
     const parentPhone =
-      cell(row, "primary phone", "parent_phone", "phone") || "—";
+      cell(row, "primary phone", "parent_phone", "parent phone", "phone") || "—";
     const parentEmail =
       cell(row, "parent email", "parent_email", "email", "guardian email") || "";
     const parentName = parentNameFromRow(row, parentEmail);
-    const homeLine = cell(row, "home_address", "address") || "Address pending";
-    const city = cell(row, "home_city", "city") || "Minneapolis";
-    const state = cell(row, "home_state", "state") || "MN";
-    const zip = cell(row, "home_zip", "zip code", "zip") || "";
+    const parsedAddress = splitHomeAddress(
+      cell(row, "home_address", "address") || "",
+    );
+    const homeLine =
+      parsedAddress.line1 ||
+      cell(row, "home_address", "address") ||
+      "Address pending";
+    const city =
+      cell(row, "home_city", "city") || parsedAddress.city || "Minneapolis";
+    const state = cell(row, "home_state", "state") || parsedAddress.state || "MN";
+    const zip = cell(row, "home_zip", "zip code", "zip") || parsedAddress.zip || "";
+    const transportType = cell(
+      row,
+      "transportation_type",
+      "transport type",
+      "ride type",
+    );
+    const vehicleName = cell(row, "vehicle_name", "vehicle name");
     const sharedBus = cell(row, "bus number", "bus", "route");
+    const rideValue =
+      vehicleName ||
+      cell(row, "am_type", "am bus", "am route", "morning", "am") ||
+      sharedBus ||
+      transportType;
     const amPlan = parsePlan(
-      cell(row, "am_type", "am bus", "am route", "morning", "am") || sharedBus,
+      /van/i.test(transportType) || /van/i.test(vehicleName)
+        ? vehicleName || transportType
+        : rideValue,
     );
     const pmPlan = parsePlan(
-      cell(row, "pm_type", "pm bus", "pm route", "afternoon", "pm") || sharedBus,
+      cell(row, "pm_type", "pm bus", "pm route", "afternoon", "pm") || rideValue,
     );
     let daycareName = cell(row, "daycare_name", "daycare");
     if (!daycareName && (amPlan.dest === "DAYCARE" || pmPlan.dest === "DAYCARE")) {
@@ -501,13 +555,20 @@ export async function importStudents(formData: FormData) {
     const daycareAddress = cell(row, "daycare_address");
     const notes = cell(row, "notes");
     const vanName =
-      cell(row, "van", "van name", "vehicle", "van number") ||
-      (amPlan.type === "VAN" ? amPlan.van : "") ||
-      (pmPlan.type === "VAN" ? pmPlan.van : "");
-    const amType = amPlan.type === "VAN" ? "VAN" : parseType(cell(row, "am_type")) || amPlan.type;
-    const pmType = pmPlan.type === "VAN" ? "VAN" : parseType(cell(row, "pm_type")) || pmPlan.type;
-    const amBus = cell(row, "am_bus", "am bus") || amPlan.bus;
-    const pmBus = cell(row, "pm_bus", "pm bus") || pmPlan.bus;
+      /van/i.test(transportType) || /van/i.test(vehicleName) || amPlan.type === "VAN"
+        ? vehicleName || amPlan.van || pmPlan.van || "Van 1"
+        : "";
+    const amType = vanName
+      ? "VAN"
+      : parseType(transportType) || parseType(cell(row, "am_type")) || amPlan.type;
+    const pmType = vanName
+      ? "VAN"
+      : parseType(transportType) || parseType(cell(row, "pm_type")) || pmPlan.type || amType;
+    const amBus =
+      cell(row, "am_bus", "am bus") ||
+      amPlan.bus ||
+      (/bus/i.test(vehicleName) ? vehicleName.replace(/^Bus\s+/i, "") : "");
+    const pmBus = cell(row, "pm_bus", "pm bus") || pmPlan.bus || amBus;
     const amDest =
       cell(row, "am_destination").toUpperCase() || amPlan.dest || "HOME";
     const pmDest =
@@ -843,6 +904,8 @@ export async function importStudents(formData: FormData) {
         });
         revalidatePath("/students");
         revalidatePath("/dashboard");
+        revalidatePath("/buses");
+        revalidatePath("/print");
         revalidatePath("/gate");
         revalidatePath("/first-day");
       })
