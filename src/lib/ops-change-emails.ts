@@ -18,6 +18,7 @@ import {
 } from "./policy";
 import { prisma } from "./prisma";
 import { changeList, groupByTeacher, stamp } from "./reports";
+import { usableTeacherEmail } from "./teacher-snapshot";
 import { loadStudents } from "./transportation";
 import type { EffectiveStudent } from "./types";
 
@@ -311,6 +312,42 @@ async function alreadySent(schoolId: string, dateKey: string) {
   });
 }
 
+export async function digestRecipients(
+  schoolId: string,
+  changed: EffectiveStudent[],
+) {
+  const [saved, users] = await Promise.all([
+    loadSavedOpsEmails(schoolId),
+    prisma.user.findMany({
+      where: {
+        schoolId,
+        active: true,
+        role: { in: ["BUS_COMPANY", "COORDINATOR", "ADMINISTRATOR"] },
+      },
+      select: { email: true },
+    }),
+  ]);
+  return parseEmailList(
+    [
+      ...saved,
+      process.env.BUS_COMPANY_EMAIL || "",
+      ...users.map((user) => user.email),
+      ...changed.map((student) => usableTeacherEmail(student.teacherEmail)),
+    ].join("\n"),
+  );
+}
+
+export async function defaultBusCompanyEmail(schoolId: string) {
+  const users = await prisma.user.findMany({
+    where: { schoolId, active: true, role: "BUS_COMPANY" },
+    select: { email: true },
+  });
+  const fromUsers = users.map((user) => usableOpsEmail(user.email)).find(Boolean);
+  if (fromUsers) return fromUsers;
+  const saved = await loadSavedOpsEmails(schoolId);
+  return usableOpsEmail(process.env.BUS_COMPANY_EMAIL || "") || saved[0] || "";
+}
+
 export async function lastOpsChangeEmail(schoolId: string) {
   return prisma.auditLog.findFirst({
     where: { schoolId, action: { in: ["EMAIL_OPS_CHANGES", "EMAIL_OPS_CHANGES_NOW"] } },
@@ -332,13 +369,16 @@ export async function sendOpsChangeDigest(args: {
     return { ok: true, sent: 0, alreadySent: true, recipients: [] };
   }
 
-  const recipients = await loadSavedOpsEmails(args.schoolId);
+  const students = await loadStudents(args.schoolId);
+  const groups = classroomGroups(students);
+  const changed = groups.flatMap(([, rows]) => rows);
+  const recipients = await digestRecipients(args.schoolId, changed);
   if (!recipients.length) {
     return {
       ok: false,
       sent: 0,
       recipients,
-      error: "Add emails on Today’s Changes first.",
+      error: "Add a bus, teacher, or leadership email first.",
     };
   }
 
@@ -351,8 +391,6 @@ export async function sendOpsChangeDigest(args: {
     };
   }
 
-  const students = await loadStudents(args.schoolId);
-  const groups = classroomGroups(students);
   const header = stamp();
   const when = opsChangesClockLabel();
   const text = opsChangesText({

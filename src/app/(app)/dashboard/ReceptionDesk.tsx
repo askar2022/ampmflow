@@ -136,18 +136,21 @@ function formFromStudent(student: DeskStudent | undefined) {
     daycareAddress: student?.daycareAddress || "",
     daycarePhone: student?.daycarePhone || "",
     parentEmail: student?.parentEmail || "",
+    teacherEmail: student?.teacherEmail || "",
   };
 }
 
 export function ReceptionDesk({
   students,
   buses,
+  busCompanyEmail = "",
   canPermanent,
   canSeeEmergency,
   initialStudentId = "",
 }: {
   students: DeskStudent[];
   buses: string[];
+  busCompanyEmail?: string;
   canPermanent: boolean;
   canSeeEmergency: boolean;
   initialStudentId?: string;
@@ -171,6 +174,8 @@ export function ReceptionDesk({
   const [daycareAddress, setDaycareAddress] = useState(initial.daycareAddress);
   const [daycarePhone, setDaycarePhone] = useState(initial.daycarePhone);
   const [parentEmail, setParentEmail] = useState(initial.parentEmail);
+  const [teacherEmail, setTeacherEmail] = useState(initial.teacherEmail);
+  const [busEmail, setBusEmail] = useState(busCompanyEmail);
   const [note, setNote] = useState("");
   const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [message, setMessage] = useState("");
@@ -218,6 +223,8 @@ export function ReceptionDesk({
     setDaycareAddress(next.daycareAddress);
     setDaycarePhone(next.daycarePhone);
     setParentEmail(next.parentEmail);
+    setTeacherEmail(next.teacherEmail);
+    setBusEmail(busCompanyEmail);
     setNote("");
     setConfirmPermanent(false);
   }
@@ -249,6 +256,8 @@ export function ReceptionDesk({
         daycareAddress,
         daycarePhone,
         parentEmail,
+        teacherEmail,
+        busCompanyEmail: busEmail,
         note,
         confirmPermanent,
       });
@@ -668,16 +677,43 @@ export function ReceptionDesk({
                 </div>
               ) : null}
 
-              <label className="block text-sm font-semibold">
-                Parent email
-                <input
-                  type="email"
-                  value={parentEmail}
-                  onChange={(event) => setParentEmail(event.target.value)}
-                  placeholder="Needed to email the parent now"
-                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                />
-              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block text-sm font-semibold">
+                  Parent email
+                  <input
+                    type="email"
+                    value={parentEmail}
+                    onChange={(event) => setParentEmail(event.target.value)}
+                    placeholder="Needed to email the parent now"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Teacher email
+                  <input
+                    type="email"
+                    value={teacherEmail}
+                    onChange={(event) => setTeacherEmail(event.target.value)}
+                    placeholder="Needed to email the teacher now"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Bus company email
+                  <input
+                    type="email"
+                    value={busEmail}
+                    onChange={(event) => setBusEmail(event.target.value)}
+                    placeholder="Needed to email the bus company now"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+              </div>
+              <p className="text-sm text-muted">
+                These three get this change now. At 2:30 p.m. one list of all
+                today’s changes goes again to the bus company, those teachers,
+                and leadership.
+              </p>
 
               <label className="block text-sm font-semibold">
                 Note (optional)

@@ -1,7 +1,7 @@
 import { writeAudit } from "./audit";
 import { sendMail, smtpConfigured } from "./email";
 import { planSummary } from "./format";
-import { loadSavedOpsEmails, usableOpsEmail } from "./ops-change-emails";
+import { usableOpsEmail } from "./ops-change-emails";
 import { prisma } from "./prisma";
 import { usableTeacherEmail } from "./teacher-snapshot";
 import type { EffectiveStudent, SessionUser, Trip } from "./types";
@@ -79,27 +79,27 @@ function changeNoticeHtml(text: string) {
 </html>`;
 }
 
-async function busCompanyEmails(schoolId: string) {
-  const [saved, users] = await Promise.all([
-    loadSavedOpsEmails(schoolId),
-    prisma.user.findMany({
-      where: { schoolId, active: true, role: { in: ["BUS_COMPANY", "COORDINATOR", "ADMINISTRATOR"] } },
-      select: { email: true, role: true },
-    }),
-  ]);
+async function busCompanyEmails(schoolId: string, extra?: string) {
+  const users = await prisma.user.findMany({
+    where: { schoolId, active: true, role: "BUS_COMPANY" },
+    select: { email: true },
+  });
   return uniqueEmails([
-    ...saved,
+    extra,
     process.env.BUS_COMPANY_EMAIL,
     ...users.map((user) => user.email),
   ]);
 }
 
-async function teacherEmails(classroomId: string) {
+async function teacherEmails(classroomId: string, extra?: string) {
   const teachers = await prisma.teacher.findMany({
     where: { classroomId },
     select: { email: true },
   });
-  return uniqueEmails(teachers.map((teacher) => usableTeacherEmail(teacher.email)));
+  return uniqueEmails([
+    extra,
+    ...teachers.map((teacher) => usableTeacherEmail(teacher.email)),
+  ]);
 }
 
 export async function notifyTransportationChange(args: {
@@ -111,6 +111,8 @@ export async function notifyTransportationChange(args: {
   when: string;
   note: string;
   waiting: boolean;
+  teacherEmail?: string;
+  busCompanyEmail?: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
@@ -128,8 +130,8 @@ export async function notifyTransportationChange(args: {
   const subject = `Transportation change — ${args.student.fullName}`;
 
   const [teachers, buses] = await Promise.all([
-    teacherEmails(args.student.classroomId),
-    busCompanyEmails(args.user.schoolId),
+    teacherEmails(args.student.classroomId, args.teacherEmail),
+    busCompanyEmails(args.user.schoolId, args.busCompanyEmail),
   ]);
   const parent = uniqueEmails([args.student.parentEmail]);
 

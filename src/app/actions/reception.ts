@@ -11,6 +11,8 @@ import {
   notifyTransportationChange,
   planLine,
 } from "@/lib/change-notify";
+import { addOpsEmail } from "@/lib/ops-change-emails";
+import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
 
 export type ReceptionChangeInput = {
@@ -26,6 +28,8 @@ export type ReceptionChangeInput = {
   daycareAddress?: string;
   daycarePhone?: string;
   parentEmail?: string;
+  teacherEmail?: string;
+  busCompanyEmail?: string;
   note?: string;
   confirmPermanent?: boolean;
 };
@@ -113,6 +117,8 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   const waiting = !busNumber;
   const note = input.note?.trim() || "";
   const parentEmail = input.parentEmail?.trim().toLowerCase() || "";
+  const teacherEmail = usableTeacherEmail(input.teacherEmail || "");
+  const busCompanyEmail = input.busCompanyEmail?.trim().toLowerCase() || "";
   const previous = planLine(loaded.effective, input.trips);
 
   if (parentEmail) {
@@ -120,6 +126,18 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
       UPDATE "Student" SET "parentEmail" = ${parentEmail} WHERE "id" = ${input.studentId}
     `.catch(() => undefined);
     loaded.effective.parentEmail = parentEmail;
+  }
+  if (teacherEmail) {
+    await prisma.teacher
+      .updateMany({
+        where: { classroomId: loaded.effective.classroomId },
+        data: { email: teacherEmail },
+      })
+      .catch(() => undefined);
+    loaded.effective.teacherEmail = teacherEmail;
+  }
+  if (busCompanyEmail) {
+    await addOpsEmail(user.schoolId, busCompanyEmail).catch(() => undefined);
   }
 
   if (destination === "CUSTOM" && !input.customAddress?.trim()) {
@@ -216,6 +234,8 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
     when,
     note,
     waiting,
+    teacherEmail,
+    busCompanyEmail,
   });
 
   return {
