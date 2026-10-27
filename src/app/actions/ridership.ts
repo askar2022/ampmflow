@@ -5,7 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { formatLongDate, schoolNow } from "@/lib/dates";
 import { sendMail, smtpConfigured } from "@/lib/email";
 import { usableOpsEmail } from "@/lib/ops-change-emails";
-import { loadRidership, ridershipText } from "@/lib/ridership";
+import { loadDriverLists, oneVehicleText } from "@/lib/ridership";
 
 function parseSendTo(raw: string) {
   return [
@@ -18,7 +18,11 @@ function parseSendTo(raw: string) {
   ];
 }
 
-export async function emailBusVanList(toRaw: string) {
+export async function emailDriverList(args: {
+  to: string;
+  bus?: string;
+  van?: string;
+}) {
   const user = await getSession();
   if (
     !user ||
@@ -29,11 +33,21 @@ export async function emailBusVanList(toRaw: string) {
     return { ok: false as const, error: "You cannot email this list.", recipients: [] as string[] };
   }
 
-  const recipients = parseSendTo(toRaw);
+  const bus = String(args.bus || "").trim();
+  const van = String(args.van || "").trim();
+  if (!bus && !van) {
+    return {
+      ok: false as const,
+      error: "Choose a bus or van first.",
+      recipients: [] as string[],
+    };
+  }
+
+  const recipients = parseSendTo(args.to);
   if (!recipients.length) {
     return {
       ok: false as const,
-      error: "Type the email of the bus company or driver first.",
+      error: "Type the driver or bus company email first.",
       recipients,
     };
   }
@@ -45,20 +59,25 @@ export async function emailBusVanList(toRaw: string) {
     };
   }
 
-  const list = await loadRidership(user.schoolId);
-  if (!list.busRiders && !list.vanRiders) {
+  const lists = await loadDriverLists(user.schoolId);
+  const picked = oneVehicleText({
+    riders: lists.riders,
+    vans: lists.vans,
+    bus: bus || undefined,
+    van: van || undefined,
+  });
+  if (!picked.rows.length) {
     return {
       ok: false as const,
-      error: "No bus or van students to email.",
+      error: "No students on that bus or van yet.",
       recipients,
     };
   }
 
-  const text = ridershipText(list);
   const result = await sendMail({
     to: recipients,
-    subject: `Bus and van list — ${formatLongDate(schoolNow())}`,
-    text,
+    subject: `${picked.title} — ${formatLongDate(schoolNow())}`,
+    text: picked.text,
   });
   if (!result.sent) {
     return {
@@ -70,9 +89,9 @@ export async function emailBusVanList(toRaw: string) {
 
   await writeAudit({
     user,
-    action: "EMAIL_BUS_VAN_LIST",
-    newPlan: { sent: recipients.length, buses: list.buses.length, vans: list.vans.length },
+    action: "EMAIL_DRIVER_LIST",
+    newPlan: { sent: recipients.length, title: picked.title, students: picked.rows.length },
   }).catch(() => undefined);
 
-  return { ok: true as const, recipients };
+  return { ok: true as const, recipients, title: picked.title };
 }

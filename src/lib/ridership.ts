@@ -27,6 +27,31 @@ export type Ridership = {
   vanRiders: number;
 };
 
+export type DriverRider = {
+  id: string;
+  name: string;
+  studentId: string;
+  grade: string;
+  teacherName: string;
+  buses: string[];
+  vanId: string | null;
+};
+
+export type DriverVan = {
+  id: string;
+  name: string;
+};
+
+export function studentBusNumbers(student: EffectiveStudent) {
+  return [
+    ...new Set(
+      [student.am.busNumber, student.pm.busNumber].filter(
+        (value): value is string => Boolean(value),
+      ),
+    ),
+  ];
+}
+
 export async function loadRidership(schoolId: string): Promise<Ridership> {
   const [students, routes, vehicles] = await Promise.all([
     loadStudents(schoolId),
@@ -123,6 +148,69 @@ export function ridershipText(list: Ridership) {
   }
 
   return lines.join("\n");
+}
+
+export async function loadDriverLists(schoolId: string) {
+  const [students, vehicles, vanRows] = await Promise.all([
+    loadStudents(schoolId),
+    loadVehicles(schoolId).catch(() => []),
+    prisma.student.findMany({
+      where: { schoolId, vehicleId: { not: null } },
+      select: { id: true, vehicleId: true },
+    }),
+  ]);
+  const vanByStudent = new Map(
+    vanRows.map((row) => [row.id, row.vehicleId] as const),
+  );
+  const vans = vehicles
+    .filter(
+      (vehicle) =>
+        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
+    )
+    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+  const riders: DriverRider[] = students.map((student) => ({
+    id: student.id,
+    name: student.fullName,
+    studentId: student.studentId,
+    grade: student.grade,
+    teacherName: student.teacherName,
+    buses: studentBusNumbers(student),
+    vanId: vanByStudent.get(student.id) || null,
+  }));
+  const buses = [
+    ...new Set(riders.flatMap((rider) => rider.buses)),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  return { riders, buses, vans };
+}
+
+export function oneVehicleText(args: {
+  riders: DriverRider[];
+  vans: DriverVan[];
+  bus?: string;
+  van?: string;
+}) {
+  const title = args.bus
+    ? `Bus ${args.bus}`
+    : args.vans.find((van) => van.id === args.van)?.name || "Van";
+  const rows = args.riders.filter((rider) =>
+    args.bus
+      ? rider.buses.includes(args.bus)
+      : Boolean(args.van && rider.vanId === args.van),
+  );
+  const lines = [
+    "AMPM Flow — driver list",
+    formatLongDate(schoolNow()),
+    title,
+    `${rows.length} student${rows.length === 1 ? "" : "s"}`,
+    "Parent pickup is not on this list.",
+    "",
+    ...rows.map(
+      (rider) =>
+        `  ${rider.name}  ${rider.studentId}  Grade ${rider.grade}  ${rider.teacherName}`,
+    ),
+  ];
+  if (!rows.length) lines.push("No students on this vehicle.");
+  return { title, rows, text: lines.join("\n") };
 }
 
 export async function ridershipRecipients(schoolId: string) {
