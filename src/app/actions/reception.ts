@@ -13,7 +13,7 @@ import {
   notifyTransportationChange,
   planLine,
 } from "@/lib/change-notify";
-import { usableOpsEmail } from "@/lib/ops-change-emails";
+import { addOpsEmail, usableOpsEmail } from "@/lib/ops-change-emails";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
 
@@ -254,6 +254,7 @@ export type RouteRequestInput = {
   teacherName: string;
   parentPhone: string;
   parentEmail: string;
+  busCompanyEmail: string;
   address: string;
   emergencyContact: string;
 };
@@ -271,16 +272,21 @@ export async function requestRoute(input: RouteRequestInput) {
   const teacherName = input.teacherName.trim();
   const parentPhone = input.parentPhone.trim();
   const parentEmail = usableOpsEmail(input.parentEmail || "");
+  const busCompanyEmail = usableOpsEmail(input.busCompanyEmail || "");
   const address = input.address.trim();
   const emergency = input.emergencyContact.trim();
 
   if (!firstName || !lastName) {
     return { ok: false as const, error: "Enter the student’s first and last name." };
   }
-  if (!grade) return { ok: false as const, error: "Enter the grade." };
   if (!parentPhone) return { ok: false as const, error: "Enter the parent phone." };
   if (!parentEmail) return { ok: false as const, error: "Enter the parent email." };
+  if (!busCompanyEmail) {
+    return { ok: false as const, error: "Enter the bus company email." };
+  }
   if (!address) return { ok: false as const, error: "Enter the student address." };
+
+  await addOpsEmail(user.schoolId, busCompanyEmail).catch(() => undefined);
 
   let loaded = input.studentId
     ? await loadStudent(input.studentId)
@@ -296,91 +302,81 @@ export async function requestRoute(input: RouteRequestInput) {
     });
     loaded = match ? await loadStudent(match.id) : null;
   }
-  if (!loaded || loaded.record.schoolId !== user.schoolId) {
-    return {
-      ok: false as const,
-      error: "Find this student on Front Desk first, then submit the request.",
-    };
-  }
 
-  await prisma.student.update({
-    where: { id: loaded.record.id },
-    data: {
-      firstName,
-      lastName,
-      grade,
-      parentPhone,
-    },
-  });
-  await prisma.$executeRaw`
-    UPDATE "Student"
-    SET "parentEmail" = ${parentEmail},
-        "emergencyName" = ${emergency},
-        "emergencyPhone" = ${emergency}
-    WHERE "id" = ${loaded.record.id}
-  `.catch(() => undefined);
-  if (address) {
-    await prisma.address
-      .update({
-        where: { id: loaded.record.homeAddressId },
-        data: { line1: address },
-      })
-      .catch(() => undefined);
-  }
-  if (teacherName) {
-    await prisma.teacher
-      .updateMany({
-        where: { classroomId: loaded.effective.classroomId },
-        data: { name: teacherName },
-      })
-      .catch(() => undefined);
-  }
-
-  const reason = `Request for route entered by ${user.name}.`;
-  for (const trip of ["AM", "PM"] as const) {
-    await prisma.transportationAssignment.upsert({
-      where: { studentId_trip: { studentId: loaded.record.id, trip } },
-      create: {
-        studentId: loaded.record.id,
-        trip,
-        type: "BUS",
-        destination: "HOME",
-        busRouteId: null,
-        waitingForAssignment: true,
-        notes: reason,
-        effectiveStart: new Date(),
-        updatedById: user.id,
-      },
-      update: {
-        type: "BUS",
-        destination: "HOME",
-        busRouteId: null,
-        waitingForAssignment: true,
-        notes: reason,
-        updatedById: user.id,
+  if (loaded && loaded.record.schoolId === user.schoolId) {
+    await prisma.student.update({
+      where: { id: loaded.record.id },
+      data: {
+        firstName,
+        lastName,
+        grade: grade || loaded.record.grade,
+        parentPhone,
       },
     });
+    await prisma.$executeRaw`
+      UPDATE "Student"
+      SET "parentEmail" = ${parentEmail},
+          "emergencyName" = ${emergency},
+          "emergencyPhone" = ${emergency}
+      WHERE "id" = ${loaded.record.id}
+    `.catch(() => undefined);
+    if (address) {
+      await prisma.address
+        .update({
+          where: { id: loaded.record.homeAddressId },
+          data: { line1: address },
+        })
+        .catch(() => undefined);
+    }
+    if (teacherName) {
+      await prisma.teacher
+        .updateMany({
+          where: { classroomId: loaded.effective.classroomId },
+          data: { name: teacherName },
+        })
+        .catch(() => undefined);
+    }
+    const reason = `Request for route entered by ${user.name}.`;
+    for (const trip of ["AM", "PM"] as const) {
+      await prisma.transportationAssignment.upsert({
+        where: { studentId_trip: { studentId: loaded.record.id, trip } },
+        create: {
+          studentId: loaded.record.id,
+          trip,
+          type: "BUS",
+          destination: "HOME",
+          busRouteId: null,
+          waitingForAssignment: true,
+          notes: reason,
+          effectiveStart: new Date(),
+          updatedById: user.id,
+        },
+        update: {
+          type: "BUS",
+          destination: "HOME",
+          busRouteId: null,
+          waitingForAssignment: true,
+          notes: reason,
+          updatedById: user.id,
+        },
+      });
+    }
   }
-
-  const after = await loadStudent(loaded.record.id);
-  const student = after?.effective ?? loaded.effective;
-  student.parentEmail = parentEmail;
-  student.parentPhone = parentPhone;
-  student.teacherName = teacherName || student.teacherName;
 
   await prisma.changeRequest
     .create({
       data: {
         schoolId: user.schoolId,
-        studentId: loaded.record.id,
+        studentId: loaded?.record.id ?? null,
         trip: "AM+PM",
         source: user.role,
         title: `Request for route — ${firstName} ${lastName}`,
         details: [
-          `Grade ${grade}`,
+          grade ? `Grade ${grade}` : "",
           teacherName,
           parentPhone,
           parentEmail,
+          busCompanyEmail,
           address,
           emergency,
           `Entered by ${user.name}.`,
@@ -401,7 +397,13 @@ export async function requestRoute(input: RouteRequestInput) {
 
   const notice = await notifyRouteRequest({
     user,
-    student,
+    studentName: `${firstName} ${lastName}`,
+    studentId: loaded?.effective.studentId,
+    grade,
+    teacherName,
+    parentPhone,
+    parentEmail,
+    busCompanyEmail,
     address,
     emergency,
   });

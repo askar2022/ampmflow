@@ -194,19 +194,25 @@ export async function notifyTransportationChange(args: {
 
 export async function notifyRouteRequest(args: {
   user: SessionUser;
-  student: EffectiveStudent;
+  studentName: string;
+  studentId?: string;
+  grade: string;
+  teacherName: string;
+  parentPhone: string;
+  parentEmail: string;
+  busCompanyEmail: string;
   address: string;
   emergency: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
   const details = [
-    `Student: ${args.student.fullName} (${args.student.studentId})`,
-    `Grade ${args.student.grade}`,
-    `Teacher: ${args.student.teacherName}`,
-    `Parent phone: ${args.student.parentPhone || "—"}`,
-    `Parent email: ${args.student.parentEmail || "—"}`,
-    `Address: ${args.address || args.student.homeAddress || "—"}`,
+    `Student: ${args.studentName}${args.studentId ? ` (${args.studentId})` : ""}`,
+    args.grade ? `Grade ${args.grade}` : "",
+    args.teacherName ? `Teacher: ${args.teacherName}` : "",
+    `Parent phone: ${args.parentPhone || "—"}`,
+    `Parent email: ${args.parentEmail || "—"}`,
+    `Address: ${args.address || "—"}`,
     args.emergency ? `Emergency contact: ${args.emergency}` : "",
     `Requested by: ${args.user.name}`,
   ].filter(Boolean);
@@ -223,16 +229,19 @@ export async function notifyRouteRequest(args: {
   const parentText = [
     "AMPM Flow",
     "",
-    `We requested a bus or van for ${args.student.fullName}.`,
+    `We requested a bus or van for ${args.studentName}.`,
     "The bus company will assign a route and the school will update you when the number is on file.",
     "",
     ...details,
   ].join("\n");
 
-  const parent = uniqueEmails([args.student.parentEmail]);
-  const company = await opsEmails(args.user.schoolId, parent);
+  const parent = uniqueEmails([args.parentEmail]);
+  const company = uniqueEmails([
+    args.busCompanyEmail,
+    ...(await opsEmails(args.user.schoolId, parent)),
+  ]);
   if (!parent.length) skipped.push("parent (email required)");
-  if (!company.length) skipped.push("bus company (add an email on Today’s Changes)");
+  if (!company.length) skipped.push("bus company (email required)");
   if (!smtpConfigured()) {
     return { sent, skipped: [...skipped, "email is not configured"], waiting: true };
   }
@@ -241,13 +250,13 @@ export async function notifyRouteRequest(args: {
     {
       label: "parent",
       to: parent,
-      subject: `Bus request for ${args.student.fullName}`,
+      subject: `Bus request for ${args.studentName}`,
       text: parentText,
     },
     {
       label: "bus company",
       to: company,
-      subject: `Request for route — ${args.student.fullName}`,
+      subject: `Request for route — ${args.studentName}`,
       text: companyText,
     },
   ];
@@ -269,7 +278,7 @@ export async function notifyRouteRequest(args: {
 
   await writeAudit({
     user: args.user,
-    studentId: args.student.id,
+    studentId: args.studentId,
     action: "EMAIL_ROUTE_REQUEST",
     newPlan: { sent, skipped },
   }).catch(() => undefined);

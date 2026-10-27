@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
+import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { RouteRequestForm } from "./RouteRequestForm";
@@ -13,6 +14,7 @@ export default async function WaitingPage({
   if (!session) return null;
   const { student: selectedId = "" } = await searchParams;
   const students = await loadStudents(session.schoolId);
+  const busCompanyEmail = await defaultBusCompanyEmail(session.schoolId);
   const pending = await prisma.changeRequest.findMany({
     where: {
       schoolId: session.schoolId,
@@ -40,6 +42,7 @@ export default async function WaitingPage({
 
       <RouteRequestForm
         initialId={selectedId}
+        busCompanyEmail={busCompanyEmail}
         students={students.map((student) => ({
           id: student.id,
           firstName: student.firstName,
