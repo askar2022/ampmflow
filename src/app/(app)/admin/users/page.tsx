@@ -14,6 +14,7 @@ import { loadPendingInquiries } from "@/lib/inquiries";
 import { ensureSchoolSlugs, schoolLoginUrl, schoolSlugForId } from "@/lib/school-slug";
 import { PENDING_ROLE } from "@/lib/types";
 import { AddUserFields } from "./AddUserFields";
+import { UserArchive } from "./UserArchive";
 import { UserPasswordField } from "./UserPasswordField";
 import { UserRemoveButton } from "./UserRemoveButton";
 
@@ -265,32 +266,15 @@ export default async function UsersPage() {
           ))}
         </ul>
       </section>
-      {takenOff.length ? (
-        <section>
-          <h2 className="font-serif text-2xl">Archive</h2>
-          <p className="mt-1 text-muted">
-            These people cannot sign in. Their account is saved here. Put back
-            restores them to the Users list.
-          </p>
-          <ul className="mt-4 space-y-4">
-            {takenOff.map((user) => (
-              <li
-                key={user.id}
-                className="rounded-2xl border border-line bg-card p-5"
-              >
-                <div className="text-xl font-semibold text-navy">{user.name}</div>
-                <div className="mt-1 text-base text-navy">{user.email}</div>
-                <div className="mt-1 text-sm text-muted">
-                  {roleLabel(user.role)} · Archived
-                </div>
-                <div className="mt-4">
-                  <UserRemoveButton id={user.id} active={user.active} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <UserArchive
+        users={takenOff.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          active: user.active,
+        }))}
+      />
       <form action={createUser} className="rounded-2xl border border-line bg-card p-6">
         <h2 className="font-serif text-2xl">Add staff for this school</h2>
         <p className="mt-1 text-sm text-muted">
