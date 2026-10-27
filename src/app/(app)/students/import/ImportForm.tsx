@@ -35,7 +35,7 @@ export function ImportForm() {
             overwrite,
             onProgress: (progress) => {
               setMessage(
-                `Loading ${Math.min(progress.processed, progress.total || progress.processed)} of ${progress.total || "…"}. Added ${progress.created} new. ${progress.skipped} already on the list. ${progress.excludedNotReturning} Not Returning skipped.`,
+                `Loading ${Math.min(progress.processed, progress.total || progress.processed)} of ${progress.total || "…"}. Added ${progress.created} new. Filled in ${progress.filled} already on the list. ${progress.excludedNotReturning} Not Returning skipped.`,
               );
             },
           });
@@ -50,7 +50,7 @@ export function ImportForm() {
           setErrors(result.errors.slice(0, 8));
           setDoneCount(result.rosterStudents);
           setMessage(
-            `Finished. ${result.rosterStudents} students are on the roster. Added ${result.created} new${result.updated ? `, updated ${result.updated}` : ""}. ${result.excludedNotReturning} Not Returning were left out on purpose.`,
+            `Finished. ${result.rosterStudents} students are on the roster. Added ${result.created} new${result.updated ? `, updated ${result.updated}` : ""}${result.filled ? `, filled in ${result.filled}` : ""}. ${result.excludedNotReturning} Not Returning were left out on purpose.`,
           );
         })();
       }}

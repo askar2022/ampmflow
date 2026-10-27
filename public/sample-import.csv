@@ -1,11 +1,11 @@
-ID,Student,Grade,Teacher,Room,AM,PM
-SNP-1001,Ayaan Hassan,K,Amina Yusuf,101,Bus 1,Bus 1
-SNP-1002,Layla Hassan,K,Amina Yusuf,101,Bus 1,Parent
-SNP-1003,Noah Carter,1,James Carter,102,Parent,Parent
-SNP-1004,Sofia Carter,1,James Carter,102,Bus 2,Bus 2
-SNP-1005,Omar Farah,2,Fatima Hassan,201,Bus 2,Bus 3 to daycare
-SNP-1006,Amina Farah,2,Fatima Hassan,201,Bus 2,Bus 3 to daycare
-SNP-1007,Malik Johnson,3,Grace Okonkwo,301,Bus 3,Bus 3
-SNP-1008,Iman Johnson,3,Grace Okonkwo,301,Parent,Bus 3
-SNP-1009,Daniel Brooks,4,Daniel Brooks,302,Bus 4,Parent
-SNP-1010,Zara Brooks,4,Daniel Brooks,302,Bus 4,Bus 4
+ID,Student,Grade,Teacher,Room,AM,PM,Van,Parent,Primary Phone,Parent Email,Address,City,Zip
+SNP-1001,Ayaan Hassan,K,Amina Yusuf,101,Bus 1,Bus 1,,Hodan Hassan,612-555-0101,hodan.hassan@email.com,123 Main St,Minneapolis,55401
+SNP-1002,Layla Hassan,K,Amina Yusuf,101,Bus 1,Parent,,Hodan Hassan,612-555-0101,hodan.hassan@email.com,123 Main St,Minneapolis,55401
+SNP-1003,Noah Carter,1,James Carter,102,Parent,Parent,Van 1,Maya Carter,612-555-0102,maya.carter@email.com,88 Cedar Ave,Minneapolis,55402
+SNP-1004,Sofia Carter,1,James Carter,102,Bus 2,Bus 2,,Maya Carter,612-555-0102,maya.carter@email.com,88 Cedar Ave,Minneapolis,55402
+SNP-1005,Omar Farah,2,Fatima Hassan,201,Bus 2,Bus 3,,Ibrahim Farah,612-555-0103,ibrahim.farah@email.com,410 Lake St,Minneapolis,55406
+SNP-1006,Amina Farah,2,Fatima Hassan,201,Bus 2,Bus 3,,Ibrahim Farah,612-555-0103,ibrahim.farah@email.com,410 Lake St,Minneapolis,55406
+SNP-1007,Malik Johnson,3,Grace Okonkwo,301,Bus 3,Bus 3,,Keisha Johnson,612-555-0104,keisha.johnson@email.com,55 Park Ave,Minneapolis,55404
+SNP-1008,Iman Johnson,3,Grace Okonkwo,301,Parent,Bus 3,,Keisha Johnson,612-555-0104,keisha.johnson@email.com,55 Park Ave,Minneapolis,55404
+SNP-1009,Daniel Brooks,4,Daniel Brooks,302,Bus 4,Parent,Van 2,Elena Brooks,612-555-0105,elena.brooks@email.com,900 Hennepin Ave,Minneapolis,55403
+SNP-1010,Zara Brooks,4,Daniel Brooks,302,Bus 4,Bus 4,,Elena Brooks,612-555-0105,elena.brooks@email.com,900 Hennepin Ave,Minneapolis,55403

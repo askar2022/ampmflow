@@ -33,9 +33,12 @@ export default async function RosterPage() {
         <div>
           <h2 className="font-serif text-2xl">Upload students</h2>
           <p className="mt-1 text-sm text-muted">
-            Choose the school Excel or CSV file, then load it. Stay on this
-            page until you see Finished. Leave overwrite unchecked unless you
-            mean to change names already on the list.
+            Include parent phone, parent email, home address, and AM/PM bus or
+            van in the file. Those show on Front Desk after you load it. If
+            students are already on the list, load the same names again with
+            the missing columns filled in. Stay on this page until you see
+            Finished. Check overwrite only if you mean to change names already
+            on the list.
           </p>
           <div className="mt-4">
             <ImportForm />

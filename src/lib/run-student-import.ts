@@ -7,6 +7,7 @@ export type ImportProgress = {
   total: number;
   created: number;
   updated: number;
+  filled: number;
   skipped: number;
   excludedNotReturning: number;
   rosterStudents: number;
@@ -40,6 +41,7 @@ export async function runStudentImport(options: {
     total: 0,
     created: 0,
     updated: 0,
+    filled: 0,
     skipped: 0,
     excludedNotReturning: 0,
     rosterStudents: 0,
@@ -73,6 +75,7 @@ export async function runStudentImport(options: {
     }
     progress.created += result.created ?? 0;
     progress.updated += result.updated ?? 0;
+    progress.filled += result.filled ?? 0;
     progress.skipped += result.skipped ?? 0;
     progress.excludedNotReturning += result.excludedNotReturning ?? 0;
     progress.rosterStudents = result.rosterStudents ?? progress.rosterStudents;

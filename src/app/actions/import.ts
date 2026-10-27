@@ -14,6 +14,7 @@ import {
   saveImportSummary,
   usablePhone,
 } from "@/lib/gate";
+import { ensureStudentContactColumns } from "@/lib/transportation";
 
 type Row = Record<string, string>;
 
@@ -82,6 +83,10 @@ const HEADER_ALIASES = new Set([
   "family_id",
   "parent/guardian",
   "primary phone",
+  "parent email",
+  "email",
+  "address",
+  "van",
   "zip code",
   "enrollment status",
   "source",
@@ -150,27 +155,124 @@ function parsePlan(value: string) {
   const raw = value.trim();
   const v = raw.toLowerCase();
   const dest = v.includes("daycare") ? "DAYCARE" : "HOME";
-  if (!v) return { type: null as "BUS" | "PARENT" | null, bus: "", dest };
+  const empty = { type: null as "BUS" | "PARENT" | "VAN" | null, bus: "", van: "", dest };
+  if (!v) return empty;
   if (
     v.includes("not checked") ||
     v.includes("not confirmed") ||
     v.includes("follow-up") ||
     v.includes("absent")
   ) {
-    return { type: null as "BUS" | "PARENT" | null, bus: "", dest };
+    return empty;
+  }
+  if (v.includes("van")) {
+    const num = raw.match(/(\d+)/);
+    return {
+      type: "VAN" as const,
+      bus: "",
+      van: num ? `Van ${num[1]}` : raw.replace(/\s+/g, " "),
+      dest,
+    };
   }
   if (v.includes("parent") || v.includes("pickup") || v.includes("drop-off")) {
-    return { type: "PARENT" as const, bus: "", dest };
+    return { type: "PARENT" as const, bus: "", van: "", dest };
   }
   const busMatch = raw.match(/(\d+)/);
   if (v.includes("bus") || busMatch) {
-    return { type: "BUS" as const, bus: busMatch?.[1] || "", dest };
+    return { type: "BUS" as const, bus: busMatch?.[1] || "", van: "", dest };
   }
-  return { type: parseType(raw), bus: "", dest };
+  return { type: parseType(raw), bus: "", van: "", dest };
 }
 
 function newId() {
   return randomUUID().replace(/-/g, "").slice(0, 24);
+}
+
+async function ensureVan(schoolId: string, name: string) {
+  const label = name.trim();
+  const existing = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "TransportVehicle"
+    WHERE "schoolId" = ${schoolId} AND lower("name") = ${label.toLowerCase()}
+  `;
+  if (existing[0]) return existing[0].id;
+  const id = newId();
+  await prisma.$executeRaw`
+    INSERT INTO "TransportVehicle"
+      ("id", "schoolId", "name", "vehicleType", "driverName", "driverPhone", "createdAt", "updatedAt")
+    VALUES
+      (${id}, ${schoolId}, ${label}, 'VAN', '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `;
+  return id;
+}
+
+async function applyStudentPlans(args: {
+  schoolId: string;
+  userId: string;
+  studentId: string;
+  amType: "BUS" | "PARENT" | "VAN" | null;
+  pmType: "BUS" | "PARENT" | "VAN" | null;
+  amBus: string;
+  pmBus: string;
+  amDest: string;
+  pmDest: string;
+  vanName: string;
+  daycareId?: string;
+}) {
+  for (const [trip, type, busNo, dest] of [
+    ["AM", args.amType, args.amBus, args.amDest],
+    ["PM", args.pmType, args.pmBus, args.pmDest],
+  ] as const) {
+    if (!type || type === "VAN") continue;
+    const route = busNo
+      ? await prisma.busRoute.upsert({
+          where: {
+            schoolId_number_trip: {
+              schoolId: args.schoolId,
+              number: busNo.replace(/^Bus\s+/i, ""),
+              trip,
+            },
+          },
+          create: {
+            schoolId: args.schoolId,
+            number: busNo.replace(/^Bus\s+/i, ""),
+            trip,
+            name: `Route ${busNo}`,
+          },
+          update: {},
+        })
+      : null;
+    await prisma.transportationAssignment.upsert({
+      where: { studentId_trip: { studentId: args.studentId, trip } },
+      create: {
+        studentId: args.studentId,
+        trip,
+        type,
+        destination:
+          dest === "DAYCARE" ? "DAYCARE" : dest === "CUSTOM" ? "CUSTOM" : "HOME",
+        busRouteId: type === "BUS" ? route?.id : null,
+        daycareId: dest === "DAYCARE" ? args.daycareId : null,
+        waitingForAssignment: type === "BUS" && !route,
+        updatedById: args.userId,
+      },
+      update: {
+        type,
+        destination:
+          dest === "DAYCARE" ? "DAYCARE" : dest === "CUSTOM" ? "CUSTOM" : "HOME",
+        busRouteId: type === "BUS" ? route?.id : null,
+        daycareId: dest === "DAYCARE" ? args.daycareId : null,
+        waitingForAssignment: type === "BUS" && !route,
+        updatedById: args.userId,
+      },
+    });
+  }
+  if (args.vanName) {
+    const vehicleId = await ensureVan(args.schoolId, args.vanName);
+    await prisma.$executeRaw`
+      UPDATE "Student"
+      SET "vehicleId" = ${vehicleId}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${args.studentId}
+    `;
+  }
 }
 
 async function findExistingStudent(
@@ -242,6 +344,7 @@ export async function importStudents(formData: FormData) {
   if (!rows.length) return { ok: false, error: "The file has no data rows." };
 
   await ensureGateTables();
+  await ensureStudentContactColumns().catch(() => undefined);
 
   const existingRows = await prisma.student.findMany({
     where: { schoolId: user.schoolId },
@@ -251,6 +354,11 @@ export async function importStudents(formData: FormData) {
       firstName: true,
       lastName: true,
       parentPhone: true,
+      parentName: true,
+      parentEmail: true,
+      homeAddressId: true,
+      vehicleId: true,
+      homeAddress: { select: { line1: true } },
     },
   });
   const existingByCode = new Map(existingRows.map((row) => [row.studentId, row]));
@@ -269,6 +377,7 @@ export async function importStudents(formData: FormData) {
 
   let created = 0;
   let updated = 0;
+  let filled = 0;
   let skipped = 0;
   let excludedNotReturning = 0;
   let excludedNoName = 0;
@@ -330,6 +439,8 @@ export async function importStudents(formData: FormData) {
       cell(row, "parent/guardian", "parent_name", "parent") || "—";
     const parentPhone =
       cell(row, "primary phone", "parent_phone", "phone") || "—";
+    const parentEmail =
+      cell(row, "parent email", "parent_email", "email", "guardian email") || "";
     const homeLine = cell(row, "home_address", "address") || "Address pending";
     const city = cell(row, "home_city", "city") || "Minneapolis";
     const state = cell(row, "home_state", "state") || "MN";
@@ -342,6 +453,18 @@ export async function importStudents(formData: FormData) {
     }
     const daycareAddress = cell(row, "daycare_address");
     const notes = cell(row, "notes");
+    const vanName =
+      cell(row, "van", "van name", "vehicle") ||
+      (amPlan.type === "VAN" ? amPlan.van : "") ||
+      (pmPlan.type === "VAN" ? pmPlan.van : "");
+    const amType = amPlan.type === "VAN" ? "VAN" : parseType(cell(row, "am_type")) || amPlan.type;
+    const pmType = pmPlan.type === "VAN" ? "VAN" : parseType(cell(row, "pm_type")) || pmPlan.type;
+    const amBus = cell(row, "am_bus", "am bus") || amPlan.bus;
+    const pmBus = cell(row, "pm_bus", "pm bus") || pmPlan.bus;
+    const amDest =
+      cell(row, "am_destination").toUpperCase() || amPlan.dest || "HOME";
+    const pmDest =
+      cell(row, "pm_destination").toUpperCase() || pmPlan.dest || "HOME";
 
     try {
     const nameMatches = existingByName.get(`${normName(firstName)}|${normName(lastName)}`) || [];
@@ -362,7 +485,74 @@ export async function importStudents(formData: FormData) {
       studentId = `${studentId}`.slice(0, 36) + `-${index + 1}`;
     }
     if (existingEarly && !canUpdate) {
-      skipped += 1;
+      const patch: {
+        parentName?: string;
+        parentPhone?: string;
+        parentEmail?: string;
+        homeAddressId?: string;
+      } = {};
+      if (usablePhone(parentPhone) && !usablePhone(existingEarly.parentPhone)) {
+        patch.parentPhone = parentPhone;
+      }
+      if (parentEmail.includes("@") && !existingEarly.parentEmail) {
+        patch.parentEmail = parentEmail;
+      }
+      if (
+        parentName !== "—" &&
+        (!existingEarly.parentName || existingEarly.parentName === "—")
+      ) {
+        patch.parentName = parentName;
+      }
+      const addressPending =
+        !existingEarly.homeAddress?.line1 ||
+        /pending/i.test(existingEarly.homeAddress.line1);
+      if (addressPending && homeLine && !/pending/i.test(homeLine)) {
+        const home = await prisma.address.create({
+          data: {
+            schoolId: user.schoolId,
+            line1: homeLine,
+            city,
+            state,
+            zip,
+            label: "home",
+          },
+        });
+        patch.homeAddressId = home.id;
+      }
+      if (Object.keys(patch).length) {
+        try {
+          await prisma.student.update({
+            where: { id: existingEarly.id },
+            data: patch,
+          });
+        } catch {
+          if (patch.parentEmail) {
+            await prisma.$executeRaw`
+              UPDATE "Student" SET "parentEmail" = ${patch.parentEmail}
+              WHERE "id" = ${existingEarly.id}
+            `;
+          }
+          if (patch.parentPhone) {
+            await prisma.student.update({
+              where: { id: existingEarly.id },
+              data: { parentPhone: patch.parentPhone, parentName: patch.parentName },
+            });
+          }
+        }
+      }
+      await applyStudentPlans({
+        schoolId: user.schoolId,
+        userId: user.id,
+        studentId: existingEarly.id,
+        amType,
+        pmType,
+        amBus,
+        pmBus,
+        amDest,
+        pmDest,
+        vanName,
+      });
+      filled += 1;
       continue;
     }
 
@@ -463,6 +653,7 @@ export async function importStudents(formData: FormData) {
             classroomId: classroom.id,
             parentName,
             parentPhone,
+            parentEmail,
             homeAddressId: homeId,
             daycareId,
             notes,
@@ -480,6 +671,7 @@ export async function importStudents(formData: FormData) {
             classroomId: classroom.id,
             parentName,
             parentPhone,
+            parentEmail,
             homeAddressId: homeId,
             daycareId,
             notes,
@@ -496,6 +688,11 @@ export async function importStudents(formData: FormData) {
       firstName,
       lastName,
       parentPhone,
+      parentName,
+      parentEmail,
+      homeAddressId: homeId,
+      vehicleId: existing?.vehicleId ?? null,
+      homeAddress: { line1: homeLine },
     });
     const nameList = existingByName.get(`${normName(firstName)}|${normName(lastName)}`) || [];
     if (!nameList.some((row) => row.id === student.id)) {
@@ -505,64 +702,28 @@ export async function importStudents(formData: FormData) {
         firstName,
         lastName,
         parentPhone,
+        parentName,
+        parentEmail,
+        homeAddressId: homeId,
+        vehicleId: existing?.vehicleId ?? null,
+        homeAddress: { line1: homeLine },
       });
       existingByName.set(`${normName(firstName)}|${normName(lastName)}`, nameList);
     }
 
-    const amType = parseType(cell(row, "am_type")) || amPlan.type;
-    const pmType = parseType(cell(row, "pm_type")) || pmPlan.type;
-    const amBus = cell(row, "am_bus", "am bus") || amPlan.bus;
-    const pmBus = cell(row, "pm_bus", "pm bus") || pmPlan.bus;
-    const amDest =
-      cell(row, "am_destination").toUpperCase() || amPlan.dest || "HOME";
-    const pmDest =
-      cell(row, "pm_destination").toUpperCase() || pmPlan.dest || "HOME";
-
-    for (const [trip, type, busNo, dest] of [
-      ["AM", amType, amBus, amDest],
-      ["PM", pmType, pmBus, pmDest],
-    ] as const) {
-      if (!type) continue;
-      const route = busNo
-        ? await prisma.busRoute.upsert({
-            where: {
-              schoolId_number_trip: {
-                schoolId: user.schoolId,
-                number: busNo.replace(/^Bus\s+/i, ""),
-                trip,
-              },
-            },
-            create: {
-              schoolId: user.schoolId,
-              number: busNo.replace(/^Bus\s+/i, ""),
-              trip,
-              name: `Route ${busNo}`,
-            },
-            update: {},
-          })
-        : null;
-      await prisma.transportationAssignment.upsert({
-        where: { studentId_trip: { studentId: student.id, trip } },
-        create: {
-          studentId: student.id,
-          trip,
-          type,
-          destination: dest === "DAYCARE" ? "DAYCARE" : dest === "CUSTOM" ? "CUSTOM" : "HOME",
-          busRouteId: type === "BUS" ? route?.id : null,
-          daycareId: dest === "DAYCARE" ? daycareId : null,
-          waitingForAssignment: type === "BUS" && !route,
-          updatedById: user.id,
-        },
-        update: {
-          type,
-          destination: dest === "DAYCARE" ? "DAYCARE" : dest === "CUSTOM" ? "CUSTOM" : "HOME",
-          busRouteId: type === "BUS" ? route?.id : null,
-          daycareId: dest === "DAYCARE" ? daycareId : null,
-          waitingForAssignment: type === "BUS" && !route,
-          updatedById: user.id,
-        },
-      });
-    }
+    await applyStudentPlans({
+      schoolId: user.schoolId,
+      userId: user.id,
+      studentId: student.id,
+      amType,
+      pmType,
+      amBus,
+      pmBus,
+      amDest,
+      pmDest,
+      vanName,
+      daycareId,
+    });
     } catch (error) {
       errors.push(
         `Row ${index + 2}: ${
@@ -613,6 +774,7 @@ export async function importStudents(formData: FormData) {
     ok: true,
     created,
     updated,
+    filled,
     skipped,
     errors,
     excludedNotReturning,
@@ -688,6 +850,7 @@ async function rowsFromUpload(
       teacherName: cell(row, "teacher") || "Unassigned",
       parentName: cell(row, "parent/guardian", "parent_name", "parent") || "—",
       parentPhone: cell(row, "primary phone", "parent_phone", "phone") || "—",
+      parentEmail: cell(row, "parent email", "parent_email", "email") || "",
       address: cell(row, "home_address", "address") || "",
       city: cell(row, "home_city", "city") || "",
       zip: cell(row, "home_zip", "zip code", "zip") || "",
