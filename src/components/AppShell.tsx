@@ -47,13 +47,13 @@ export function AppShell({
         } as CSSProperties
       }
     >
-      <header className="no-print bg-navy text-white">
-        <div className="mx-auto max-w-4xl px-4 pt-2 sm:px-6">
+      <header className="no-print">
+        <div className="mx-auto max-w-4xl px-4 pt-3 sm:px-6">
           <Link href={home} className="block">
             <HeaderWelcome schoolName={schoolName} />
           </Link>
         </div>
-        <nav className="mt-2 bg-navy-deep">
+        <nav className="mt-3 bg-navy-deep text-white">
           <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-1 px-4 py-2 sm:px-6">
             <AppNav links={links} />
             <form action={logoutAction} className="ml-auto">
