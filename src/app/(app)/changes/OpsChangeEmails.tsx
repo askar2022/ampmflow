@@ -25,12 +25,12 @@ export function OpsChangeEmails({
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
       <h2 className="text-xl font-semibold text-navy">
-        Leadership and bus coordinator
+        Who gets change emails
       </h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Add emails here — not on the Front Desk change form. These people get
-        each change when it is saved, and the {sendAt} list if anyone changed.
-        Parent and teacher stay on the change form.
+        Add the leadership or bus coordinator email here. They get each Front
+        Desk change, and the {sendAt} list if anyone changed. Parent and
+        teacher emails stay on the student form on Front Desk.
       </p>
       {emails.length ? (
         <ul className="mt-4 space-y-2">
