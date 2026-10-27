@@ -78,9 +78,11 @@ export default async function Home({
             error={
               error === "pending"
                 ? "This account is waiting for approval."
-                : error === "1" || error === "db"
-                  ? "That email or password is not recognized."
-                  : undefined
+                : error === "admin"
+                  ? "This sign-in is only for the AMPM Flow administrator."
+                  : error === "1" || error === "db"
+                    ? "That email or password is not recognized."
+                    : undefined
             }
           />
         </section>

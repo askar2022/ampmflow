@@ -39,12 +39,19 @@ export async function loginAction(formData: FormData) {
     }
   }
 
+  if (goToSchools) {
+    if (!(await isPlatformAdmin(result.user))) {
+      redirect("/?error=admin");
+    }
+    await createSession(result.user, {
+      remember: formData.get("remember") === "1",
+    });
+    redirect("/platform");
+  }
+
   await createSession(result.user, {
     remember: formData.get("remember") === "1",
   });
-  if (goToSchools && (await isPlatformAdmin(result.user))) {
-    redirect("/platform");
-  }
   redirect(homePath(result.user.role));
 }
 

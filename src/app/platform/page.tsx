@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession, isPlatformAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +10,7 @@ import { ensureSchoolSlugs, schoolLoginUrl } from "@/lib/school-slug";
 export default async function PlatformSchoolsPage() {
   const session = await getSession();
   if (!session) redirect("/");
-  if (!(await isPlatformAdmin(session))) redirect("/dashboard");
+  if (!(await isPlatformAdmin(session))) redirect("/");
 
   await ensureSchoolSlugs().catch(() => undefined);
   const inquiries = await loadPendingInquiries();
@@ -128,13 +127,6 @@ export default async function PlatformSchoolsPage() {
             ))}
           </ul>
         </section>
-
-        <p className="text-center text-sm text-[#4b5563]">
-          Need a school desk?{" "}
-          <Link href="/dashboard" className="font-semibold text-navy underline">
-            Open Front Desk
-          </Link>
-        </p>
       </div>
     </div>
   );
