@@ -112,38 +112,6 @@ export async function toggleUser(id: string) {
   return { ok: true };
 }
 
-export async function deleteUser(id: string) {
-  const session = await getSession();
-  if (!session || !canManageUsers(session.role)) {
-    return { ok: false, error: "Only administrators can take out a user." };
-  }
-  const user = await prisma.user.findFirst({
-    where: { id, schoolId: session.schoolId },
-  });
-  if (!user) return { ok: false, error: "User not found." };
-  if (user.id === session.id) {
-    return { ok: false, error: "You cannot take out your own account." };
-  }
-  if (user.role === PENDING_ROLE) {
-    return { ok: false, error: "Reject this request instead." };
-  }
-  try {
-    await prisma.user.delete({ where: { id } });
-  } catch {
-    return {
-      ok: false,
-      error: "This person still has records, so they cannot be deleted. They stay off the login list.",
-    };
-  }
-  await writeAudit({
-    user: session,
-    action: "DELETE_USER",
-    newPlan: { name: user.name, email: user.email },
-  }).catch(() => undefined);
-  revalidatePath("/admin/users");
-  return { ok: true };
-}
-
 export async function approveUser(formData: FormData) {
   const session = await getSession();
   if (!session || !canManageUsers(session.role)) {

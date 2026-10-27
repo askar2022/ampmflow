@@ -16,7 +16,6 @@ import { PENDING_ROLE } from "@/lib/types";
 import { AddUserFields } from "./AddUserFields";
 import { UserPasswordField } from "./UserPasswordField";
 import { UserRemoveButton } from "./UserRemoveButton";
-import { UserTakeOutButton } from "./UserTakeOutButton";
 
 export default async function UsersPage() {
   const session = await getSession();
@@ -237,8 +236,8 @@ export default async function UsersPage() {
       <section>
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
-          Active staff are listed here. Remove turns off their login. If you
-          want them gone for good, Take out in the list below.
+          Active staff are listed here. Move to archive turns off their login
+          and keeps their card under Archive. They are not deleted.
         </p>
         <ul className="mt-4 space-y-4">
           {staff.map((user) => (
@@ -268,10 +267,10 @@ export default async function UsersPage() {
       </section>
       {takenOff.length ? (
         <section>
-          <h2 className="font-serif text-2xl">Taken off the login list</h2>
+          <h2 className="font-serif text-2xl">Archive</h2>
           <p className="mt-1 text-muted">
-            These people cannot sign in. Put back restores them. Take out
-            deletes the account.
+            These people cannot sign in. Their account is saved here. Put back
+            restores them to the Users list.
           </p>
           <ul className="mt-4 space-y-4">
             {takenOff.map((user) => (
@@ -281,10 +280,11 @@ export default async function UsersPage() {
               >
                 <div className="text-xl font-semibold text-navy">{user.name}</div>
                 <div className="mt-1 text-base text-navy">{user.email}</div>
-                <div className="mt-1 text-sm text-muted">{roleLabel(user.role)}</div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-1 text-sm text-muted">
+                  {roleLabel(user.role)} · Archived
+                </div>
+                <div className="mt-4">
                   <UserRemoveButton id={user.id} active={user.active} />
-                  <UserTakeOutButton id={user.id} name={user.name} />
                 </div>
               </li>
             ))}
