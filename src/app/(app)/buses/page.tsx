@@ -19,8 +19,9 @@ export default async function BusesPage() {
         <p className="text-sm text-muted">{formatLongDate(schoolNow())}</p>
         <h1 className="font-serif text-4xl">Buses</h1>
         <p className="mt-1 max-w-2xl text-muted">
-          Students on a bus or special van today. Parent pickup is not on this
-          list. Front Desk can print or email it.
+          Students who ride each bus or van today — not parent pickup. Print a
+          list and give it to the driver if they did not get the email from the
+          bus company.
         </p>
         <p className="mt-2 text-sm font-semibold text-navy">
           {list.busRiders} on buses
@@ -42,6 +43,12 @@ export default async function BusesPage() {
                   {riders.length} student{riders.length === 1 ? "" : "s"}
                 </span>
               </div>
+              <Link
+                href={`/buses/print?bus=${encodeURIComponent(number)}`}
+                className="no-print mt-2 inline-block text-sm font-semibold text-navy"
+              >
+                Print for driver
+              </Link>
               <ul className="mt-3 space-y-2 text-sm">
                 {riders.map((student) => (
                   <li
@@ -90,6 +97,12 @@ export default async function BusesPage() {
                 {van.driverName ? (
                   <p className="mt-1 text-sm text-muted">{van.driverName}</p>
                 ) : null}
+                <Link
+                  href={`/buses/print?van=${van.id}`}
+                  className="no-print mt-2 inline-block text-sm font-semibold text-navy"
+                >
+                  Print for driver
+                </Link>
                 <ul className="mt-3 space-y-2 text-sm">
                   {van.riders.map((student) => (
                     <li
