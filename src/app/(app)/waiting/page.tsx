@@ -2,18 +2,11 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { prisma } from "@/lib/prisma";
-import { loadStudents } from "@/lib/transportation";
 import { RouteRequestForm } from "./RouteRequestForm";
 
-export default async function WaitingPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ student?: string }>;
-}) {
+export default async function WaitingPage() {
   const session = await getSession();
   if (!session) return null;
-  const { student: selectedId = "" } = await searchParams;
-  const students = await loadStudents(session.schoolId);
   const busCompanyEmail = await defaultBusCompanyEmail(session.schoolId);
   const pending = await prisma.changeRequest.findMany({
     where: {
@@ -40,23 +33,7 @@ export default async function WaitingPage({
         </p>
       </div>
 
-      <RouteRequestForm
-        initialId={selectedId}
-        busCompanyEmail={busCompanyEmail}
-        students={students.map((student) => ({
-          id: student.id,
-          firstName: student.firstName,
-          lastName: student.lastName,
-          grade: student.grade,
-          teacherName: student.teacherName,
-          parentPhone: student.parentPhone,
-          parentEmail: student.parentEmail,
-          address: student.homeAddress,
-          emergencyContact: [student.emergencyName, student.emergencyPhone]
-            .filter(Boolean)
-            .join(" · "),
-        }))}
-      />
+      <RouteRequestForm busCompanyEmail={busCompanyEmail} />
 
       <section>
         <h2 className="font-serif text-2xl">Waiting for a bus or van</h2>

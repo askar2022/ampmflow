@@ -1,19 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { requestRoute } from "@/app/actions/reception";
-
-export type RouteStudent = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  grade: string;
-  teacherName: string;
-  parentPhone: string;
-  parentEmail: string;
-  address: string;
-  emergencyContact: string;
-};
 
 const empty = {
   studentId: "",
@@ -29,49 +17,14 @@ const empty = {
 };
 
 export function RouteRequestForm({
-  students,
-  initialId = "",
   busCompanyEmail = "",
 }: {
-  students: RouteStudent[];
-  initialId?: string;
   busCompanyEmail?: string;
 }) {
-  const starting = students.find((row) => row.id === initialId);
-  const [form, setForm] = useState(() =>
-    starting
-      ? { ...empty, ...starting, studentId: starting.id, busCompanyEmail }
-      : { ...empty, busCompanyEmail },
-  );
-  const [query, setQuery] = useState(
-    starting ? `${starting.firstName} ${starting.lastName}` : "",
-  );
+  const [form, setForm] = useState({ ...empty, busCompanyEmail });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
-
-  const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return students
-      .filter((student) =>
-        `${student.firstName} ${student.lastName} ${student.grade}`
-          .toLowerCase()
-          .includes(q),
-      )
-      .slice(0, 8);
-  }, [query, students]);
-
-  function fill(student: RouteStudent) {
-    setForm((current) => ({
-      ...current,
-      ...student,
-      studentId: student.id,
-    }));
-    setQuery(`${student.firstName} ${student.lastName}`);
-    setError("");
-    setMessage("");
-  }
 
   function setField(name: keyof typeof empty, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -92,46 +45,14 @@ export function RouteRequestForm({
           }
           setMessage(result.message);
           setForm({ ...empty, busCompanyEmail: form.busCompanyEmail });
-          setQuery("");
         });
       }}
     >
       <h2 className="font-serif text-2xl">Submit a route request</h2>
       <p className="mt-1 text-sm text-muted">
-        Put the parent email and the bus company email on this form. The
-        button emails both at once.
+        Fill this form. The button emails the parent and the bus company.
+        Submitted requests stay in the list below.
       </p>
-
-      <label className="mt-4 block text-sm font-semibold">
-        Find student
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setForm((current) => ({ ...current, studentId: "" }));
-          }}
-          placeholder="Type a name"
-          className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-        />
-      </label>
-      {matches.length && !form.studentId ? (
-        <ul className="mt-2 divide-y divide-line rounded-xl border border-line">
-          {matches.map((student) => (
-            <li key={student.id}>
-              <button
-                type="button"
-                onClick={() => fill(student)}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-paper"
-              >
-                <span className="font-semibold">
-                  {student.firstName} {student.lastName}
-                </span>
-                <span className="ml-2 text-muted">Grade {student.grade}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-semibold">
