@@ -5,7 +5,7 @@ import { loadStudents } from "@/lib/transportation";
 import { loadVehicles } from "@/lib/gate";
 import { groupByBus, stamp } from "@/lib/reports";
 import { planSummary } from "@/lib/format";
-import { saveVehicleAction } from "@/app/actions/gate";
+import { addSpecialVan } from "@/app/actions/gate";
 import { getSchoolIdentityById } from "@/lib/school";
 import { WelcomeBanner } from "@/components/WelcomeBanner";
 
@@ -120,7 +120,7 @@ export default async function PrintPage({
             </p>
           </div>
           {session.role === "ADMINISTRATOR" || session.role === "COORDINATOR" ? (
-            <form action={saveVehicleAction} className="flex flex-wrap gap-2">
+            <form action={addSpecialVan} className="flex flex-wrap gap-2">
               <input type="hidden" name="vehicleType" value="VAN" />
               <input
                 name="name"

@@ -145,16 +145,14 @@ export function ReceptionDesk({
   buses,
   canPermanent,
   canSeeEmergency,
-  canUpload = false,
-  canManageTeachers = false,
+  changeCount = 0,
   initialStudentId = "",
 }: {
   students: DeskStudent[];
   buses: string[];
   canPermanent: boolean;
   canSeeEmergency: boolean;
-  canUpload?: boolean;
-  canManageTeachers?: boolean;
+  changeCount?: number;
   initialStudentId?: string;
 }) {
   const router = useRouter();
@@ -268,27 +266,27 @@ export function ReceptionDesk({
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6">
-        <label className="text-sm font-semibold text-navy" htmlFor="student-search">
-          Find a student
-        </label>
-        <input
-          id="student-search"
-          type="search"
-          autoFocus
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setSelectedId("");
-            setOpenForm(false);
-            setMessage("");
-          }}
-          placeholder="Name or student ID"
-          className="mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-lg outline-none focus:border-gold"
-        />
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted">
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <label className="min-w-0 flex-1 text-xs font-semibold uppercase tracking-wider text-muted">
+            Find a student
+            <input
+              id="student-search"
+              type="search"
+              autoFocus
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setSelectedId("");
+                setOpenForm(false);
+                setMessage("");
+              }}
+              placeholder="Name or student ID"
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-4 py-2.5 text-base font-medium text-navy outline-none focus:border-gold"
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-36">
             Grade
             <select
               value={grade}
@@ -297,7 +295,7 @@ export function ReceptionDesk({
                 setSelectedId("");
                 setOpenForm(false);
               }}
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm font-medium text-navy"
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
               <option value="">All grades</option>
               {grades.map((item) => (
@@ -307,7 +305,7 @@ export function ReceptionDesk({
               ))}
             </select>
           </label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-44">
             Class
             <select
               value={classroom}
@@ -316,7 +314,7 @@ export function ReceptionDesk({
                 setSelectedId("");
                 setOpenForm(false);
               }}
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm font-medium text-navy"
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
               <option value="">All classes</option>
               {classes.map((item) => (
@@ -326,7 +324,7 @@ export function ReceptionDesk({
               ))}
             </select>
           </label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-muted">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-40">
             Bus
             <select
               value={bus}
@@ -335,7 +333,7 @@ export function ReceptionDesk({
                 setSelectedId("");
                 setOpenForm(false);
               }}
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm font-medium text-navy"
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
               <option value="">All buses</option>
               <option value="waiting">Waiting for route</option>
@@ -346,44 +344,51 @@ export function ReceptionDesk({
               ))}
             </select>
           </label>
+          <Link
+            href="/changes"
+            className="rounded-xl bg-navy px-4 py-2.5 text-center text-sm font-semibold text-white lg:whitespace-nowrap"
+          >
+            Today’s Changes{changeCount ? ` (${changeCount})` : ""}
+          </Link>
         </div>
-        {browsing && !selected ? (
-          <ul className="mt-3 divide-y divide-line rounded-2xl border border-line">
-            {matches.map((student) => (
-              <li key={student.id}>
-                <button
-                  type="button"
-                  onClick={() => choose(student)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-paper"
-                >
-                  <span>
-                    <span className="font-semibold">{student.fullName}</span>
-                    <span className="ml-2 text-sm text-muted">
-                      Grade {student.grade} · {classLabel(student)}
-                    </span>
-                  </span>
-                  <span className="text-sm text-muted">
-                    {studentBuses(student).length
-                      ? studentBuses(student).map((number) => `Bus ${number}`).join(" · ")
-                      : "No bus"}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {!matches.length ? (
-              <li className="px-4 py-3 text-sm text-muted">No student matches those filters.</li>
-            ) : filtered.length > matches.length ? (
-              <li className="px-4 py-2 text-xs text-muted">
-                Showing {matches.length} of {filtered.length}. Narrow the filters to see the rest.
-              </li>
-            ) : (
-              <li className="px-4 py-2 text-xs text-muted">
-                {matches.length} student{matches.length === 1 ? "" : "s"}, sorted by grade, class, then bus.
-              </li>
-            )}
-          </ul>
-        ) : null}
       </section>
+
+      {browsing && !selected ? (
+        <ul className="divide-y divide-line rounded-2xl border border-line bg-card">
+          {matches.map((student) => (
+            <li key={student.id}>
+              <button
+                type="button"
+                onClick={() => choose(student)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-paper"
+              >
+                <span>
+                  <span className="font-semibold">{student.fullName}</span>
+                  <span className="ml-2 text-sm text-muted">
+                    Grade {student.grade} · {classLabel(student)}
+                  </span>
+                </span>
+                <span className="text-sm text-muted">
+                  {studentBuses(student).length
+                    ? studentBuses(student).map((number) => `Bus ${number}`).join(" · ")
+                    : "No bus"}
+                </span>
+              </button>
+            </li>
+          ))}
+          {!matches.length ? (
+            <li className="px-4 py-3 text-sm text-muted">No student matches those filters.</li>
+          ) : filtered.length > matches.length ? (
+            <li className="px-4 py-2 text-xs text-muted">
+              Showing {matches.length} of {filtered.length}. Narrow the filters to see the rest.
+            </li>
+          ) : (
+            <li className="px-4 py-2 text-xs text-muted">
+              {matches.length} student{matches.length === 1 ? "" : "s"}
+            </li>
+          )}
+        </ul>
+      ) : null}
 
       {selected ? (
         <section className="rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6">
@@ -720,43 +725,11 @@ export function ReceptionDesk({
             </p>
           ) : null}
         </section>
-      ) : (
+      ) : browsing ? null : (
         <p className="text-sm text-muted">
-          Search a name or ID, or filter by grade, class, or bus.
+          Type a name or ID to see that student’s transportation plan.
         </p>
       )}
-
-      <p className="text-sm text-muted">
-        Same-day changes email the teacher, parent, and bus company now, and
-        again in the 2:30 p.m. reminder.{" "}
-        <Link href="/changes" className="font-semibold text-navy">
-          Today’s changes
-        </Link>
-        {" · "}
-        <Link href="/waiting" className="font-semibold text-navy">
-          Waiting for route
-        </Link>
-        {" · "}
-        <Link href="/print" className="font-semibold text-navy">
-          Reports
-        </Link>
-        {canUpload ? (
-          <>
-            {" · "}
-            <Link href="/students/import" className="font-semibold text-navy">
-              Upload roster
-            </Link>
-          </>
-        ) : null}
-        {canManageTeachers ? (
-          <>
-            {" · "}
-            <Link href="/teachers" className="font-semibold text-navy">
-              Teacher emails
-            </Link>
-          </>
-        ) : null}
-      </p>
     </div>
   );
 }

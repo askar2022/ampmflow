@@ -143,6 +143,10 @@ export async function saveVehicleAction(formData: FormData) {
   return result;
 }
 
+export async function addSpecialVan(formData: FormData): Promise<void> {
+  await saveVehicleAction(formData);
+}
+
 export async function assignStudentVehicleAction(studentId: string, vehicleId: string) {
   const user = await getSession();
   if (!user || !canLead(user.role)) {
