@@ -1,37 +1,25 @@
-export const WELCOME_IMAGE = "/demo-2.jpg";
+export const WELCOME_IMAGE = "/demo4.png";
 
 export function HeaderWelcome({
   schoolName,
-  meta,
 }: {
   schoolName?: string | null;
-  meta?: string;
 }) {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
-      <div className="relative overflow-hidden rounded-2xl">
+    <div className="mx-auto max-w-4xl px-4 py-2 sm:px-6">
+      <div className="relative h-28 overflow-hidden rounded-2xl sm:h-32">
         <img
           src={WELCOME_IMAGE}
           alt=""
-          className="h-48 w-full object-cover object-center sm:h-56"
+          className="h-full w-full object-cover object-right"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--navy)]/75 via-[color:var(--navy)]/25 to-transparent" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
-          <p className="text-sm font-semibold tracking-wide text-white/80">
-            AMPM Flow
-          </p>
-          <h1 className="mt-1 font-serif text-3xl text-white sm:text-4xl">
+        <div className="absolute inset-0 bg-gradient-to-r from-[color:var(--navy)]/70 via-[color:var(--navy)]/20 to-transparent" />
+        <div className="absolute inset-0 flex flex-col items-start justify-center px-5">
+          <h1 className="font-serif text-2xl leading-tight text-white sm:text-3xl">
             Welcome to {schoolName || "your school"}
           </h1>
-          <p className="mt-1 text-sm text-white/85 sm:text-base">
-            Student Transportation Desk
-          </p>
+          <p className="mt-0.5 text-sm text-white/90">Transportation Desk</p>
         </div>
-        {meta ? (
-          <p className="absolute bottom-3 right-4 hidden max-w-[42%] text-right text-xs text-white/75 sm:block">
-            {meta}
-          </p>
-        ) : null}
       </div>
     </div>
   );

@@ -1,8 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { logoutAction } from "@/app/actions/auth";
-import { roleLabel } from "@/lib/format";
-import { formatLongDate, formatTime, schoolNow } from "@/lib/dates";
 import { AppNav } from "@/components/AppNav";
 import { HeaderWelcome } from "@/components/WelcomeBanner";
 import { schoolTheme } from "@/lib/school";
@@ -30,7 +28,6 @@ export function AppShell({
   schoolLogoUrl?: string | null;
   children: React.ReactNode;
 }) {
-  const now = schoolNow();
   const links = NAV.filter((item) => item.roles.includes(user.role));
   const theme = schoolTheme(schoolName);
   const home =
@@ -52,10 +49,7 @@ export function AppShell({
     >
       <header className="no-print bg-navy text-white">
         <Link href={home} className="block">
-          <HeaderWelcome
-            schoolName={schoolName}
-            meta={`${user.name} · ${roleLabel(user.role)} · ${formatLongDate(now)} · ${formatTime(now)}`}
-          />
+          <HeaderWelcome schoolName={schoolName} />
         </Link>
         <nav className="bg-navy-deep">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-3 py-2 sm:px-4">
@@ -68,7 +62,7 @@ export function AppShell({
           </div>
         </nav>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6">{children}</main>
     </div>
   );
 }
