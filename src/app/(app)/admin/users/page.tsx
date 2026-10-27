@@ -10,6 +10,8 @@ import {
 } from "@/app/actions/users";
 import { updateSchoolIdentity } from "@/app/actions/school";
 import { roleLabel } from "@/lib/format";
+import { loadPendingInquiries } from "@/lib/inquiries";
+import { ensureSchoolSlugs, schoolLoginUrl, schoolSlugForId } from "@/lib/school-slug";
 import { PENDING_ROLE } from "@/lib/types";
 import { AddUserFields } from "./AddUserFields";
 import { UserRemoveButton } from "./UserRemoveButton";
@@ -32,6 +34,9 @@ export default async function UsersPage() {
   const staff = users.filter(
     (user) => user.role !== PENDING_ROLE && user.schoolId === session.schoolId,
   );
+  await ensureSchoolSlugs().catch(() => undefined);
+  const inquiries = platform ? await loadPendingInquiries() : [];
+  const schoolSlug = await schoolSlugForId(session.schoolId);
   const school = await prisma.school
     .findUnique({
       where: { id: session.schoolId },
@@ -54,9 +59,14 @@ export default async function UsersPage() {
           School identity
         </h2>
         <p className="mt-1 text-sm text-muted">
-          This name and logo appear on sign-in and in the header. Do not use a
-          logo from another school.
+          This name and logo appear on your private sign-in page and in the
+          header. Do not use a logo from another school.
         </p>
+        {schoolSlug ? (
+          <p className="mt-2 text-sm font-semibold text-navy">
+            Private sign-in: {schoolLoginUrl(schoolSlug)}
+          </p>
+        ) : null}
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <input
             name="schoolName"
@@ -79,51 +89,80 @@ export default async function UsersPage() {
         </button>
       </form>
       {platform ? (
-        <form
-          action={createSchoolForDemo}
-          className="rounded-2xl border border-line bg-card p-6"
-        >
-          <h2 className="text-2xl font-semibold tracking-tight text-navy">
-            Open a school for demo
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Creates the school and an admin login they can use tomorrow. If
-            they already submitted a request, this approves that same email
-            and emails them that they can sign in.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <input
-              name="schoolName"
-              required
-              placeholder="School name"
-              className="w-full rounded-xl border border-line px-3 py-2"
-            />
-            <input
-              name="name"
-              required
-              placeholder="Admin name"
-              className="w-full rounded-xl border border-line px-3 py-2"
-            />
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="Admin email"
-              className="w-full rounded-xl border border-line px-3 py-2"
-            />
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              placeholder="Demo password (8+ characters)"
-              className="w-full rounded-xl border border-line px-3 py-2"
-            />
-          </div>
-          <button className="mt-3 rounded-xl bg-navy px-4 py-2 font-semibold text-white">
-            Open school and email them
-          </button>
-        </form>
+        <div className="space-y-6">
+          {inquiries.length ? (
+            <section className="rounded-2xl border border-line bg-card p-6">
+              <h2 className="text-2xl font-semibold tracking-tight text-navy">
+                School requests
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                These schools contacted us. They are not active until you set
+                them up below. This list is only for you.
+              </p>
+              <ul className="mt-4 divide-y divide-line">
+                {inquiries.map((row) => (
+                  <li key={row.id} className="py-3 text-sm">
+                    <div className="font-medium">{row.schoolName}</div>
+                    <div className="text-muted">
+                      {row.name} · {row.email}
+                    </div>
+                    {row.note ? <div className="mt-1 text-muted">{row.note}</div> : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          <form
+            action={createSchoolForDemo}
+            className="rounded-2xl border border-line bg-card p-6"
+          >
+            <h2 className="text-2xl font-semibold tracking-tight text-navy">
+              Set up a school
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Review first, then create the school, branding, and a private
+              sign-in link. This emails the admin that link. A public request
+              does not turn a school on.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <input
+                name="schoolName"
+                required
+                placeholder="School name"
+                className="w-full rounded-xl border border-line px-3 py-2"
+              />
+              <input
+                name="slug"
+                placeholder="Private link name (aim-academy)"
+                className="w-full rounded-xl border border-line px-3 py-2"
+              />
+              <input
+                name="name"
+                required
+                placeholder="Admin name"
+                className="w-full rounded-xl border border-line px-3 py-2"
+              />
+              <input
+                name="email"
+                type="email"
+                required
+                placeholder="Admin email"
+                className="w-full rounded-xl border border-line px-3 py-2"
+              />
+              <input
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                placeholder="Temporary password (8+ characters)"
+                className="w-full rounded-xl border border-line px-3 py-2 sm:col-span-2"
+              />
+            </div>
+            <button className="mt-3 rounded-xl bg-navy px-4 py-2 font-semibold text-white">
+              Set up school and email the private link
+            </button>
+          </form>
+        </div>
       ) : null}
       {pending.length ? (
         <section>

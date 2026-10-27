@@ -7,7 +7,7 @@ const secret = new TextEncoder().encode(
 );
 
 const PUBLIC_EXACT = ["/"];
-const PUBLIC_PREFIX = ["/login", "/schools"];
+const PUBLIC_PREFIX = ["/login", "/schools", "/contact", "/s"];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_EXACT.includes(pathname)) return true;

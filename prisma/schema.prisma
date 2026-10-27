@@ -10,6 +10,7 @@ datasource db {
 model School {
   id        String   @id @default(cuid())
   name      String
+  slug      String?  @unique
   logoUrl   String?
   timezone  String   @default("America/Chicago")
   createdAt DateTime @default(now())

@@ -79,8 +79,8 @@ export default async function LoginPage({
             Welcome back
           </h2>
           <p className="mt-0.5 text-sm text-[#7b8490]">
-            Sign in to your school. Ask your administrator if you need a staff
-            account.
+            Sign in with the account your school administrator created. Ask
+            them if you need an account.
           </p>
           <div className="mt-3 short-h:mt-2.5">
             <SignInForm
@@ -93,7 +93,7 @@ export default async function LoginPage({
               }
               notice={
                 requested === "school"
-                  ? "Your school request was sent. Check your email. An AMPM Flow administrator must approve the school before you can sign in."
+                  ? "We received your message. You will get a private sign-in link after AMPM Flow sets up the school."
                   : undefined
               }
             />

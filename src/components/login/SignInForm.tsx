@@ -12,15 +12,18 @@ export const fieldClass =
 export function SignInForm({
   authError,
   notice,
+  schoolSlug,
 }: {
   authError?: string;
   notice?: string;
+  schoolSlug?: string;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const invalid = Boolean(authError);
 
   return (
     <form action={loginAction} className="space-y-3 short-h:space-y-2.5" aria-labelledby="login-heading">
+      {schoolSlug ? <input type="hidden" name="schoolSlug" value={schoolSlug} /> : null}
       <label className="block text-left text-sm font-semibold text-navy" htmlFor="login-email">
         Email
         <input

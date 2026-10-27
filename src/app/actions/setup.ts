@@ -4,24 +4,9 @@ import { randomUUID } from "crypto";
 import { redirect } from "next/navigation";
 import { prisma, isDatabaseConfigured } from "@/lib/prisma";
 import { createSession, hashPassword } from "@/lib/auth";
-import { notifyCoordinators } from "@/lib/audit";
-import { emailNewSchoolRequest } from "@/lib/school-request-email";
 import { PENDING_ROLE } from "@/lib/types";
 
 const FIRST_ADMIN_ROLE = "ADMINISTRATOR" as const;
-
-function normSchoolName(value: string) {
-  return value.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-async function findSchoolByName(name: string) {
-  const wanted = normSchoolName(name);
-  if (!wanted) return null;
-  const schools = await prisma.school.findMany({
-    select: { id: true, name: true },
-  });
-  return schools.find((row) => normSchoolName(row.name) === wanted) || null;
-}
 
 function isNextRedirect(error: unknown) {
   return (
@@ -100,51 +85,7 @@ export async function createAccount(formData: FormData) {
     redirect("/admin/users");
   }
 
-  if (intent === "new-school") {
-    if (!schoolName) {
-      redirect("/schools?error=setup");
-    }
-    const taken = await findSchoolByName(schoolName);
-    if (taken) {
-      redirect("/schools?error=school-exists");
-    }
-    const created = await prisma.school.create({
-      data: { name: schoolName, timezone: "America/Chicago" },
-      select: { id: true, name: true },
-    });
-    await prisma.schoolSettings
-      .create({ data: { id: randomUUID(), schoolId: created.id } })
-      .catch(() => undefined);
-    await prisma.user.create({
-      data: {
-        schoolId: created.id,
-        name,
-        email,
-        role: PENDING_ROLE,
-        passwordHash,
-        active: false,
-      },
-    });
-    const home = await prisma.school.findFirst({
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    });
-    if (home) {
-      await notifyCoordinators(
-        home.id,
-        "New school request",
-        `${name} asked to open ${created.name}. Approve them under Users before they can sign in.`,
-      ).catch(() => undefined);
-    }
-    await emailNewSchoolRequest({
-      schoolName: created.name,
-      name,
-      email,
-    }).catch(() => undefined);
-    redirect("/login?requested=school");
-  }
-
-  redirect("/login");
+  redirect("/contact");
 }
 
 async function createFirstAdministrator({

@@ -26,8 +26,8 @@ export default async function Home() {
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-semibold text-navy">Already at a school</h2>
             <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-              Sign in to your school. You only see your own school. If you need
-              an account, contact your school administrator.
+              Use the private sign-in link your school gave you, or sign in
+              here. Ask your school administrator if you need an account.
             </p>
             <Link
               href="/login"
@@ -38,24 +38,19 @@ export default async function Home() {
           </section>
 
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
-            <h2 className="text-lg font-semibold text-navy">New school</h2>
+            <h2 className="text-lg font-semibold text-navy">Interested school</h2>
             <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-              Request a separate school. You cannot sign in until AMPM Flow
-              approves you. Existing staff do not use this form.
+              Contact us to get started. We review each request and set up the
+              school. You get a private sign-in link when it is ready.
             </p>
             <Link
-              href="/schools"
+              href="/contact"
               className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] border border-navy px-4 py-2.5 text-[16px] font-semibold text-navy hover:bg-navy hover:text-white"
             >
-              Request your school
+              Contact us
             </Link>
           </section>
         </div>
-
-        <p className="mt-6 text-center text-sm leading-6 text-[#6b7280]">
-          Only a school administrator can add staff. Regular staff never open a
-          new school.
-        </p>
       </div>
     </div>
   );

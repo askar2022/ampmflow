@@ -26,6 +26,7 @@ export async function emailNewSchoolRequest(args: {
   schoolName: string;
   name: string;
   email: string;
+  note?: string;
 }) {
   if (!smtpConfigured()) {
     return { sent: false as const, reason: "email is not configured" };
@@ -37,13 +38,14 @@ export async function emailNewSchoolRequest(args: {
 
   if (requester) {
     const text = [
-      "AMPM Flow received your school request.",
+      "AMPM Flow received your message.",
       "",
       `School: ${args.schoolName}`,
       `Requested by: ${args.name}`,
       "",
-      "You cannot sign in yet. The AMPM Flow administrator must approve the school first.",
-      "You will get another email when the school is ready.",
+      "This did not open a school or an account.",
+      "The AMPM Flow administrator will review it and set the school up.",
+      "You will get a private sign-in link when it is ready.",
     ].join("\n");
     const sent = await sendMail({
       to: requester,
@@ -55,14 +57,15 @@ export async function emailNewSchoolRequest(args: {
 
   if (admins.length) {
     const text = [
-      "A school asked to join AMPM Flow.",
+      "A school asked to start AMPM Flow. Do not activate it until you review and set it up.",
       "",
       `School: ${args.schoolName}`,
       `Name: ${args.name}`,
       `Email: ${args.email}`,
+      args.note ? `Note: ${args.note}` : "",
       "",
-      "Open Users, approve them as Admin, then they can sign in for a demo.",
-      "https://ampmflow.com/admin/users",
+      "Open Users, then Set up a school. That creates the private sign-in link and emails them.",
+      "https://www.ampmflow.com/admin/users",
     ].join("\n");
     const sent = await sendMail({
       to: admins,
@@ -79,16 +82,18 @@ export async function emailSchoolApproved(args: {
   schoolName: string;
   name: string;
   email: string;
+  loginUrl?: string;
 }) {
   const to = usableOpsEmail(args.email);
   if (!to || !smtpConfigured()) return { sent: false as const };
+  const signIn = args.loginUrl || "https://www.ampmflow.com/login";
   const text = [
     `Hello ${args.name},`,
     "",
     `${args.schoolName} is ready on AMPM Flow.`,
     "",
-    "Sign in at https://ampmflow.com/login with the email and password you used when you requested the school.",
-    "Use the student desk to search a child and save a bus change. Teacher, parent, and the bus company are emailed right away.",
+    `Use this private sign-in link for your school only: ${signIn}`,
+    "Ask your school administrator if other staff need an account.",
   ].join("\n");
   return sendMail({
     to,

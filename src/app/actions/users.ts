@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers, getSession, hashPassword, isPlatformAdmin } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
+import { markInquirySetup } from "@/lib/inquiries";
 import { emailSchoolApproved } from "@/lib/school-request-email";
+import { assignUniqueSlug, schoolLoginUrl } from "@/lib/school-slug";
 import { PENDING_ROLE, ROLES, type Role } from "@/lib/types";
 
 export async function createUser(formData: FormData): Promise<void> {
@@ -170,6 +172,7 @@ export async function createSchoolForDemo(formData: FormData) {
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
+  const requestedSlug = String(formData.get("slug") || "").trim();
   if (!schoolName || !name || !email || password.length < 8) return;
 
   const takenUser = await prisma.user.findUnique({
@@ -190,10 +193,17 @@ export async function createSchoolForDemo(formData: FormData) {
       where: { id: takenUser.schoolId },
       select: { name: true },
     });
+    const slug = await assignUniqueSlug(
+      takenUser.schoolId,
+      school?.name || schoolName,
+      requestedSlug,
+    );
+    await markInquirySetup(email, school?.name || schoolName);
     await emailSchoolApproved({
       schoolName: school?.name || schoolName,
       name,
       email,
+      loginUrl: schoolLoginUrl(slug),
     }).catch(() => undefined);
     revalidatePath("/admin/users");
     return;
@@ -220,10 +230,13 @@ export async function createSchoolForDemo(formData: FormData) {
       active: true,
     },
   });
+  const slug = await assignUniqueSlug(school.id, school.name, requestedSlug);
+  await markInquirySetup(email, school.name);
   await emailSchoolApproved({
     schoolName: school.name,
     name,
     email,
+    loginUrl: schoolLoginUrl(slug),
   }).catch(() => undefined);
   revalidatePath("/admin/users");
 }

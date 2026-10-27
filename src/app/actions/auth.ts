@@ -3,10 +3,14 @@
 import { redirect } from "next/navigation";
 import { authenticate, clearSession, createSession, homePath } from "@/lib/auth";
 import { isDatabaseConfigured } from "@/lib/prisma";
+import { findSchoolBySlug, schoolLoginPath } from "@/lib/school-slug";
 
 export async function loginAction(formData: FormData) {
+  const slug = String(formData.get("schoolSlug") || "").trim();
+  const fail = slug ? schoolLoginPath(slug) : "/login";
+
   if (!isDatabaseConfigured()) {
-    redirect("/login?error=db");
+    redirect(`${fail}?error=db`);
   }
 
   const email = String(formData.get("email") || "");
@@ -16,14 +20,21 @@ export async function loginAction(formData: FormData) {
   try {
     result = await authenticate(email, password);
   } catch {
-    redirect("/login?error=db");
+    redirect(`${fail}?error=db`);
   }
 
   if (result.status === "pending") {
-    redirect("/login?error=pending");
+    redirect(`${fail}?error=pending`);
   }
   if (result.status !== "ok") {
-    redirect("/login?error=1");
+    redirect(`${fail}?error=1`);
+  }
+
+  if (slug) {
+    const school = await findSchoolBySlug(slug);
+    if (!school || result.user.schoolId !== school.id) {
+      redirect(`${fail}?error=1`);
+    }
   }
 
   await createSession(result.user, {
