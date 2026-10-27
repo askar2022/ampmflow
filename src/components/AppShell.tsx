@@ -7,7 +7,7 @@ import { schoolTheme } from "@/lib/school";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
-  { href: "/dashboard", label: "Desk", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/dashboard", label: "Front Desk", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/changes", label: "Today’s Changes", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/buses", label: "Buses", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/waiting", label: "Waiting for Route", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
