@@ -32,8 +32,8 @@ export default async function DashboardPage({
         <p className="text-sm text-muted">{formatLongDate(schoolNow())}</p>
         <h1 className="font-serif text-4xl">Student desk</h1>
         <p className="mt-2 text-muted">
-          Search a student, check today’s bus plan, and save one transportation
-          change. {changed} change{changed === 1 ? "" : "s"} today
+          Search or filter by grade, class, or bus. Teachers get an email when
+          you save a change. {changed} change{changed === 1 ? "" : "s"} today
           {waiting ? ` · ${waiting} waiting for a route` : ""}.
         </p>
       </div>
@@ -47,6 +47,8 @@ export default async function DashboardPage({
           session.role === "COORDINATOR" ||
           session.role === "FRONT_DESK"
         }
+        canUpload={session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"}
+        canManageTeachers={session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"}
       />
     </div>
   );

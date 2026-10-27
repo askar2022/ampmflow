@@ -8,21 +8,76 @@ import { planSummary, planTone } from "@/lib/format";
 import type { Destination, DurationType, EffectiveStudent, Trip } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
-function deskSearch(students: EffectiveStudent[], query: string) {
+function gradeRank(grade: string) {
+  const value = grade.trim().toLowerCase();
+  if (value.startsWith("k")) return 0;
+  const number = Number.parseInt(value.replace(/\D/g, ""), 10);
+  return Number.isFinite(number) ? number : 99;
+}
+
+function classLabel(student: EffectiveStudent) {
+  return student.classroomName || student.teacherName || "Unassigned";
+}
+
+function studentBuses(student: EffectiveStudent) {
+  return [...new Set([student.am.busNumber, student.pm.busNumber].filter(Boolean))];
+}
+
+function uniqueSorted(values: string[]) {
+  return [...new Set(values.filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+  );
+}
+
+function deskRows(
+  students: EffectiveStudent[],
+  query: string,
+  grade: string,
+  classroom: string,
+  bus: string,
+) {
   const q = query.trim().toLowerCase().replace(/\s+/g, " ");
-  if (!q) return [];
   const tokens = q.split(" ").filter(Boolean);
-  return students.filter((student) => {
-    const hay = [
-      student.fullName,
-      student.studentId,
-      student.grade,
-      student.teacherName,
-    ]
-      .join(" ")
-      .toLowerCase();
-    return hay.includes(q) || tokens.every((part) => hay.includes(part));
-  });
+  return students
+    .filter((student) => {
+      if (grade && student.grade !== grade) return false;
+      if (classroom && classLabel(student) !== classroom) return false;
+      if (bus === "waiting") {
+        if (
+          !student.am.waitingForAssignment &&
+          !student.pm.waitingForAssignment &&
+          student.am.busNumber &&
+          student.pm.busNumber
+        ) {
+          return false;
+        }
+      } else if (bus && !studentBuses(student).includes(bus)) {
+        return false;
+      }
+      if (!q) return true;
+      const hay = [
+        student.fullName,
+        student.studentId,
+        student.grade,
+        student.teacherName,
+        student.classroomName,
+        ...studentBuses(student),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q) || tokens.every((part) => hay.includes(part));
+    })
+    .sort((a, b) => {
+      const byGrade = gradeRank(a.grade) - gradeRank(b.grade);
+      if (byGrade) return byGrade;
+      const byClass = classLabel(a).localeCompare(classLabel(b));
+      if (byClass) return byClass;
+      const busA = studentBuses(a)[0] || "";
+      const busB = studentBuses(b)[0] || "";
+      const byBus = busA.localeCompare(busB, undefined, { numeric: true });
+      if (byBus) return byBus;
+      return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
+    });
 }
 
 type DeskStudent = EffectiveStudent;
@@ -84,17 +139,24 @@ export function ReceptionDesk({
   buses,
   canPermanent,
   canSeeEmergency,
+  canUpload = false,
+  canManageTeachers = false,
   initialStudentId = "",
 }: {
   students: DeskStudent[];
   buses: string[];
   canPermanent: boolean;
   canSeeEmergency: boolean;
+  canUpload?: boolean;
+  canManageTeachers?: boolean;
   initialStudentId?: string;
 }) {
   const router = useRouter();
   const initial = formFromStudent(students.find((row) => row.id === initialStudentId));
   const [query, setQuery] = useState(() => startingQuery(students, initialStudentId));
+  const [grade, setGrade] = useState("");
+  const [classroom, setClassroom] = useState("");
+  const [bus, setBus] = useState("");
   const [selectedId, setSelectedId] = useState(initialStudentId);
   const [openForm, setOpenForm] = useState(false);
   const [destination, setDestination] = useState<Destination>(initial.destination);
@@ -114,10 +176,31 @@ export function ReceptionDesk({
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
-  const matches = useMemo(
-    () => deskSearch(students, query).slice(0, 12),
-    [students, query],
+  const grades = useMemo(
+    () =>
+      uniqueSorted(students.map((student) => student.grade)).sort(
+        (a, b) => gradeRank(a) - gradeRank(b),
+      ),
+    [students],
   );
+  const classes = useMemo(
+    () => uniqueSorted(students.map((student) => classLabel(student))),
+    [students],
+  );
+  const busChoices = useMemo(
+    () =>
+      uniqueSorted([
+        ...buses,
+        ...students.flatMap((student) => studentBuses(student)),
+      ]),
+    [buses, students],
+  );
+  const filtered = useMemo(
+    () => deskRows(students, query, grade, classroom, bus),
+    [students, query, grade, classroom, bus],
+  );
+  const browsing = Boolean(query.trim() || grade || classroom || bus);
+  const matches = browsing ? filtered.slice(0, 80) : [];
   const selected = students.find((student) => student.id === selectedId) || null;
 
   function choose(student: DeskStudent) {
@@ -198,7 +281,67 @@ export function ReceptionDesk({
           placeholder="Name or student ID"
           className="mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-lg outline-none focus:border-gold"
         />
-        {query.trim() && !selected ? (
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted">
+            Grade
+            <select
+              value={grade}
+              onChange={(event) => {
+                setGrade(event.target.value);
+                setSelectedId("");
+                setOpenForm(false);
+              }}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm font-medium text-navy"
+            >
+              <option value="">All grades</option>
+              {grades.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted">
+            Class
+            <select
+              value={classroom}
+              onChange={(event) => {
+                setClassroom(event.target.value);
+                setSelectedId("");
+                setOpenForm(false);
+              }}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm font-medium text-navy"
+            >
+              <option value="">All classes</option>
+              {classes.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted">
+            Bus
+            <select
+              value={bus}
+              onChange={(event) => {
+                setBus(event.target.value);
+                setSelectedId("");
+                setOpenForm(false);
+              }}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm font-medium text-navy"
+            >
+              <option value="">All buses</option>
+              <option value="waiting">Waiting for route</option>
+              {busChoices.map((item) => (
+                <option key={item} value={item}>
+                  Bus {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {browsing && !selected ? (
           <ul className="mt-3 divide-y divide-line rounded-2xl border border-line">
             {matches.map((student) => (
               <li key={student.id}>
@@ -210,16 +353,28 @@ export function ReceptionDesk({
                   <span>
                     <span className="font-semibold">{student.fullName}</span>
                     <span className="ml-2 text-sm text-muted">
-                      {student.studentId} · Grade {student.grade}
+                      Grade {student.grade} · {classLabel(student)}
                     </span>
                   </span>
-                  <span className="text-sm text-muted">{student.teacherName}</span>
+                  <span className="text-sm text-muted">
+                    {studentBuses(student).length
+                      ? studentBuses(student).map((number) => `Bus ${number}`).join(" · ")
+                      : "No bus"}
+                  </span>
                 </button>
               </li>
             ))}
             {!matches.length ? (
-              <li className="px-4 py-3 text-sm text-muted">No student matches that search.</li>
-            ) : null}
+              <li className="px-4 py-3 text-sm text-muted">No student matches those filters.</li>
+            ) : filtered.length > matches.length ? (
+              <li className="px-4 py-2 text-xs text-muted">
+                Showing {matches.length} of {filtered.length}. Narrow the filters to see the rest.
+              </li>
+            ) : (
+              <li className="px-4 py-2 text-xs text-muted">
+                {matches.length} student{matches.length === 1 ? "" : "s"}, sorted by grade, class, then bus.
+              </li>
+            )}
           </ul>
         ) : null}
       </section>
@@ -234,15 +389,30 @@ export function ReceptionDesk({
                 {selected.classroomName ? ` · ${selected.classroomName}` : ""}
               </p>
             </div>
-            {!openForm ? (
-              <button
-                type="button"
-                onClick={() => setOpenForm(true)}
-                className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
-              >
-                Change Transportation
-              </button>
-            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {browsing ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedId("");
+                    setQuery("");
+                    setOpenForm(false);
+                  }}
+                  className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+                >
+                  Back to list
+                </button>
+              ) : null}
+              {!openForm ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenForm(true)}
+                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                  Change Transportation
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -546,7 +716,7 @@ export function ReceptionDesk({
         </section>
       ) : (
         <p className="text-sm text-muted">
-          Search a name or ID, then tap Change Transportation.
+          Search a name or ID, or filter by grade, class, or bus.
         </p>
       )}
 
@@ -564,6 +734,22 @@ export function ReceptionDesk({
         <Link href="/print" className="font-semibold text-navy">
           Reports
         </Link>
+        {canUpload ? (
+          <>
+            {" · "}
+            <Link href="/students/import" className="font-semibold text-navy">
+              Upload roster
+            </Link>
+          </>
+        ) : null}
+        {canManageTeachers ? (
+          <>
+            {" · "}
+            <Link href="/teachers" className="font-semibold text-navy">
+              Teacher emails
+            </Link>
+          </>
+        ) : null}
       </p>
     </div>
   );

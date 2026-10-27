@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
@@ -76,30 +75,6 @@ export default async function PrintPage({
             ? "This is one class only. Email this teacher here, or go back to Teachers to email everyone."
             : "Print a roster or email teachers and the bus company. Daily change control stays on the student desk."}
         </p>
-        {session.role !== "TEACHER" ? (
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            {[
-              ["/leadership", "Leadership"],
-              ["/plans", "Regular plans"],
-              ["/activity", "Activity log"],
-              ["/acknowledgments", "Teacher acknowledgments"],
-              ["/gate", "First-day gate"],
-              ["/first-day", "First-day counts"],
-              ["/bus-tomorrow", "Bus needed tomorrow"],
-              ["/pickup", "Parent pickup"],
-              ["/vehicles", "Vehicles"],
-              ["/checkin", "Bus check-in"],
-            ].map(([href, label]) => (
-              <Link
-                key={href}
-                href={href}
-                className="rounded-full border border-line bg-card px-3 py-1.5 font-semibold text-navy"
-              >
-                {label}
-              </Link>
-            ))}
-          </div>
-        ) : null}
         {lastEmail && selected === "teacher" ? (
           <p className="mt-2 text-sm text-muted">
             Last emailed {formatDateTime(lastEmail.createdAt)}.

@@ -8,7 +8,7 @@ export const maxDuration = 60;
 export default async function ImportPage() {
   const session = await getSession();
   if (!session || (session.role !== "COORDINATOR" && session.role !== "ADMINISTRATOR")) {
-    redirect("/students");
+    redirect("/dashboard");
   }
   return (
     <div className="max-w-3xl space-y-6">
