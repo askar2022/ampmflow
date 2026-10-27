@@ -8,15 +8,15 @@ export function HeaderWelcome({
   meta?: string;
 }) {
   return (
-    <div className="relative h-40 overflow-hidden sm:h-52">
-      <img
-        src={WELCOME_IMAGE}
-        alt=""
-        className="h-full w-full object-cover object-right"
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-[color:var(--navy)]/88 via-[color:var(--navy)]/40 to-transparent" />
-      <div className="absolute inset-0 flex items-end justify-between gap-4 px-4 py-5 sm:px-6">
-        <div>
+    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6">
+      <div className="relative overflow-hidden rounded-2xl">
+        <img
+          src={WELCOME_IMAGE}
+          alt=""
+          className="h-48 w-full object-cover object-center sm:h-56"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--navy)]/75 via-[color:var(--navy)]/25 to-transparent" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
           <p className="text-sm font-semibold tracking-wide text-white/80">
             AMPM Flow
           </p>
@@ -28,7 +28,7 @@ export function HeaderWelcome({
           </p>
         </div>
         {meta ? (
-          <p className="max-w-[40%] text-right text-xs text-white/80 sm:text-sm">
+          <p className="absolute bottom-3 right-4 hidden max-w-[42%] text-right text-xs text-white/75 sm:block">
             {meta}
           </p>
         ) : null}
