@@ -34,16 +34,18 @@ export default async function BusDriverPrintPage({
         id: student.id,
         name: student.fullName,
         parent: student.parentName,
+        teacher: student.teacherName,
+        grade: student.grade,
         phone: student.parentPhone,
-        detail: `Grade ${student.grade} · ${student.teacherName}`,
       }))
     : vanGroup
       ? vanGroup.riders.map((student) => ({
           id: student.id,
           name: student.name,
           parent: student.parentName,
+          teacher: "",
+          grade: student.grade,
           phone: student.parentPhone,
-          detail: `Grade ${student.grade}`,
         }))
       : [
           ...list.buses.flatMap(([number, riders]) =>
@@ -51,8 +53,9 @@ export default async function BusDriverPrintPage({
               id: `${number}-${student.id}`,
               name: student.fullName,
               parent: student.parentName,
+              teacher: student.teacherName,
+              grade: student.grade,
               phone: student.parentPhone,
-              detail: `Bus ${number} · Grade ${student.grade}`,
             })),
           ),
           ...list.vans.flatMap((item) =>
@@ -60,8 +63,9 @@ export default async function BusDriverPrintPage({
               id: `${item.id}-${student.id}`,
               name: student.name,
               parent: student.parentName,
+              teacher: "",
+              grade: student.grade,
               phone: student.parentPhone,
-              detail: `${item.name} · Grade ${student.grade}`,
             })),
           ),
         ];
@@ -89,10 +93,11 @@ export default async function BusDriverPrintPage({
           <thead>
             <tr className="text-muted">
               <th className="py-2">#</th>
-              <th>Student</th>
-              <th>Parent</th>
+              <th>Student name</th>
+              <th>Parent name</th>
+              <th>Teacher name</th>
+              <th>Grade</th>
               <th>Parent phone</th>
-              <th>Grade / class</th>
             </tr>
           </thead>
           <tbody>
@@ -101,8 +106,9 @@ export default async function BusDriverPrintPage({
                 <td className="py-2">{index + 1}</td>
                 <td className="font-semibold">{row.name}</td>
                 <td>{row.parent && row.parent !== "—" ? row.parent : "—"}</td>
+                <td>{row.teacher || "—"}</td>
+                <td>{row.grade}</td>
                 <td>{row.phone || "—"}</td>
-                <td>{row.detail}</td>
               </tr>
             ))}
           </tbody>

@@ -212,59 +212,48 @@ export function DriverLists({
           {message ? (
             <p className="no-print mt-3 text-sm text-muted">{message}</p>
           ) : null}
-          <ul className="mt-4 divide-y divide-line">
-            <li className="hidden py-2 text-[11px] font-semibold uppercase tracking-wide text-muted sm:grid sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(8rem,0.9fr)_auto] sm:gap-3">
-              <span>Student</span>
-              <span>Parent</span>
-              <span>Parent phone</span>
-              <span>Grade</span>
-            </li>
-            {rows.map((rider) => {
-              const call = phoneHref(rider.parentPhone);
-              const parent =
-                rider.parentName && rider.parentName !== "—"
-                  ? rider.parentName
-                  : "Not on file";
-              return (
-                <li
-                  key={rider.id}
-                  className="grid gap-2 py-3 text-sm sm:grid-cols-[minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(8rem,0.9fr)_auto] sm:items-center sm:gap-3"
-                >
-                  <span>
-                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted sm:hidden">
-                      Student
-                    </span>
-                    <span className="font-semibold">{rider.name}</span>
-                  </span>
-                  <span>
-                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted sm:hidden">
-                      Parent
-                    </span>
-                    <span className="font-medium">{parent}</span>
-                  </span>
-                  <span>
-                    <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted sm:hidden">
-                      Parent phone
-                    </span>
-                    {hasParentPhone(rider.parentPhone) && call ? (
-                      <a
-                        href={call}
-                        className="font-semibold text-navy underline-offset-2 hover:underline"
-                      >
-                        {rider.parentPhone}
-                      </a>
-                    ) : (
-                      <span className="text-muted">Not on file</span>
-                    )}
-                  </span>
-                  <span className="text-muted">
-                    Grade {rider.grade}
-                    {rider.teacherName ? ` · ${rider.teacherName}` : ""}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[36rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  <th className="py-2 pr-3">Student name</th>
+                  <th className="py-2 pr-3">Parent name</th>
+                  <th className="py-2 pr-3">Teacher name</th>
+                  <th className="py-2 pr-3">Grade</th>
+                  <th className="py-2">Parent phone</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((rider) => {
+                  const call = phoneHref(rider.parentPhone);
+                  const parent =
+                    rider.parentName && rider.parentName !== "—"
+                      ? rider.parentName
+                      : "Not on file";
+                  return (
+                    <tr key={rider.id} className="border-b border-line last:border-0">
+                      <td className="py-2.5 pr-3 font-semibold">{rider.name}</td>
+                      <td className="py-2.5 pr-3">{parent}</td>
+                      <td className="py-2.5 pr-3">{rider.teacherName || "—"}</td>
+                      <td className="py-2.5 pr-3">{rider.grade}</td>
+                      <td className="py-2.5">
+                        {hasParentPhone(rider.parentPhone) && call ? (
+                          <a
+                            href={call}
+                            className="font-semibold text-navy underline-offset-2 hover:underline"
+                          >
+                            {rider.parentPhone}
+                          </a>
+                        ) : (
+                          <span className="text-muted">Not on file</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           {!rows.length ? (
             <p className="mt-3 text-sm text-muted">
               No students on {title} yet.

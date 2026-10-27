@@ -216,9 +216,10 @@ export function oneVehicleText(args: {
     `${rows.length} student${rows.length === 1 ? "" : "s"}`,
     "Parent pickup is not on this list.",
     "",
+    "Student name  |  Parent name  |  Teacher name  |  Grade  |  Parent phone",
     ...rows.map(
       (rider) =>
-        `  ${rider.name}  Parent: ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  ${rider.parentPhone || "—"}  Grade ${rider.grade}  ${rider.teacherName}`,
+        `  ${rider.name}  |  ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  |  ${rider.teacherName || "—"}  |  Grade ${rider.grade}  |  ${rider.parentPhone || "—"}`,
     ),
   ];
   if (!rows.length) lines.push("No students on this vehicle.");
