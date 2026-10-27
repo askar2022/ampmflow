@@ -41,10 +41,10 @@ export default async function Home() {
           </section>
 
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
-            <h2 className="text-lg font-semibold text-navy">Interested school</h2>
+            <h2 className="text-lg font-semibold text-navy">Talk to AMPM Flow</h2>
             <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-              Contact us to get started. We review each request and set up the
-              school. You get a private sign-in link when it is ready.
+              Send a message to the AMPM Flow administrator. Schools cannot
+              add themselves.
             </p>
             <Link
               href="/contact"

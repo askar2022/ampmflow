@@ -5,7 +5,7 @@ export function ContactForm({ error }: { error?: string }) {
   return (
     <form action={submitSchoolInquiry} className="space-y-3">
       <label className="block text-left text-sm font-medium text-navy">
-        School name
+        School you are asking about
         <input name="schoolName" required className={fieldClass} />
       </label>
       <label className="block text-left text-sm font-medium text-navy">

@@ -32,50 +32,31 @@ export async function emailNewSchoolRequest(args: {
     return { sent: false as const, reason: "email is not configured" };
   }
 
-  const requester = usableOpsEmail(args.email);
   const admins = await platformAdminEmails();
-  const results: string[] = [];
-
-  if (requester) {
-    const text = [
-      "AMPM Flow received your message.",
-      "",
-      `School: ${args.schoolName}`,
-      `Requested by: ${args.name}`,
-      "",
-      "This did not open a school or an account.",
-      "The AMPM Flow administrator will review it and set the school up.",
-      "You will get a private sign-in link when it is ready.",
-    ].join("\n");
-    const sent = await sendMail({
-      to: requester,
-      subject: `AMPM Flow received ${args.schoolName}`,
-      text,
-    });
-    if (sent.sent) results.push(requester);
+  if (!admins.length) {
+    return { sent: false as const, reason: "no admin email" };
   }
 
-  if (admins.length) {
-    const text = [
-      "A school asked to start AMPM Flow. Do not activate it until you review and set it up.",
-      "",
-      `School: ${args.schoolName}`,
-      `Name: ${args.name}`,
-      `Email: ${args.email}`,
-      args.note ? `Note: ${args.note}` : "",
-      "",
-      "Open Users, then Set up a school. That creates the private sign-in link and emails them.",
-      "https://www.ampmflow.com/admin/users",
-    ].join("\n");
-    const sent = await sendMail({
-      to: admins,
-      subject: `New school request — ${args.schoolName}`,
-      text,
-    });
-    if (sent.sent) results.push(...admins);
-  }
-
-  return { sent: results.length > 0, recipients: results };
+  const text = [
+    "Someone sent a message from the AMPM Flow contact form.",
+    "Do not treat this as a school adding itself. Only you can add a school.",
+    "",
+    `School they mentioned: ${args.schoolName}`,
+    `Name: ${args.name}`,
+    `Their email: ${args.email}`,
+    args.note ? `Note: ${args.note}` : "",
+    "",
+    "If you want this school on AMPM Flow, open Users and Set up a school.",
+    "https://www.ampmflow.com/admin/users",
+  ]
+    .filter((line, index, lines) => line !== "" || lines[index - 1] !== "")
+    .join("\n");
+  const sent = await sendMail({
+    to: admins,
+    subject: `AMPM Flow contact — ${args.schoolName}`,
+    text,
+  });
+  return { sent: sent.sent, recipients: sent.sent ? admins : [] };
 }
 
 export async function emailSchoolApproved(args: {

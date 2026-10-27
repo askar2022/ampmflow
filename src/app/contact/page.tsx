@@ -19,17 +19,16 @@ export default async function ContactPage({
     <LoginFrame variant="signup">
       <div>
         <h2 className="text-lg font-semibold text-navy short-h:text-base">
-          Contact us to get started
+          Contact AMPM Flow
         </h2>
         <p className="mt-0.5 text-sm text-[#7b8490]">
-          Tell us about your school. This does not open an account. AMPM Flow
-          reviews each request and sets the school up. You will get a private
-          sign-in link when it is ready.
+          Leave a message for the AMPM Flow administrator. Schools cannot add
+          themselves. Only the AMPM Flow administrator can add a school.
         </p>
         {sent === "1" ? (
           <p className="mt-4 rounded-xl border border-line bg-paper px-4 py-3 text-sm text-navy">
-            We received your message. Watch your email for a private sign-in
-            link after the school is set up.
+            Your message was sent to AMPM Flow. The administrator will follow
+            up if a school should be set up.
           </p>
         ) : (
           <div className="mt-3">
