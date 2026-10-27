@@ -343,6 +343,53 @@ async function applyStudentPlans(args: {
   }
 }
 
+async function placeWithTeacher(args: {
+  schoolId: string;
+  studentId: string;
+  grade: string;
+  teacherName: string;
+}) {
+  const name = args.teacherName.trim() || "Unassigned";
+  const classroomName = name === "Unassigned" ? `${args.grade} classroom` : name;
+  let classroom = await prisma.classroom.findFirst({
+    where: { schoolId: args.schoolId, name: classroomName },
+    select: { id: true },
+  });
+  if (!classroom) {
+    classroom = await prisma.classroom.create({
+      data: {
+        schoolId: args.schoolId,
+        name: classroomName,
+        grade: args.grade,
+      },
+      select: { id: true },
+    });
+  }
+  const teacher = await prisma.teacher.findFirst({
+    where: { classroomId: classroom.id },
+    select: { id: true },
+  });
+  if (!teacher) {
+    await prisma.teacher.create({
+      data: {
+        schoolId: args.schoolId,
+        classroomId: classroom.id,
+        name,
+        email: "",
+      },
+    });
+  } else if (name !== "Unassigned") {
+    await prisma.teacher.update({
+      where: { id: teacher.id },
+      data: { name },
+    });
+  }
+  await prisma.student.update({
+    where: { id: args.studentId },
+    data: { classroomId: classroom.id },
+  });
+}
+
 async function findExistingStudent(
   schoolId: string,
   studentId: string,
@@ -497,11 +544,6 @@ export async function importStudents(formData: FormData) {
     const rowSource = parseEnrollment(enrollmentRaw, enrollmentSource);
     const grade = normalizeGrade(cell(row, "grade") || "—");
     const room = cell(row, "classroom", "room", "teacher/class");
-    const classroomName = room
-      ? /^\d+$/.test(room)
-        ? `Room ${room}`
-        : room
-      : `${grade} classroom`;
     const teacherName =
       cell(
         row,
@@ -511,6 +553,13 @@ export async function importStudents(formData: FormData) {
         "homeroom teacher",
         "classroom teacher",
       ) || "Unassigned";
+    const classroomName = room
+      ? /^\d+$/.test(room)
+        ? `Room ${room}`
+        : room
+      : teacherName !== "Unassigned"
+        ? teacherName
+        : `${grade} classroom`;
     const parentPhone =
       cell(row, "primary phone", "parent_phone", "parent phone", "phone") || "—";
     const parentEmail =
@@ -648,33 +697,12 @@ export async function importStudents(formData: FormData) {
           }
         }
       }
-      if (teacherName && teacherName !== "Unassigned") {
-        const current = await prisma.student.findUnique({
-          where: { id: existingEarly.id },
-          select: { classroomId: true },
-        });
-        if (current?.classroomId) {
-          const teacher = await prisma.teacher.findFirst({
-            where: { classroomId: current.classroomId },
-            select: { id: true },
-          });
-          if (teacher) {
-            await prisma.teacher.update({
-              where: { id: teacher.id },
-              data: { name: teacherName },
-            });
-          } else {
-            await prisma.teacher.create({
-              data: {
-                schoolId: user.schoolId,
-                classroomId: current.classroomId,
-                name: teacherName,
-                email: "",
-              },
-            });
-          }
-        }
-      }
+      await placeWithTeacher({
+        schoolId: user.schoolId,
+        studentId: existingEarly.id,
+        grade,
+        teacherName,
+      });
       await applyStudentPlans({
         schoolId: user.schoolId,
         userId: user.id,
