@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { APP_NAME, APP_SUBTITLE } from "@/lib/school";
 
 export function LoginFrame({
@@ -16,14 +17,16 @@ export function LoginFrame({
     <div className="flex min-h-dvh items-center justify-center overflow-x-hidden overflow-y-auto bg-[#f3f4f6] px-4 py-4 short-h:py-3 sm:py-6">
       <div className="login-card w-full max-w-[440px] rounded-[20px] border border-[#e8e8ea] bg-white px-6 py-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)] short-h:py-4 sm:px-8">
         <div className="flex flex-col items-center text-center">
-          <img
-            src="/front_image.png"
-            alt=""
-            className={`${illustrationWidth} h-auto object-contain mix-blend-multiply`}
-          />
-          <h1 className="mt-1.5 text-[28px] leading-none font-semibold tracking-tight text-navy short-h:mt-1 short-h:text-[22px]">
-            {APP_NAME}
-          </h1>
+          <Link href="/" className="flex flex-col items-center">
+            <img
+              src="/front_image.png"
+              alt=""
+              className={`${illustrationWidth} h-auto object-contain mix-blend-multiply`}
+            />
+            <h1 className="mt-1.5 text-[28px] leading-none font-semibold tracking-tight text-navy short-h:mt-1 short-h:text-[22px]">
+              {APP_NAME}
+            </h1>
+          </Link>
           <p className="mt-1.5 text-[13px] font-medium text-[#4b5563] short-h:mt-1">
             {APP_SUBTITLE}
           </p>

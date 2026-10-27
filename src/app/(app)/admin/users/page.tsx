@@ -194,9 +194,9 @@ export default async function UsersPage() {
       <section>
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
-          The system does not email a password or a verification link. Type a
-          temporary password, tell that person, and they sign in on the login
-          page. If login fails, set a new password here and try again.
+          Add staff for this school only. Type a temporary password, tell that
+          person, and they sign in at the regular login page. AMPM Flow does
+          not email a password. If login fails, set a new password here.
         </p>
         <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
           <table className="w-full text-left text-sm">
@@ -232,11 +232,14 @@ export default async function UsersPage() {
         </div>
       </section>
       <form action={createUser} className="rounded-2xl border border-line bg-card p-6">
-        <h2 className="font-serif text-2xl">Add user</h2>
+        <h2 className="font-serif text-2xl">Add staff for this school</h2>
         <p className="mt-1 text-sm text-muted">
-          For Bus Coordinator, Reception, Admin, or Bus Company, leave class
-          blank. Only a Teacher login needs a class. Write down the temporary
-          password and give it to that person — AMPM Flow does not send it.
+          This is how Front Desk, teachers, and other staff get an account for
+          this school only. They sign in at the regular login page. They cannot
+          open a new school. Write down the temporary password and give it to
+          that person — AMPM Flow does not send it. For Bus Coordinator,
+          Reception, Admin, or Bus Company, leave class blank. Only a Teacher
+          login needs a class.
         </p>
         <div className="mt-4 space-y-3">
           <input name="name" required placeholder="Name" className="w-full rounded-xl border border-line px-3 py-2" />

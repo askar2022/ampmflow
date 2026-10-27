@@ -88,7 +88,7 @@ export function SetupForm({
         {mode === "request"
           ? "Request to join this school"
           : mode === "new-school"
-            ? "Create my school"
+            ? "Request this school"
             : "Create account"}
       </SubmitButton>
     </form>

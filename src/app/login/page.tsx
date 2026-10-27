@@ -79,7 +79,8 @@ export default async function LoginPage({
             Welcome back
           </h2>
           <p className="mt-0.5 text-sm text-[#7b8490]">
-            Sign in to manage today’s transportation.
+            Sign in to your school. Ask your administrator if you need a staff
+            account.
           </p>
           <div className="mt-3 short-h:mt-2.5">
             <SignInForm
@@ -91,9 +92,11 @@ export default async function LoginPage({
                     : undefined
               }
               notice={
-                requested === "1"
-                  ? "Your request was sent. Check your email. An AMPM Flow administrator must approve the school before you can sign in."
-                  : undefined
+                requested === "school"
+                  ? "Your school request was sent. Check your email. An AMPM Flow administrator must approve the school before you can sign in."
+                  : requested === "1"
+                    ? "Your request was sent. Your school administrator must approve you before you can sign in."
+                    : undefined
               }
             />
           </div>

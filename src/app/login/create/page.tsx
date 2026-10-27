@@ -10,6 +10,10 @@ export default async function CreateAccountPage({
   searchParams: Promise<{ error?: string; kind?: string }>;
 }) {
   const { error, kind } = await searchParams;
+  if (kind === "new") {
+    redirect("/schools");
+  }
+
   const db = await checkDatabase();
   if (!db.ok) {
     redirect("/login");
@@ -23,18 +27,17 @@ export default async function CreateAccountPage({
   }
 
   const firstAdmin = userCount === 0;
-  const startNew = !firstAdmin && kind === "new";
   const message =
     error === "exists"
       ? "That email already has an account. Sign in instead."
       : error === "pending"
         ? "That email already has a request waiting for approval."
         : error === "setup"
-          ? "School name, your name, email, and a password of at least 8 characters are required."
+          ? firstAdmin
+            ? "School name, your name, email, and a password of at least 8 characters are required."
+            : "Your name, email, school name, and a password of at least 8 characters are required."
         : error === "no-school"
-          ? "No school with that name. Check the spelling, or start a new school."
-        : error === "school-exists"
-          ? "That school is already on AMPM Flow. Request to join it instead."
+          ? "No school with that name. Check the spelling, or ask your administrator."
         : error === "db"
           ? "The account could not be saved. Check the database connection and try again."
           : undefined;
@@ -43,46 +46,18 @@ export default async function CreateAccountPage({
     <LoginFrame variant="signup">
       <div>
         <h2 className="text-lg font-semibold text-navy short-h:text-base">
-          {firstAdmin
-            ? "Create account"
-            : startNew
-              ? "Start a new school"
-              : "Join a school"}
+          {firstAdmin ? "Create account" : "Join your school"}
         </h2>
         <p className="mt-0.5 text-sm text-[#7b8490]">
           {firstAdmin
             ? "Create your AMPM Flow administrator account."
-            : startNew
-              ? "This sends a request for a separate school. You cannot sign in until the AMPM Flow administrator approves you."
-              : "Ask to join a school that is already on AMPM Flow. An administrator must approve you before you can sign in."}
+            : "Type your school name exactly. Your school administrator must approve you before you can sign in. This does not open a new school."}
         </p>
-        {!firstAdmin ? (
-          <div className="mt-3 flex gap-2 text-sm font-semibold">
-            <Link
-              href="/login/create"
-              className={`rounded-full px-3 py-1.5 ${
-                startNew ? "border border-line text-navy" : "bg-navy text-white"
-              }`}
-            >
-              Join a school
-            </Link>
-            <Link
-              href="/login/create?kind=new"
-              className={`rounded-full px-3 py-1.5 ${
-                startNew ? "bg-navy text-white" : "border border-line text-navy"
-              }`}
-            >
-              Start a new school
-            </Link>
-          </div>
-        ) : null}
         <div className="mt-3 short-h:mt-2.5">
           <SetupForm
             error={message}
             showSchoolName
-            mode={
-              firstAdmin ? "first-admin" : startNew ? "new-school" : "request"
-            }
+            mode={firstAdmin ? "first-admin" : "request"}
           />
         </div>
         <p className="mt-3 text-center text-sm text-navy">

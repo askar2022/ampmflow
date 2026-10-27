@@ -42,17 +42,19 @@ async function ensureOptionalColumns() {
 }
 
 export async function createAccount(formData: FormData) {
-  if (!isDatabaseConfigured()) {
-    redirect("/login/create?error=db");
-  }
-
   const schoolName = String(formData.get("schoolName") || "").trim();
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
+  const intent = String(formData.get("intent") || "join");
+  const failPath = intent === "new-school" ? "/schools" : "/login/create";
+
+  if (!isDatabaseConfigured()) {
+    redirect(`${failPath}?error=db`);
+  }
 
   if (!name || !email || !password || password.length < 8) {
-    redirect("/login/create?error=setup");
+    redirect(`${failPath}?error=setup`);
   }
 
   await ensureOptionalColumns();
@@ -71,20 +73,18 @@ export async function createAccount(formData: FormData) {
       select: { id: true, name: true },
     });
   } catch {
-    redirect("/login/create?error=db");
+    redirect(`${failPath}?error=db`);
   }
 
   if (already) {
     redirect(
       already.role === PENDING_ROLE
-        ? "/login/create?error=pending"
-        : "/login/create?error=exists",
+        ? `${failPath}?error=pending`
+        : `${failPath}?error=exists`,
     );
   }
 
   const passwordHash = await hashPassword(password);
-
-  const intent = String(formData.get("intent") || "join");
 
   if (existingUsers === 0) {
     if (!schoolName) {
@@ -102,11 +102,11 @@ export async function createAccount(formData: FormData) {
 
   if (intent === "new-school") {
     if (!schoolName) {
-      redirect("/login/create?error=setup&kind=new");
+      redirect("/schools?error=setup");
     }
     const taken = await findSchoolByName(schoolName);
     if (taken) {
-      redirect("/login/create?error=school-exists&kind=new");
+      redirect("/schools?error=school-exists");
     }
     const created = await prisma.school.create({
       data: { name: schoolName, timezone: "America/Chicago" },
@@ -141,7 +141,7 @@ export async function createAccount(formData: FormData) {
       name,
       email,
     }).catch(() => undefined);
-    redirect("/login?requested=1");
+    redirect("/login?requested=school");
   }
 
   const joinSchool = schoolName

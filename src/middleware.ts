@@ -6,7 +6,15 @@ const secret = new TextEncoder().encode(
   process.env.SESSION_SECRET || "dev-only-change-me",
 );
 
-const PUBLIC = ["/login"];
+const PUBLIC_EXACT = ["/"];
+const PUBLIC_PREFIX = ["/login", "/schools"];
+
+function isPublicPath(pathname: string) {
+  if (PUBLIC_EXACT.includes(pathname)) return true;
+  return PUBLIC_PREFIX.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -30,7 +38,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (PUBLIC.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+  if (isPublicPath(pathname)) {
     if (role) {
       const url = request.nextUrl.clone();
       url.pathname =
