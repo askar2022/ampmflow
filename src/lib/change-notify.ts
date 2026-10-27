@@ -83,8 +83,8 @@ async function busCompanyEmails(schoolId: string) {
   const [saved, users] = await Promise.all([
     loadSavedOpsEmails(schoolId),
     prisma.user.findMany({
-      where: { schoolId, active: true, role: "BUS_COMPANY" },
-      select: { email: true },
+      where: { schoolId, active: true, role: { in: ["BUS_COMPANY", "COORDINATOR", "ADMINISTRATOR"] } },
+      select: { email: true, role: true },
     }),
   ]);
   return uniqueEmails([

@@ -176,6 +176,37 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
 
   const after = await loadStudent(input.studentId);
   const student = after?.effective ?? loaded.effective;
+  await prisma.changeRequest
+    .create({
+      data: {
+        schoolId: user.schoolId,
+        studentId: input.studentId,
+        trip: input.trips.join("+"),
+        source: user.role,
+        title: `Transportation change — ${student.fullName}`,
+        details: [
+          planLine(student, input.trips),
+          when,
+          note,
+          waiting ? "Waiting for a bus route." : "",
+          `Entered by ${user.name}.`,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        status: waiting ? "PENDING" : "COMPLETED",
+        busNumber: busNumber || null,
+        payload: JSON.stringify({
+          destination,
+          duration: input.duration,
+          trips: input.trips,
+          waiting,
+        }),
+        createdById: user.id,
+        reviewedById: waiting ? null : user.id,
+        reviewedAt: waiting ? null : new Date(),
+      },
+    })
+    .catch(() => undefined);
   const notice = await notifyTransportationChange({
     user,
     student,

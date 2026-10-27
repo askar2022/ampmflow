@@ -1,9 +1,11 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers, getSession, hashPassword, isPlatformAdmin } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
+import { emailSchoolApproved } from "@/lib/school-request-email";
 import { PENDING_ROLE, ROLES, type Role } from "@/lib/types";
 
 export async function createUser(formData: FormData): Promise<void> {
@@ -141,6 +143,83 @@ export async function approveUser(formData: FormData) {
     newPlan: { name: user.name, email: user.email, role },
   });
 
+  const school = await prisma.school.findUnique({
+    where: { id: user.schoolId },
+    select: { name: true },
+  });
+  await emailSchoolApproved({
+    schoolName: school?.name || "your school",
+    name: user.name,
+    email: user.email,
+  }).catch(() => undefined);
+
+  revalidatePath("/admin/users");
+}
+
+export async function createSchoolForDemo(formData: FormData) {
+  const session = await getSession();
+  if (!session || !canManageUsers(session.role)) return;
+  if (!(await isPlatformAdmin(session))) return;
+
+  const schoolName = String(formData.get("schoolName") || "").trim();
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
+  if (!schoolName || !name || !email || password.length < 8) return;
+
+  const takenUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, role: true, schoolId: true },
+  });
+  const schools = await prisma.school.findMany({ select: { id: true, name: true } });
+  const takenSchool = schools.find(
+    (row) => row.name.toLowerCase().replace(/\s+/g, " ") === schoolName.toLowerCase().replace(/\s+/g, " "),
+  );
+
+  if (takenUser?.role === PENDING_ROLE) {
+    await prisma.user.update({
+      where: { id: takenUser.id },
+      data: { role: "ADMINISTRATOR", active: true, passwordHash: await hashPassword(password) },
+    });
+    const school = await prisma.school.findUnique({
+      where: { id: takenUser.schoolId },
+      select: { name: true },
+    });
+    await emailSchoolApproved({
+      schoolName: school?.name || schoolName,
+      name,
+      email,
+    }).catch(() => undefined);
+    revalidatePath("/admin/users");
+    return;
+  }
+
+  if (takenUser) return;
+
+  const school =
+    takenSchool ||
+    (await prisma.school.create({
+      data: { name: schoolName, timezone: "America/Chicago" },
+      select: { id: true, name: true },
+    }));
+  await prisma.schoolSettings
+    .create({ data: { id: randomUUID(), schoolId: school.id } })
+    .catch(() => undefined);
+  await prisma.user.create({
+    data: {
+      schoolId: school.id,
+      name,
+      email,
+      role: "ADMINISTRATOR",
+      passwordHash: await hashPassword(password),
+      active: true,
+    },
+  });
+  await emailSchoolApproved({
+    schoolName: school.name,
+    name,
+    email,
+  }).catch(() => undefined);
   revalidatePath("/admin/users");
 }
 

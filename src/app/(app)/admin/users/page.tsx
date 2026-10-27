@@ -3,6 +3,7 @@ import { canManageUsers, getSession, isPlatformAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
   approveUser,
+  createSchoolForDemo,
   createUser,
   rejectUser,
   resetUserPassword,
@@ -77,6 +78,53 @@ export default async function UsersPage() {
           Save school identity
         </button>
       </form>
+      {platform ? (
+        <form
+          action={createSchoolForDemo}
+          className="rounded-2xl border border-line bg-card p-6 lg:col-span-2"
+        >
+          <h2 className="text-2xl font-semibold tracking-tight text-navy">
+            Open a school for demo
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Creates the school and an admin login they can use tomorrow. If
+            they already submitted a request, this approves that same email
+            and emails them that they can sign in.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <input
+              name="schoolName"
+              required
+              placeholder="School name"
+              className="w-full rounded-xl border border-line px-3 py-2"
+            />
+            <input
+              name="name"
+              required
+              placeholder="Admin name"
+              className="w-full rounded-xl border border-line px-3 py-2"
+            />
+            <input
+              name="email"
+              type="email"
+              required
+              placeholder="Admin email"
+              className="w-full rounded-xl border border-line px-3 py-2"
+            />
+            <input
+              name="password"
+              type="password"
+              required
+              minLength={8}
+              placeholder="Demo password (8+ characters)"
+              className="w-full rounded-xl border border-line px-3 py-2"
+            />
+          </div>
+          <button className="mt-3 rounded-xl bg-navy px-4 py-2 font-semibold text-white">
+            Open school and email them
+          </button>
+        </form>
+      ) : null}
       {pending.length ? (
         <section className="lg:col-span-2">
           <h2 className="text-2xl font-semibold tracking-tight text-navy">

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma, isDatabaseConfigured } from "@/lib/prisma";
 import { createSession, hashPassword } from "@/lib/auth";
 import { notifyCoordinators } from "@/lib/audit";
+import { emailNewSchoolRequest } from "@/lib/school-request-email";
 import { PENDING_ROLE } from "@/lib/types";
 
 const FIRST_ADMIN_ROLE = "ADMINISTRATOR" as const;
@@ -135,6 +136,11 @@ export async function createAccount(formData: FormData) {
         `${name} asked to open ${created.name}. Approve them under Users before they can sign in.`,
       ).catch(() => undefined);
     }
+    await emailNewSchoolRequest({
+      schoolName: created.name,
+      name,
+      email,
+    }).catch(() => undefined);
     redirect("/login?requested=1");
   }
 

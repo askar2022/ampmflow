@@ -26,10 +26,9 @@ export function OpsChangeEmails({
     <section className="rounded-2xl border border-line bg-card p-5">
       <h2 className="text-xl font-semibold text-navy">Daily change emails</h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Add bus coordinator, admin, and bus assistant emails here. Every school
-        day at {sendAt}, they get one email of <strong>only today’s changes</strong>,
-        grouped by class, so they know which rooms to check. Friday sends at
-        11:30 AM.
+        These people also get the 2:30 reminder of only today’s changes,
+        grouped by class. The desk already emailed teacher, parent, and the bus
+        company when the change was saved. Friday reminder is 11:30 AM.
       </p>
       {emails.length ? (
         <ul className="mt-4 space-y-2">
@@ -118,7 +117,8 @@ export function OpsChangeEmails({
         </form>
       ) : (
         <p className="mt-3 text-sm text-muted">
-          Ask a bus coordinator or admin to add emails here.
+          Reception only saves the change on the desk. The {sendAt} reminder
+          is automatic.
         </p>
       )}
       {lastSent ? (

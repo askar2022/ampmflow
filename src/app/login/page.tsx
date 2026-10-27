@@ -92,7 +92,7 @@ export default async function LoginPage({
               }
               notice={
                 requested === "1"
-                  ? "Your request was sent. An AMPM Flow administrator must approve it before you can sign in."
+                  ? "Your request was sent. Check your email. An AMPM Flow administrator must approve the school before you can sign in."
                   : undefined
               }
             />

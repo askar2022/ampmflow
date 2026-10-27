@@ -28,8 +28,10 @@ export default async function ChangesPage() {
         </p>
         <h1 className="font-serif text-4xl">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          These students have a today-only or date-range exception. When the dates
-          end, they automatically return to their permanent AM and PM assignments.
+          Reception does not send this list by hand. Saving a change on the desk
+          emails the teacher, parent, and bus company right away. This page is
+          the same-day list. At {opsChangesClockLabel()} it goes out again so
+          nobody has to remember.
         </p>
         <a
           href="/print/export?kind=changes"
@@ -84,8 +86,8 @@ export default async function ChangesPage() {
                       {student.pm.endDate || student.am.endDate}
                     </td>
                     <td className="px-4">
-                      <Link href={`/students/${student.id}`} className="font-semibold text-blue">
-                        Record
+                      <Link href={`/dashboard?student=${student.id}`} className="font-semibold text-blue">
+                        Open on desk
                       </Link>
                     </td>
                   </tr>
