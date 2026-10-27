@@ -14,6 +14,7 @@ import { loadPendingInquiries } from "@/lib/inquiries";
 import { ensureSchoolSlugs, schoolLoginUrl, schoolSlugForId } from "@/lib/school-slug";
 import { PENDING_ROLE } from "@/lib/types";
 import { AddUserFields } from "./AddUserFields";
+import { UserPasswordField } from "./UserPasswordField";
 import { UserRemoveButton } from "./UserRemoveButton";
 
 export default async function UsersPage() {
@@ -234,8 +235,9 @@ export default async function UsersPage() {
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
           Add staff for this school only. Type a temporary password, tell that
-          person, and they sign in at the regular login page. AMPM Flow does
-          not email a password. If login fails, set a new password here.
+          person, and they sign in. AMPM Flow does not email a password. To
+          change a password, type the new one on that row and click Set
+          password.
         </p>
         <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-card">
           <table className="w-full text-left text-sm">
@@ -245,6 +247,7 @@ export default async function UsersPage() {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
+                <th className="px-4">Password</th>
                 <th className="px-4">Remove</th>
               </tr>
             </thead>
@@ -257,6 +260,9 @@ export default async function UsersPage() {
                   <td className="text-muted">{user.email}</td>
                   <td>{roleLabel(user.role)}</td>
                   <td>{user.active ? "Active" : "Removed"}</td>
+                  <td className="px-4 py-3">
+                    <UserPasswordField id={user.id} />
+                  </td>
                   <td className="px-4 py-3">
                     {user.id !== session.id ? (
                       <UserRemoveButton id={user.id} active={user.active} />
