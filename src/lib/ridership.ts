@@ -11,6 +11,7 @@ export type VanRider = {
   id: string;
   name: string;
   grade: string;
+  parentPhone: string;
 };
 
 export type VanGroup = {
@@ -33,6 +34,8 @@ export type DriverRider = {
   studentId: string;
   grade: string;
   teacherName: string;
+  parentName: string;
+  parentPhone: string;
   buses: string[];
   vanId: string | null;
 };
@@ -85,6 +88,7 @@ export async function loadRidership(schoolId: string): Promise<Ridership> {
           firstName: true,
           lastName: true,
           grade: true,
+          parentPhone: true,
           vehicleId: true,
         },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -101,6 +105,7 @@ export async function loadRidership(schoolId: string): Promise<Ridership> {
           id: student.id,
           name: `${student.firstName} ${student.lastName}`,
           grade: student.grade,
+          parentPhone: student.parentPhone,
         })),
     }))
     .filter((van) => van.riders.length);
@@ -129,7 +134,7 @@ export function ridershipText(list: Ridership) {
     lines.push(`Bus ${number} (${riders.length})`);
     for (const student of riders) {
       lines.push(
-        `  ${student.fullName}  ${student.studentId}  Grade ${student.grade}  ${planSummary(student.pm, "PM")}`,
+        `  ${student.fullName}  Grade ${student.grade}  ${planSummary(student.pm, "PM")}  ${student.parentPhone || "—"}`,
       );
     }
     lines.push("");
@@ -138,7 +143,7 @@ export function ridershipText(list: Ridership) {
   for (const van of list.vans) {
     lines.push(`${van.name} (${van.riders.length})`);
     for (const student of van.riders) {
-      lines.push(`  ${student.name}  Grade ${student.grade}`);
+      lines.push(`  ${student.name}  Grade ${student.grade}  ${student.parentPhone || "—"}`);
     }
     lines.push("");
   }
@@ -174,6 +179,8 @@ export async function loadDriverLists(schoolId: string) {
     studentId: student.studentId,
     grade: student.grade,
     teacherName: student.teacherName,
+    parentName: student.parentName,
+    parentPhone: student.parentPhone,
     buses: studentBusNumbers(student),
     vanId: vanByStudent.get(student.id) || null,
   }));
@@ -206,7 +213,7 @@ export function oneVehicleText(args: {
     "",
     ...rows.map(
       (rider) =>
-        `  ${rider.name}  ${rider.studentId}  Grade ${rider.grade}  ${rider.teacherName}`,
+        `  ${rider.name}  Grade ${rider.grade}  ${rider.teacherName}  ${rider.parentPhone || "—"}`,
     ),
   ];
   if (!rows.length) lines.push("No students on this vehicle.");

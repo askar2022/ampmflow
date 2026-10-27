@@ -18,6 +18,15 @@ function vehicleLabel(kind: "bus" | "van", id: string, vans: DriverVan[]) {
   return vans.find((van) => van.id === id)?.name || "Van";
 }
 
+function phoneHref(value: string) {
+  const digits = value.replace(/[^\d+]/g, "");
+  return digits.length >= 7 ? `tel:${digits}` : "";
+}
+
+function hasParentPhone(value: string) {
+  return Boolean(phoneHref(value));
+}
+
 export function DriverLists({
   riders,
   buses,
@@ -49,7 +58,14 @@ export function DriverLists({
       return [];
     }
     return riders.filter((rider) =>
-      [rider.name, rider.studentId, rider.grade, rider.teacherName]
+      [
+        rider.name,
+        rider.studentId,
+        rider.grade,
+        rider.teacherName,
+        rider.parentName,
+        rider.parentPhone,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(q),
@@ -197,18 +213,38 @@ export function DriverLists({
             <p className="no-print mt-3 text-sm text-muted">{message}</p>
           ) : null}
           <ul className="mt-4 divide-y divide-line">
-            {rows.map((rider) => (
-              <li key={rider.id} className="flex justify-between gap-3 py-2 text-sm">
-                <span>
-                  <span className="font-semibold">{rider.name}</span>
-                  <span className="ml-2 text-muted">{rider.studentId}</span>
-                </span>
-                <span className="text-muted">
-                  Grade {rider.grade}
-                  {rider.teacherName ? ` · ${rider.teacherName}` : ""}
-                </span>
-              </li>
-            ))}
+            {rows.map((rider) => {
+              const call = phoneHref(rider.parentPhone);
+              return (
+                <li
+                  key={rider.id}
+                  className="flex flex-wrap items-start justify-between gap-3 py-2 text-sm"
+                >
+                  <span>
+                    <span className="font-semibold">{rider.name}</span>
+                    <span className="mt-0.5 block">
+                      {hasParentPhone(rider.parentPhone) && call ? (
+                        <a
+                          href={call}
+                          className="font-semibold text-navy underline-offset-2 hover:underline"
+                        >
+                          {rider.parentPhone}
+                        </a>
+                      ) : (
+                        <span className="text-muted">No parent phone</span>
+                      )}
+                      {rider.parentName && rider.parentName !== "—" ? (
+                        <span className="ml-2 text-muted">{rider.parentName}</span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className="text-muted">
+                    Grade {rider.grade}
+                    {rider.teacherName ? ` · ${rider.teacherName}` : ""}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
           {!rows.length ? (
             <p className="mt-3 text-sm text-muted">

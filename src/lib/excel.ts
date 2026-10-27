@@ -35,6 +35,8 @@ function studentRow(student: EffectiveStudent, extra: Record<string, string> = {
     "Student ID": student.studentId,
     Grade: student.grade,
     Teacher: student.teacherName,
+    Parent: student.parentName,
+    Phone: student.parentPhone,
     "Today PM": planSummary(student.pm, "PM"),
     Location: student.pm.location,
     Address: student.homeAddress,
