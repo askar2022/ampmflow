@@ -10,7 +10,6 @@ import {
   workbookBytes,
 } from "@/lib/excel";
 import {
-  groupConfirmedBus,
   loadGateRoster,
   parentPickupToday,
 } from "@/lib/gate";
@@ -62,15 +61,13 @@ export async function GET(request: Request) {
   let workbook;
   if (kind === "checkin") {
     workbook = checkInWorkbook(await loadCheckInSummary(session.schoolId));
-  } else if (kind === "bus" || kind === "pickup") {
+  } else if (kind === "pickup") {
     const roster = await loadGateRoster(session.schoolId);
-    const useGate =
-      kind === "pickup"
-        ? parentPickupToday(roster).length > 0
-        : groupConfirmedBus(roster).length > 0;
-    workbook = useGate
-      ? gateDismissalWorkbook(kind, roster)
+    workbook = parentPickupToday(roster).length
+      ? gateDismissalWorkbook("pickup", roster)
       : studentsWorkbook(kind, students);
+  } else if (kind === "bus") {
+    workbook = studentsWorkbook(kind, students);
   } else {
     workbook = studentsWorkbook(kind, students);
   }
