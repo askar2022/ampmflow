@@ -7,12 +7,12 @@ import {
   createUser,
   rejectUser,
   resetUserPassword,
-  toggleUserAction,
 } from "@/app/actions/users";
 import { updateSchoolIdentity } from "@/app/actions/school";
 import { roleLabel } from "@/lib/format";
 import { PENDING_ROLE } from "@/lib/types";
 import { AddUserFields } from "./AddUserFields";
+import { UserRemoveButton } from "./UserRemoveButton";
 
 export default async function UsersPage() {
   const session = await getSession();
@@ -45,10 +45,10 @@ export default async function UsersPage() {
     );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="space-y-6">
       <form
         action={updateSchoolIdentity}
-        className="rounded-2xl border border-line bg-card p-6 lg:col-span-2"
+        className="rounded-2xl border border-line bg-card p-6"
       >
         <h2 className="text-2xl font-semibold tracking-tight text-navy">
           School identity
@@ -81,7 +81,7 @@ export default async function UsersPage() {
       {platform ? (
         <form
           action={createSchoolForDemo}
-          className="rounded-2xl border border-line bg-card p-6 lg:col-span-2"
+          className="rounded-2xl border border-line bg-card p-6"
         >
           <h2 className="text-2xl font-semibold tracking-tight text-navy">
             Open a school for demo
@@ -126,7 +126,7 @@ export default async function UsersPage() {
         </form>
       ) : null}
       {pending.length ? (
-        <section className="lg:col-span-2">
+        <section>
           <h2 className="text-2xl font-semibold tracking-tight text-navy">
             Waiting for approval
           </h2>
@@ -191,7 +191,7 @@ export default async function UsersPage() {
           </div>
         </section>
       ) : null}
-      <section className="lg:col-span-2">
+      <section>
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
           The system does not email a password or a verification link. Type a
@@ -220,12 +220,7 @@ export default async function UsersPage() {
                   <td>{user.active ? "Active" : "Removed"}</td>
                   <td className="px-4 py-3">
                     {user.id !== session.id ? (
-                      <form action={toggleUserAction}>
-                        <input type="hidden" name="id" value={user.id} />
-                        <button className="rounded-full bg-red/10 px-3 py-1.5 text-sm font-semibold text-red">
-                          {user.active ? "Remove" : "Put back"}
-                        </button>
-                      </form>
+                      <UserRemoveButton id={user.id} active={user.active} />
                     ) : (
                       <span className="text-xs text-muted">You</span>
                     )}
