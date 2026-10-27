@@ -43,7 +43,7 @@ export function AddSchoolSignIn({ error }: { error?: string }) {
       </label>
       {error ? <p className="text-sm text-red">{error}</p> : null}
       <button className="min-h-11 w-full rounded-[8px] bg-navy px-4 py-2.5 text-[16px] font-semibold text-white hover:bg-navy-deep">
-        Sign in and add schools
+        Sign in
       </button>
     </form>
   );

@@ -71,8 +71,7 @@ export default async function Home({
             AMPM Flow administrator
           </h2>
           <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-            Sign in here to add a school and create its first admin. Schools
-            cannot add themselves.
+            Sign in here. Schools cannot add themselves.
           </p>
           <AddSchoolSignIn
             error={
