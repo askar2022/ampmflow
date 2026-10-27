@@ -26,8 +26,8 @@ export default async function Home() {
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-semibold text-navy">Already at a school</h2>
             <p className="mt-2 text-sm leading-6 text-[#4b5563]">
-              Sign in to your school. You only see your own school. Need an
-              account? Ask your administrator, or join your school.
+              Sign in to your school. You only see your own school. If you need
+              an account, contact your school administrator.
             </p>
             <Link
               href="/login"
@@ -35,12 +35,6 @@ export default async function Home() {
             >
               Sign in
             </Link>
-            <p className="mt-3 text-center text-sm text-navy">
-              Need an account?{" "}
-              <Link href="/login/create" className="font-medium text-teal hover:text-teal-deep">
-                Join your school
-              </Link>
-            </p>
           </section>
 
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
@@ -59,8 +53,8 @@ export default async function Home() {
         </div>
 
         <p className="mt-6 text-center text-sm leading-6 text-[#6b7280]">
-          School administrators create staff accounts under Users, or approve
-          people who join their school. Regular staff never open a new school.
+          Only a school administrator can add staff. Regular staff never open a
+          new school.
         </p>
       </div>
     </div>

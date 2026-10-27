@@ -47,7 +47,7 @@ export async function createAccount(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
   const intent = String(formData.get("intent") || "join");
-  const failPath = intent === "new-school" ? "/schools" : "/login/create";
+  const failPath = intent === "new-school" ? "/schools" : "/login";
 
   if (!isDatabaseConfigured()) {
     redirect(`${failPath}?error=db`);
@@ -88,7 +88,7 @@ export async function createAccount(formData: FormData) {
 
   if (existingUsers === 0) {
     if (!schoolName) {
-      redirect("/login/create?error=setup");
+      redirect("/login?error=setup");
     }
     await createFirstAdministrator({
       school,
@@ -144,55 +144,7 @@ export async function createAccount(formData: FormData) {
     redirect("/login?requested=school");
   }
 
-  const joinSchool = schoolName
-    ? await findSchoolByName(schoolName)
-    : school;
-  if (!joinSchool) {
-    redirect("/login/create?error=no-school");
-  }
-  school = joinSchool;
-
-  try {
-    await prisma.user.create({
-      data: {
-        schoolId: school.id,
-        name,
-        email,
-        role: PENDING_ROLE,
-        passwordHash,
-        active: false,
-      },
-      select: { id: true },
-    });
-  } catch (error) {
-    if (isNextRedirect(error)) {
-      throw error;
-    }
-    const code =
-      typeof error === "object" && error && "code" in error
-        ? String((error as { code?: string }).code)
-        : "";
-    if (code === "P2002") {
-      redirect("/login/create?error=exists");
-    }
-    try {
-      const userId = randomUUID().replace(/-/g, "").slice(0, 24);
-      await prisma.$executeRaw`
-        INSERT INTO "User" ("id", "schoolId", "email", "name", "passwordHash", "role", "active", "createdAt", "updatedAt")
-        VALUES (${userId}, ${school.id}, ${email}, ${name}, ${passwordHash}, ${PENDING_ROLE}, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      `;
-    } catch {
-      redirect("/login/create?error=db");
-    }
-  }
-
-  await notifyCoordinators(
-    school.id,
-    "Account request",
-    `${name} requested a staff account and is waiting for approval.`,
-  ).catch(() => undefined);
-
-  redirect("/login?requested=1");
+  redirect("/login");
 }
 
 async function createFirstAdministrator({
@@ -209,7 +161,7 @@ async function createFirstAdministrator({
   passwordHash: string;
 }) {
   if (!school && !schoolName) {
-    redirect("/login/create?error=setup");
+    redirect("/login?error=setup");
   }
 
   try {
@@ -267,11 +219,11 @@ async function createFirstAdministrator({
         ? String((error as { code?: string }).code)
         : "";
     if (code === "P2002") {
-      redirect("/login/create?error=exists");
+      redirect("/login?error=exists");
     }
 
     if (!school) {
-      redirect("/login/create?error=db");
+      redirect("/login?error=db");
     }
 
     try {
@@ -297,7 +249,7 @@ async function createFirstAdministrator({
       if (isNextRedirect(fallbackError)) {
         throw fallbackError;
       }
-      redirect("/login/create?error=db");
+      redirect("/login?error=db");
     }
   }
 }

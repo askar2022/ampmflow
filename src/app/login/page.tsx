@@ -94,9 +94,7 @@ export default async function LoginPage({
               notice={
                 requested === "school"
                   ? "Your school request was sent. Check your email. An AMPM Flow administrator must approve the school before you can sign in."
-                  : requested === "1"
-                    ? "Your request was sent. Your school administrator must approve you before you can sign in."
-                    : undefined
+                  : undefined
               }
             />
           </div>

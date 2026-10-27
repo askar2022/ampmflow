@@ -91,10 +91,7 @@ export function SignInForm({
       </p>
       <SubmitButton>Sign in</SubmitButton>
       <p className="text-center text-sm text-navy">
-        Need an account?{" "}
-        <Link href="/login/create" className="font-medium text-teal hover:text-teal-deep">
-          Join your school
-        </Link>
+        Need an account? Ask your school administrator.
       </p>
     </form>
   );
