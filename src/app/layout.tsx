@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 
 const sans = Inter({
@@ -17,7 +18,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sans.variable} h-full antialiased`}>
-      <body className={`${sans.className} min-h-full`}>{children}</body>
+      <body className={`${sans.className} min-h-full`}>
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }
