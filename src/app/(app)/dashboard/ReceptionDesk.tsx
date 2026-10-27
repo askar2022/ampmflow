@@ -19,8 +19,14 @@ function classLabel(student: EffectiveStudent) {
   return student.classroomName || student.teacherName || "Unassigned";
 }
 
-function studentBuses(student: EffectiveStudent) {
-  return [...new Set([student.am.busNumber, student.pm.busNumber].filter(Boolean))];
+function studentBuses(student: EffectiveStudent): string[] {
+  return [
+    ...new Set(
+      [student.am.busNumber, student.pm.busNumber].filter(
+        (value): value is string => Boolean(value),
+      ),
+    ),
+  ];
 }
 
 function uniqueSorted(values: string[]) {

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
@@ -15,6 +16,7 @@ import { TodayChangeForm } from "@/components/TodayChangeForm";
 export default async function CompanyPage() {
   const session = await getSession();
   if (!session) return null;
+  if (session.role !== "BUS_COMPANY") redirect("/dashboard");
   await collapseDuplicateRequests(session.schoolId);
   const students = await loadStudents(session.schoolId);
   const waiting = missingList(students).filter(
