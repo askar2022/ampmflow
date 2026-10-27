@@ -305,9 +305,11 @@ export function ReceptionDesk({
             <select
               value={grade}
               onChange={(event) => {
-                setGrade(event.target.value);
+                const value = event.target.value;
+                setGrade(value);
                 setSelectedId("");
                 setOpenForm(false);
+                if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
@@ -324,9 +326,11 @@ export function ReceptionDesk({
             <select
               value={teacher}
               onChange={(event) => {
-                setTeacher(event.target.value);
+                const value = event.target.value;
+                setTeacher(value);
                 setSelectedId("");
                 setOpenForm(false);
+                if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
@@ -343,9 +347,11 @@ export function ReceptionDesk({
             <select
               value={ride}
               onChange={(event) => {
-                setRide(event.target.value);
+                const value = event.target.value;
+                setRide(value);
                 setSelectedId("");
                 setOpenForm(false);
+                if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
