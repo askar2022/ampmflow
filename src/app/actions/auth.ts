@@ -7,7 +7,9 @@ import { findSchoolBySlug, schoolLoginPath } from "@/lib/school-slug";
 
 export async function loginAction(formData: FormData) {
   const slug = String(formData.get("schoolSlug") || "").trim();
-  const fail = slug ? schoolLoginPath(slug) : "/login";
+  const next = String(formData.get("next") || "").trim();
+  const goToSchools = next === "schools";
+  const fail = slug ? schoolLoginPath(slug) : goToSchools ? "/" : "/login";
 
   if (!isDatabaseConfigured()) {
     redirect(`${fail}?error=db`);
@@ -40,6 +42,9 @@ export async function loginAction(formData: FormData) {
   await createSession(result.user, {
     remember: formData.get("remember") === "1",
   });
+  if (goToSchools && result.user.role === "ADMINISTRATOR") {
+    redirect("/admin/schools");
+  }
   redirect(homePath(result.user.role));
 }
 

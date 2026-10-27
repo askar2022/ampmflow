@@ -48,7 +48,9 @@ export async function middleware(request: NextRequest) {
             ? "/company"
             : role === "BUS_ASSISTANT"
               ? "/checkin"
-              : "/dashboard";
+              : role === "ADMINISTRATOR" && pathname === "/"
+                ? "/admin/schools"
+                : "/dashboard";
       return NextResponse.redirect(url);
     }
     return NextResponse.next();

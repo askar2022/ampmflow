@@ -1,11 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSession, homePath } from "@/lib/auth";
+import { getSession, homePath, isPlatformAdmin } from "@/lib/auth";
 import { APP_NAME, APP_SUBTITLE } from "@/lib/school";
+import { AddSchoolSignIn } from "@/components/landing/AddSchoolSignIn";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await getSession();
-  if (session) redirect(homePath(session.role));
+  if (session) {
+    if (session.role === "ADMINISTRATOR" && (await isPlatformAdmin(session))) {
+      redirect("/admin/schools");
+    }
+    redirect(homePath(session.role));
+  }
+  const { error } = await searchParams;
 
   return (
     <div className="min-h-dvh bg-[#f3f4f6] px-3 py-4 sm:px-4 sm:py-8">
@@ -54,6 +65,25 @@ export default async function Home() {
             </Link>
           </section>
         </div>
+
+        <section className="mx-auto mt-4 max-w-3xl rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-navy">
+            AMPM Flow administrator
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+            Sign in here to add a school and create its first admin. Schools
+            cannot add themselves.
+          </p>
+          <AddSchoolSignIn
+            error={
+              error === "pending"
+                ? "This account is waiting for approval."
+                : error === "1" || error === "db"
+                  ? "That email or password is not recognized."
+                  : undefined
+            }
+          />
+        </section>
       </div>
     </div>
   );
