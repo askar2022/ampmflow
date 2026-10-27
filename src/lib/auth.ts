@@ -123,7 +123,6 @@ export function homePath(role: Role) {
   if (role === "TEACHER") return "/teacher";
   if (role === "BUS_COMPANY") return "/company";
   if (role === "BUS_ASSISTANT") return "/checkin";
-  if (role === "ADMINISTRATOR") return "/leadership";
   return "/dashboard";
 }
 

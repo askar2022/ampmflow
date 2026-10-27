@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
-import { listBusNumbers } from "@/app/actions/plans";
 import { loadStudents, searchStudents } from "@/lib/transportation";
 import { StudentsTable } from "./StudentsTable";
 
@@ -18,10 +17,7 @@ export default async function StudentsPage({
   const session = await getSession();
   if (!session) return null;
   const { q = "", imported, updated, issues, uploaded } = await searchParams;
-  const [roster, listed] = await Promise.all([
-    loadStudents(session.schoolId),
-    listBusNumbers(session.schoolId),
-  ]);
+  const roster = await loadStudents(session.schoolId);
   const students = searchStudents(roster, q);
   const canImport =
     session.role === "COORDINATOR" || session.role === "ADMINISTRATOR";
@@ -59,8 +55,7 @@ export default async function StudentsPage({
         <div>
           <h1 className="font-serif text-4xl">Students</h1>
           <p className="mt-1 text-muted">
-            Search a child, then click Parent change to save home pickup, a
-            different address, or daycare — no Excel note needed.
+            Roster and import. Daily changes happen on the student desk.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -114,10 +109,6 @@ export default async function StudentsPage({
       ) : (
         <StudentsTable
           students={students}
-          buses={listed.numbers}
-          allowPermanent={
-            session.role === "COORDINATOR" || session.role === "ADMINISTRATOR"
-          }
           canChange={
             session.role === "COORDINATOR" ||
             session.role === "ADMINISTRATOR" ||

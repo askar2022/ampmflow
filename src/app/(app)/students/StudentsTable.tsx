@@ -1,20 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ParentChangeButton } from "@/components/ParentChangeCard";
 import { planSummary, planTone } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { EffectiveStudent } from "@/lib/types";
 
 export function StudentsTable({
   students,
-  buses,
-  allowPermanent,
   canChange,
 }: {
   students: EffectiveStudent[];
-  buses: string[];
-  allowPermanent: boolean;
   canChange: boolean;
 }) {
   return (
@@ -55,19 +50,12 @@ export function StudentsTable({
                 </td>
                 <td className="px-4">
                   {canChange ? (
-                    <div className="flex flex-col items-start gap-1">
-                      <ParentChangeButton
-                        student={student}
-                        buses={buses}
-                        allowPermanent={allowPermanent}
-                      />
-                      <Link
-                        href={`/students/${student.id}/update`}
-                        className="text-xs font-semibold text-muted underline"
-                      >
-                        Full form
-                      </Link>
-                    </div>
+                    <Link
+                      href={`/dashboard?student=${student.id}`}
+                      className="rounded-full bg-navy px-3 py-1.5 text-xs font-semibold text-white"
+                    >
+                      Change
+                    </Link>
                   ) : null}
                 </td>
               </tr>

@@ -113,6 +113,7 @@ model Daycare {
   schoolId  String
   addressId String
   name      String
+  phone     String   @default("")
   createdAt DateTime @default(now())
 
   school      School                     @relation(fields: [schoolId], references: [id])
@@ -132,6 +133,9 @@ model Student {
   classroomId   String
   parentName    String
   parentPhone   String
+  parentEmail      String   @default("")
+  emergencyName    String   @default("")
+  emergencyPhone   String   @default("")
   homeAddressId String
   daycareId     String?
   notes            String   @default("")

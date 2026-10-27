@@ -40,9 +40,7 @@ export async function middleware(request: NextRequest) {
             ? "/company"
             : role === "BUS_ASSISTANT"
               ? "/checkin"
-              : role === "ADMINISTRATOR"
-                ? "/leadership"
-                : "/dashboard";
+              : "/dashboard";
       return NextResponse.redirect(url);
     }
     return NextResponse.next();

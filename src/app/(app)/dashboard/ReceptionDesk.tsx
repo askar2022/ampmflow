@@ -1,0 +1,570 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { saveReceptionChange } from "@/app/actions/reception";
+import { planSummary, planTone } from "@/lib/format";
+import type { Destination, DurationType, EffectiveStudent, Trip } from "@/lib/types";
+import { StatusBadge } from "@/components/StatusBadge";
+
+function deskSearch(students: EffectiveStudent[], query: string) {
+  const q = query.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!q) return [];
+  const tokens = q.split(" ").filter(Boolean);
+  return students.filter((student) => {
+    const hay = [
+      student.fullName,
+      student.studentId,
+      student.grade,
+      student.teacherName,
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q) || tokens.every((part) => hay.includes(part));
+  });
+}
+
+type DeskStudent = EffectiveStudent;
+
+function phoneHref(value: string) {
+  const digits = value.replace(/[^\d+]/g, "");
+  return digits ? `tel:${digits}` : "";
+}
+
+function Field({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value?: string | null;
+  href?: string;
+}) {
+  if (!value) return null;
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+        {label}
+      </div>
+      {href ? (
+        <a href={href} className="mt-0.5 block font-medium text-navy underline">
+          {value}
+        </a>
+      ) : (
+        <div className="mt-0.5 font-medium">{value}</div>
+      )}
+    </div>
+  );
+}
+
+function startingQuery(students: DeskStudent[], id: string) {
+  const student = students.find((row) => row.id === id);
+  return student ? `${student.firstName} ${student.lastName}` : "";
+}
+
+function formFromStudent(student: DeskStudent | undefined) {
+  return {
+    destination: (student?.pm.destination === "DAYCARE"
+      ? "DAYCARE"
+      : student?.pm.destination === "CUSTOM"
+        ? "CUSTOM"
+        : "HOME") as Destination,
+    busNumber: student?.pm.busNumber || student?.am.busNumber || "",
+    customAddress: student?.pm.customAddress || "",
+    daycareName: student?.daycareName || "",
+    daycareAddress: student?.daycareAddress || "",
+    daycarePhone: student?.daycarePhone || "",
+    parentEmail: student?.parentEmail || "",
+  };
+}
+
+export function ReceptionDesk({
+  students,
+  buses,
+  canPermanent,
+  canSeeEmergency,
+  initialStudentId = "",
+}: {
+  students: DeskStudent[];
+  buses: string[];
+  canPermanent: boolean;
+  canSeeEmergency: boolean;
+  initialStudentId?: string;
+}) {
+  const router = useRouter();
+  const initial = formFromStudent(students.find((row) => row.id === initialStudentId));
+  const [query, setQuery] = useState(() => startingQuery(students, initialStudentId));
+  const [selectedId, setSelectedId] = useState(initialStudentId);
+  const [openForm, setOpenForm] = useState(false);
+  const [destination, setDestination] = useState<Destination>(initial.destination);
+  const [trips, setTrips] = useState<Trip[]>(["PM"]);
+  const [duration, setDuration] = useState<DurationType>("TODAY");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [busNumber, setBusNumber] = useState(initial.busNumber);
+  const [customAddress, setCustomAddress] = useState(initial.customAddress);
+  const [daycareName, setDaycareName] = useState(initial.daycareName);
+  const [daycareAddress, setDaycareAddress] = useState(initial.daycareAddress);
+  const [daycarePhone, setDaycarePhone] = useState(initial.daycarePhone);
+  const [parentEmail, setParentEmail] = useState(initial.parentEmail);
+  const [note, setNote] = useState("");
+  const [confirmPermanent, setConfirmPermanent] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  const matches = useMemo(
+    () => deskSearch(students, query).slice(0, 12),
+    [students, query],
+  );
+  const selected = students.find((student) => student.id === selectedId) || null;
+
+  function choose(student: DeskStudent) {
+    setSelectedId(student.id);
+    setQuery(`${student.firstName} ${student.lastName}`);
+    setOpenForm(false);
+    setMessage("");
+    setError("");
+    const next = formFromStudent(student);
+    setDestination(next.destination);
+    setBusNumber(next.busNumber);
+    setCustomAddress(next.customAddress);
+    setDaycareName(next.daycareName);
+    setDaycareAddress(next.daycareAddress);
+    setDaycarePhone(next.daycarePhone);
+    setParentEmail(next.parentEmail);
+    setNote("");
+    setConfirmPermanent(false);
+  }
+
+  function toggleTrip(trip: Trip) {
+    setTrips((current) => {
+      if (current.includes(trip)) {
+        return current.filter((item) => item !== trip);
+      }
+      return [...current, trip];
+    });
+  }
+
+  function save() {
+    if (!selected) return;
+    setError("");
+    setMessage("");
+    startTransition(async () => {
+      const result = await saveReceptionChange({
+        studentId: selected.id,
+        destination,
+        trips,
+        duration,
+        startDate,
+        endDate,
+        busNumber,
+        customAddress,
+        daycareName,
+        daycareAddress,
+        daycarePhone,
+        parentEmail,
+        note,
+        confirmPermanent,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setMessage(result.message);
+      setOpenForm(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6">
+        <label className="text-sm font-semibold text-navy" htmlFor="student-search">
+          Find a student
+        </label>
+        <input
+          id="student-search"
+          type="search"
+          autoFocus
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSelectedId("");
+            setOpenForm(false);
+            setMessage("");
+          }}
+          placeholder="Name or student ID"
+          className="mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-lg outline-none focus:border-gold"
+        />
+        {query.trim() && !selected ? (
+          <ul className="mt-3 divide-y divide-line rounded-2xl border border-line">
+            {matches.map((student) => (
+              <li key={student.id}>
+                <button
+                  type="button"
+                  onClick={() => choose(student)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-paper"
+                >
+                  <span>
+                    <span className="font-semibold">{student.fullName}</span>
+                    <span className="ml-2 text-sm text-muted">
+                      {student.studentId} · Grade {student.grade}
+                    </span>
+                  </span>
+                  <span className="text-sm text-muted">{student.teacherName}</span>
+                </button>
+              </li>
+            ))}
+            {!matches.length ? (
+              <li className="px-4 py-3 text-sm text-muted">No student matches that search.</li>
+            ) : null}
+          </ul>
+        ) : null}
+      </section>
+
+      {selected ? (
+        <section className="rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-3xl">{selected.fullName}</h2>
+              <p className="mt-1 text-muted">
+                {selected.studentId} · Grade {selected.grade} · {selected.teacherName}
+                {selected.classroomName ? ` · ${selected.classroomName}` : ""}
+              </p>
+            </div>
+            {!openForm ? (
+              <button
+                type="button"
+                onClick={() => setOpenForm(true)}
+                className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
+              >
+                Change Transportation
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-line bg-paper p-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Morning
+              </div>
+              <div className="mt-2">
+                <StatusBadge tone={planTone(selected.am)}>
+                  {planSummary(selected.am, "AM")}
+                </StatusBadge>
+              </div>
+              <p className="mt-2 text-sm">{selected.am.location}</p>
+            </div>
+            <div className="rounded-xl border border-line bg-paper p-4">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Afternoon
+              </div>
+              <div className="mt-2">
+                <StatusBadge tone={planTone(selected.pm)}>
+                  {planSummary(selected.pm, "PM")}
+                </StatusBadge>
+              </div>
+              <p className="mt-2 text-sm">{selected.pm.location}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Field label="Parent" value={selected.parentName} />
+            <Field
+              label="Parent phone"
+              value={selected.parentPhone}
+              href={phoneHref(selected.parentPhone)}
+            />
+            <Field
+              label="Parent email"
+              value={selected.parentEmail || "Not on file"}
+            />
+            <Field label="Home address" value={selected.homeAddress} />
+            {selected.daycareName ? (
+              <>
+                <Field label="Daycare" value={selected.daycareName} />
+                <Field label="Daycare address" value={selected.daycareAddress} />
+                <Field
+                  label="Daycare phone"
+                  value={selected.daycarePhone}
+                  href={selected.daycarePhone ? phoneHref(selected.daycarePhone) : undefined}
+                />
+              </>
+            ) : null}
+            <Field
+              label="Teacher"
+              value={
+                selected.teacherEmail
+                  ? `${selected.teacherName} · ${selected.teacherEmail}`
+                  : selected.teacherName
+              }
+            />
+            {canSeeEmergency ? (
+              <>
+                <Field
+                  label="Emergency contact"
+                  value={
+                    selected.emergencyName || selected.emergencyPhone
+                      ? [selected.emergencyName, selected.emergencyPhone]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : selected.notes || "See student notes"
+                  }
+                />
+                {selected.notes && (selected.emergencyName || selected.emergencyPhone) ? (
+                  <Field label="Notes" value={selected.notes} />
+                ) : null}
+              </>
+            ) : null}
+          </div>
+
+          {openForm ? (
+            <form
+              className="mt-6 space-y-4 rounded-2xl border border-gold bg-paper p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                save();
+              }}
+            >
+              <h3 className="font-serif text-2xl">Change transportation</h3>
+              <p className="text-sm text-muted">
+                Choose the new destination, trip, and when it starts. The staff
+                member signed in is recorded automatically.
+              </p>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold">Destination</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["HOME", "Home bus"],
+                      ["DAYCARE", "Daycare bus"],
+                      ["CUSTOM", "New address"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setDestination(value)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        destination === value
+                          ? "bg-navy text-white"
+                          : "border border-line bg-card"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold">Trip</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(["AM", "PM"] as const).map((trip) => (
+                    <button
+                      key={trip}
+                      type="button"
+                      onClick={() => toggleTrip(trip)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        trips.includes(trip)
+                          ? "bg-navy text-white"
+                          : "border border-line bg-card"
+                      }`}
+                    >
+                      {trip === "AM" ? "Morning" : "Afternoon"}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold">When</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["TODAY", "Today"],
+                      ["DATE_RANGE", "Date range"],
+                      ...(canPermanent ? ([["PERMANENT", "Permanent"]] as const) : []),
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setDuration(value)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        duration === value
+                          ? "bg-navy text-white"
+                          : "border border-line bg-card"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {duration === "DATE_RANGE" ? (
+                  <div className="flex flex-wrap gap-3 pt-1">
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                      className="rounded-xl border border-line bg-card px-3 py-2"
+                      required
+                    />
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(event) => setEndDate(event.target.value)}
+                      className="rounded-xl border border-line bg-card px-3 py-2"
+                      required
+                    />
+                  </div>
+                ) : null}
+                {duration === "PERMANENT" ? (
+                  <label className="flex items-center gap-2 pt-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={confirmPermanent}
+                      onChange={(event) => setConfirmPermanent(event.target.checked)}
+                    />
+                    Confirm this is the new regular plan
+                  </label>
+                ) : null}
+              </fieldset>
+
+              <label className="block text-sm font-semibold">
+                Bus number
+                <input
+                  list="desk-buses"
+                  value={busNumber}
+                  onChange={(event) => setBusNumber(event.target.value)}
+                  placeholder="Leave blank if a new route is needed"
+                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                />
+              </label>
+              <datalist id="desk-buses">
+                {buses.map((bus) => (
+                  <option key={bus} value={bus} />
+                ))}
+              </datalist>
+              {!busNumber.trim() ? (
+                <p className="text-sm text-orange-800">
+                  No bus number yet — this student will be marked Waiting for Route.
+                </p>
+              ) : null}
+
+              {destination === "CUSTOM" ? (
+                <label className="block text-sm font-semibold">
+                  New address
+                  <input
+                    value={customAddress}
+                    onChange={(event) => setCustomAddress(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    required
+                  />
+                </label>
+              ) : null}
+
+              {destination === "DAYCARE" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-sm font-semibold">
+                    Daycare name
+                    <input
+                      value={daycareName}
+                      onChange={(event) => setDaycareName(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold">
+                    Daycare phone
+                    <input
+                      value={daycarePhone}
+                      onChange={(event) => setDaycarePhone(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold sm:col-span-2">
+                    Daycare address
+                    <input
+                      value={daycareAddress}
+                      onChange={(event) => setDaycareAddress(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              <label className="block text-sm font-semibold">
+                Parent email
+                <input
+                  type="email"
+                  value={parentEmail}
+                  onChange={(event) => setParentEmail(event.target.value)}
+                  placeholder="Needed to email the parent now"
+                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                />
+              </label>
+
+              <label className="block text-sm font-semibold">
+                Note (optional)
+                <textarea
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                />
+              </label>
+
+              {error ? <p className="text-sm text-red">{error}</p> : null}
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={pending || !trips.length}
+                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {pending ? "Saving…" : "Save Change"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenForm(false)}
+                  className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : null}
+
+          {message ? (
+            <p className="mt-4 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-900">
+              {message}
+            </p>
+          ) : null}
+        </section>
+      ) : (
+        <p className="text-sm text-muted">
+          Search a name or ID, then tap Change Transportation.
+        </p>
+      )}
+
+      <p className="text-sm text-muted">
+        Same-day changes email the teacher, parent, and bus company now, and
+        again in the 2:30 p.m. reminder.{" "}
+        <Link href="/changes" className="font-semibold text-navy">
+          Today’s changes
+        </Link>
+        {" · "}
+        <Link href="/waiting" className="font-semibold text-navy">
+          Waiting for route
+        </Link>
+        {" · "}
+        <Link href="/print" className="font-semibold text-navy">
+          Reports
+        </Link>
+      </p>
+    </div>
+  );
+}

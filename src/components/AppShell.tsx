@@ -7,28 +7,18 @@ import { AppNav } from "@/components/AppNav";
 import type { SessionUser } from "@/lib/types";
 
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
-  { href: "/dashboard", label: "Dashboard", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/gate", label: "The Gate", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/dismissal-grade", label: "Dismissal by Grade/Class", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/bus-tomorrow", label: "Bus Needed Tomorrow", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/first-day", label: "First-Day Dashboard", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/leadership", label: "Leadership", roles: ["ADMINISTRATOR", "COORDINATOR"] },
-  { href: "/vehicles", label: "Vehicles", roles: ["ADMINISTRATOR", "COORDINATOR"] },
+  { href: "/dashboard", label: "Desk", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/changes", label: "Today’s Changes", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/requests", label: "Requests", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/activity", label: "Today’s Activity", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/plans", label: "AM & PM Plans", roles: ["COORDINATOR", "ADMINISTRATOR"] },
   { href: "/buses", label: "Buses", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/pickup", label: "Parent Pickup", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/waiting", label: "Waiting for Route", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/acknowledgments", label: "Teacher Acknowledgments", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/checkin", label: "Bus Check-In", roles: ["COORDINATOR", "ADMINISTRATOR", "BUS_ASSISTANT"] },
+  { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK", "TEACHER"] },
+  { href: "/plans", label: "Regular Plans", roles: ["COORDINATOR", "ADMINISTRATOR"] },
   { href: "/students", label: "Students", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/teachers", label: "Teachers", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "TEACHER"] },
-  { href: "/teacher", label: "My Classroom", roles: ["TEACHER"] },
+  { href: "/teachers", label: "Teachers", roles: ["COORDINATOR", "ADMINISTRATOR"] },
   { href: "/company", label: "Bus Company", roles: ["COORDINATOR", "ADMINISTRATOR", "BUS_COMPANY"] },
   { href: "/admin/users", label: "Users", roles: ["ADMINISTRATOR"] },
+  { href: "/teacher", label: "My Classroom", roles: ["TEACHER"] },
+  { href: "/checkin", label: "Bus Check-In", roles: ["BUS_ASSISTANT"] },
 ];
 
 export function AppShell({
@@ -55,9 +45,7 @@ export function AppShell({
                 ? "/teacher"
                 : user.role === "BUS_ASSISTANT"
                   ? "/checkin"
-                  : user.role === "ADMINISTRATOR"
-                    ? "/leadership"
-                    : "/dashboard"
+                  : "/dashboard"
             }
           >
             <BrandMark

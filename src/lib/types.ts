@@ -65,12 +65,17 @@ export type EffectiveStudent = {
   grade: string;
   parentName: string;
   parentPhone: string;
+  parentEmail: string;
+  emergencyName: string;
+  emergencyPhone: string;
   homeAddress: string;
   daycareName: string | null;
   daycareAddress: string | null;
+  daycarePhone: string | null;
   classroomId: string;
   classroomName: string;
   teacherName: string;
+  teacherEmail: string;
   notes: string;
   am: PlanSnapshot;
   pm: PlanSnapshot;

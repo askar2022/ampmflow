@@ -10,6 +10,26 @@ import type {
   Trip,
 } from "./types";
 
+function extraText(row: object, key: string) {
+  const value = (row as Record<string, unknown>)[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+export async function ensureStudentContactColumns() {
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentEmail" TEXT NOT NULL DEFAULT ''`,
+  );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyName" TEXT NOT NULL DEFAULT ''`,
+  );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyPhone" TEXT NOT NULL DEFAULT ''`,
+  );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Daycare" ADD COLUMN IF NOT EXISTS "phone" TEXT NOT NULL DEFAULT ''`,
+  );
+}
+
 const studentInclude = {
   classroom: {
     include: { teachers: true },
@@ -162,14 +182,21 @@ export function toEffective(
     grade: student.grade,
     parentName: student.parentName,
     parentPhone: student.parentPhone,
+    parentEmail: extraText(student, "parentEmail"),
+    emergencyName: extraText(student, "emergencyName"),
+    emergencyPhone: extraText(student, "emergencyPhone"),
     homeAddress: formatAddress(student.homeAddress),
     daycareName: student.daycare?.name ?? null,
     daycareAddress: student.daycare
       ? formatAddress(student.daycare.address)
       : null,
+    daycarePhone: student.daycare
+      ? extraText(student.daycare, "phone") || null
+      : null,
     classroomId: student.classroomId,
     classroomName: student.classroom.name,
     teacherName: teacher?.name ?? "Unassigned",
+    teacherEmail: extraText(teacher ?? {}, "email"),
     notes: student.notes,
     am: resolveTrip(student, "AM", day),
     pm: resolveTrip(student, "PM", day),
@@ -180,6 +207,7 @@ export function toEffective(
 
 export async function loadStudents(schoolId: string, day = todayKey()) {
   await ensureGateTables();
+  await ensureStudentContactColumns().catch(() => undefined);
   const rows = await prisma.student.findMany({
     where: { schoolId },
     include: studentInclude,
@@ -190,6 +218,7 @@ export async function loadStudents(schoolId: string, day = todayKey()) {
 
 export async function loadStudent(id: string, day = todayKey()) {
   await ensureGateTables();
+  await ensureStudentContactColumns().catch(() => undefined);
   const row = await prisma.student.findUnique({
     where: { id },
     include: studentInclude,
