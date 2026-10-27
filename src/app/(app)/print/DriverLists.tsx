@@ -61,7 +61,7 @@ export function DriverLists({
     (visibleBuses.length === 1 && visibleVans.length === 0 && q
       ? { kind: "bus", id: visibleBuses[0] }
       : visibleVans.length === 1 && visibleBuses.length === 0 && q
-        ? { kind: "van", id: visibleVans[0] }
+        ? { kind: "van", id: visibleVans[0].id }
         : namedStudents.length && namedStudents[0].buses[0]
           ? { kind: "bus", id: namedStudents[0].buses[0] }
           : namedStudents.length && namedStudents[0].vanId
