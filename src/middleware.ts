@@ -65,6 +65,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (
+    pathname.startsWith("/admin") &&
+    role !== "ADMINISTRATOR"
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
   if (role === "BUS_COMPANY" && !pathname.startsWith("/company")) {
     if (pathname.startsWith("/api") || pathname.startsWith("/print")) {
       return NextResponse.next();
