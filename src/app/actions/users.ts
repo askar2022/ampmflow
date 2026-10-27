@@ -84,6 +84,11 @@ export async function resetUserPassword(formData: FormData): Promise<void> {
   revalidatePath("/admin/users");
 }
 
+export async function toggleUserAction(formData: FormData) {
+  const id = String(formData.get("id") || "");
+  if (id) await toggleUser(id);
+}
+
 export async function toggleUser(id: string) {
   const session = await getSession();
   if (!session || !canManageUsers(session.role)) {

@@ -7,7 +7,7 @@ import {
   createUser,
   rejectUser,
   resetUserPassword,
-  toggleUser,
+  toggleUserAction,
 } from "@/app/actions/users";
 import { updateSchoolIdentity } from "@/app/actions/school";
 import { roleLabel } from "@/lib/format";
@@ -191,7 +191,7 @@ export default async function UsersPage() {
           </div>
         </section>
       ) : null}
-      <section>
+      <section className="lg:col-span-2">
         <h1 className="font-serif text-4xl">Users</h1>
         <p className="mt-1 text-muted">
           The system does not email a password or a verification link. Type a
@@ -201,11 +201,12 @@ export default async function UsersPage() {
         <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-paper text-muted">
-              <tr>
+                <tr>
                 <th className="px-4 py-3">Name</th>
+                <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
-                <th></th>
+                <th className="px-4">Remove</th>
               </tr>
             </thead>
             <tbody>
@@ -213,37 +214,21 @@ export default async function UsersPage() {
                 <tr key={user.id} className="border-t border-line">
                   <td className="px-4 py-3">
                     <div className="font-medium">{user.name}</div>
-                    <div className="text-muted">{user.email}</div>
                   </td>
+                  <td className="text-muted">{user.email}</td>
                   <td>{roleLabel(user.role)}</td>
-                  <td>{user.active ? "Active" : "Disabled"}</td>
+                  <td>{user.active ? "Active" : "Removed"}</td>
                   <td className="px-4 py-3">
-                    <form action={resetUserPassword} className="flex flex-wrap items-center gap-2">
-                      <input type="hidden" name="id" value={user.id} />
-                      <input
-                        name="password"
-                        type="password"
-                        required
-                        minLength={4}
-                        placeholder="New password"
-                        className="w-36 rounded-xl border border-line px-2 py-1.5"
-                      />
-                      <button className="text-sm font-semibold text-blue">
-                        Set password
-                      </button>
-                    </form>
                     {user.id !== session.id ? (
-                      <form
-                        action={async () => {
-                          "use server";
-                          await toggleUser(user.id);
-                        }}
-                      >
-                        <button className="mt-1 text-sm font-semibold text-blue">
-                          {user.active ? "Disable" : "Enable"}
+                      <form action={toggleUserAction}>
+                        <input type="hidden" name="id" value={user.id} />
+                        <button className="rounded-full bg-red/10 px-3 py-1.5 text-sm font-semibold text-red">
+                          {user.active ? "Remove" : "Put back"}
                         </button>
                       </form>
-                    ) : null}
+                    ) : (
+                      <span className="text-xs text-muted">You</span>
+                    )}
                   </td>
                 </tr>
               ))}
