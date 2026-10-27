@@ -10,6 +10,8 @@ export default async function WaitingPage() {
     (s) =>
       s.am.waitingForAssignment ||
       s.pm.waitingForAssignment ||
+      s.am.source === "MISSING" ||
+      s.pm.source === "MISSING" ||
       (s.am.type === "BUS" && !s.am.busNumber) ||
       (s.pm.type === "BUS" && !s.pm.busNumber),
   );
@@ -18,9 +20,9 @@ export default async function WaitingPage() {
     <div className="space-y-4">
       <h1 className="font-serif text-4xl">Request for Route</h1>
       <p className="max-w-2xl text-muted">
-        New students, or students with no bus or van yet, wait here until a
-        route is assigned. Front Desk can open the student and add the bus or
-        van number when the company confirms it.
+        Students waiting for a bus or van. Front Desk emails the company from
+        the student card. When the company emails or calls with the number,
+        open the student and enter it. They stay here until that happens.
       </p>
       <a
         href="/print/export?kind=missing"
@@ -28,34 +30,45 @@ export default async function WaitingPage() {
       >
         Download Excel
       </a>
-      <div className="overflow-hidden rounded-2xl border border-line bg-card">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-paper text-muted">
-            <tr>
-              <th className="px-4 py-3">Student</th>
-              <th>Teacher</th>
-              <th>AM</th>
-              <th>PM</th>
-              <th>Address</th>
-            </tr>
-          </thead>
-          <tbody>
-            {waiting.map((student) => (
-              <tr key={student.id} className="row-red border-t border-line">
-                <td className="px-4 py-3 font-medium">
-                  <Link href={`/dashboard?student=${student.id}`} className="hover:underline">
-                    {student.fullName}
-                  </Link>
-                </td>
-                <td>{student.teacherName}</td>
-                <td>{planSummary(student.am, "AM")}</td>
-                <td>{planSummary(student.pm, "PM")}</td>
-                <td>{student.homeAddress}</td>
+      {waiting.length ? (
+        <div className="overflow-hidden rounded-2xl border border-line bg-card">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-paper text-muted">
+              <tr>
+                <th className="px-4 py-3">Student</th>
+                <th>Teacher</th>
+                <th>AM</th>
+                <th>PM</th>
+                <th>Address</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {waiting.map((student) => (
+                <tr key={student.id} className="row-red border-t border-line">
+                  <td className="px-4 py-3 font-medium">{student.fullName}</td>
+                  <td>{student.teacherName}</td>
+                  <td>{planSummary(student.am, "AM")}</td>
+                  <td>{planSummary(student.pm, "PM")}</td>
+                  <td>{student.homeAddress}</td>
+                  <td className="px-4">
+                    <Link
+                      href={`/dashboard?student=${student.id}`}
+                      className="font-semibold text-blue"
+                    >
+                      Open / assign
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
+          No route requests right now.
+        </p>
+      )}
     </div>
   );
 }

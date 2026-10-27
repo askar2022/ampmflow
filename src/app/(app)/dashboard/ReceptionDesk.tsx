@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveReceptionChange } from "@/app/actions/reception";
+import { requestRoute, saveReceptionChange } from "@/app/actions/reception";
 import { planSummary, planTone } from "@/lib/format";
 import type { Destination, DurationType, EffectiveStudent, Trip } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -161,6 +161,8 @@ export function ReceptionDesk({
   const [bus, setBus] = useState("");
   const [selectedId, setSelectedId] = useState(initialStudentId);
   const [openForm, setOpenForm] = useState(false);
+  const [openRequest, setOpenRequest] = useState(false);
+  const [vehicle, setVehicle] = useState<"BUS" | "VAN">("BUS");
   const [destination, setDestination] = useState<Destination>(initial.destination);
   const [trips, setTrips] = useState<Trip[]>(["PM"]);
   const [duration, setDuration] = useState<DurationType>("TODAY");
@@ -210,8 +212,10 @@ export function ReceptionDesk({
     setSelectedId(student.id);
     setQuery(`${student.firstName} ${student.lastName}`);
     setOpenForm(false);
+    setOpenRequest(false);
     setMessage("");
     setError("");
+    setVehicle("BUS");
     const next = formFromStudent(student);
     setDestination(next.destination);
     setBusNumber(next.busNumber);
@@ -266,6 +270,36 @@ export function ReceptionDesk({
       }
       setMessage(result.message);
       setOpenForm(false);
+      router.refresh();
+    });
+  }
+
+  function saveRequest() {
+    if (!selected) return;
+    if (!trips.length) {
+      setError("Choose morning, afternoon, or both.");
+      return;
+    }
+    setError("");
+    setMessage("");
+    startTransition(async () => {
+      const result = await requestRoute({
+        studentId: selected.id,
+        vehicle,
+        destination,
+        trips,
+        customAddress,
+        daycareName,
+        daycareAddress,
+        daycarePhone,
+        note,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setMessage(result.message);
+      setOpenRequest(false);
       router.refresh();
     });
   }
@@ -407,20 +441,38 @@ export function ReceptionDesk({
                     setSelectedId("");
                     setQuery("");
                     setOpenForm(false);
+                    setOpenRequest(false);
                   }}
                   className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
                 >
                   Back to list
                 </button>
               ) : null}
-              {!openForm ? (
-                <button
-                  type="button"
-                  onClick={() => setOpenForm(true)}
-                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
-                >
-                  Change Transportation
-                </button>
+              {!openForm && !openRequest ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenRequest(true);
+                      setOpenForm(false);
+                      setError("");
+                      setMessage("");
+                    }}
+                    className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Request for Route
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenForm(true);
+                      setOpenRequest(false);
+                    }}
+                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                  >
+                    Change Transportation
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
@@ -499,6 +551,164 @@ export function ReceptionDesk({
               </>
             ) : null}
           </div>
+
+          {openRequest ? (
+            <form
+              className="mt-6 space-y-4 rounded-2xl border border-gold bg-paper p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveRequest();
+              }}
+            >
+              <h3 className="font-serif text-2xl">Request for Route</h3>
+              <p className="text-sm text-muted">
+                This emails the bus company now. The student stays on Request
+                for Route until they email or call the school with the bus or
+                van number. Then use Change Transportation to enter it.
+              </p>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold">Need</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["BUS", "Bus"],
+                      ["VAN", "Van"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setVehicle(value)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        vehicle === value
+                          ? "bg-navy text-white"
+                          : "border border-line bg-card"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold">Destination</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["HOME", "Home"],
+                      ["DAYCARE", "Daycare"],
+                      ["CUSTOM", "New address"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setDestination(value)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        destination === value
+                          ? "bg-navy text-white"
+                          : "border border-line bg-card"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold">Trip</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(["AM", "PM"] as const).map((trip) => (
+                    <button
+                      key={trip}
+                      type="button"
+                      onClick={() => toggleTrip(trip)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        trips.includes(trip)
+                          ? "bg-navy text-white"
+                          : "border border-line bg-card"
+                      }`}
+                    >
+                      {trip === "AM" ? "Morning" : "Afternoon"}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              {destination === "CUSTOM" ? (
+                <label className="block text-sm font-semibold">
+                  Address
+                  <input
+                    value={customAddress}
+                    onChange={(event) => setCustomAddress(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    required
+                  />
+                </label>
+              ) : null}
+
+              {destination === "DAYCARE" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block text-sm font-semibold">
+                    Daycare name
+                    <input
+                      value={daycareName}
+                      onChange={(event) => setDaycareName(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold">
+                    Daycare phone
+                    <input
+                      value={daycarePhone}
+                      onChange={(event) => setDaycarePhone(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold sm:col-span-2">
+                    Daycare address
+                    <input
+                      value={daycareAddress}
+                      onChange={(event) => setDaycareAddress(event.target.value)}
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              <label className="block text-sm font-semibold">
+                Note for the bus company (optional)
+                <textarea
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                />
+              </label>
+
+              {error ? <p className="text-sm text-red">{error}</p> : null}
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={pending || !trips.length}
+                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {pending ? "Sending…" : "Email request to bus company"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenRequest(false)}
+                  className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : null}
 
           {openForm ? (
             <form

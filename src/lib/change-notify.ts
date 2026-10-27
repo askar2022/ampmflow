@@ -192,6 +192,68 @@ export async function notifyTransportationChange(args: {
   return { sent, skipped, waiting: args.waiting };
 }
 
+export async function notifyRouteRequest(args: {
+  user: SessionUser;
+  student: EffectiveStudent;
+  trips: Trip[];
+  vehicle: "BUS" | "VAN";
+  destination: string;
+  address: string;
+  note: string;
+}): Promise<ChangeNotice> {
+  const sent: string[] = [];
+  const skipped: string[] = [];
+  const vehicle = args.vehicle === "VAN" ? "van" : "bus";
+  const text = [
+    "AMPM Flow — request for route",
+    "",
+    `Please assign a ${vehicle} for this student and email or call the school with the number.`,
+    "Front Desk will update the student after you confirm.",
+    "",
+    `Student: ${args.student.fullName} (${args.student.studentId})`,
+    `Grade ${args.student.grade} · ${args.student.teacherName}`,
+    `Trip: ${args.trips.join(" and ")}`,
+    `Need: ${vehicle}`,
+    `Destination: ${args.destination}`,
+    args.address ? `Address: ${args.address}` : "",
+    args.student.parentName ? `Parent: ${args.student.parentName}` : "",
+    args.student.parentPhone ? `Parent phone: ${args.student.parentPhone}` : "",
+    args.student.parentEmail ? `Parent email: ${args.student.parentEmail}` : "",
+    args.note ? `Note: ${args.note}` : "",
+    `Requested by: ${args.user.name}`,
+    "",
+    "The student stays on Request for Route until a bus or van is assigned.",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+  const to = await opsEmails(args.user.schoolId, []);
+  if (!to.length) skipped.push("bus company (add an email on Today’s Changes)");
+  if (!smtpConfigured()) {
+    return { sent, skipped: [...skipped, "email is not configured"], waiting: true };
+  }
+  if (to.length) {
+    const result = await sendMail({
+      to,
+      subject: `Request for ${vehicle} — ${args.student.fullName}`,
+      text,
+      html: changeNoticeHtml(text),
+    });
+    if (result.sent) {
+      sent.push(...to.map((email) => `bus company: ${email}`));
+    } else {
+      skipped.push(`bus company (${result.reason})`);
+    }
+  }
+  await writeAudit({
+    user: args.user,
+    studentId: args.student.id,
+    action: "EMAIL_ROUTE_REQUEST",
+    trip: args.trips.join("+"),
+    newPlan: { sent, skipped, vehicle: args.vehicle },
+  }).catch(() => undefined);
+  return { sent, skipped, waiting: true };
+}
+
 export function noticeSummary(notice: ChangeNotice) {
   const parts = [];
   if (notice.waiting) {
