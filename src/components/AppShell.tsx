@@ -48,11 +48,13 @@ export function AppShell({
       }
     >
       <header className="no-print bg-navy text-white">
-        <Link href={home} className="block">
-          <HeaderWelcome schoolName={schoolName} />
-        </Link>
-        <nav className="bg-navy-deep">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-3 py-2 sm:px-4">
+        <div className="mx-auto max-w-4xl px-4 pt-2 sm:px-6">
+          <Link href={home} className="block">
+            <HeaderWelcome schoolName={schoolName} />
+          </Link>
+        </div>
+        <nav className="mt-2 bg-navy-deep">
+          <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-1 px-4 py-2 sm:px-6">
             <AppNav links={links} />
             <form action={logoutAction} className="ml-auto">
               <button className="rounded-full px-3 py-1.5 text-sm text-white/70 hover:bg-white/10 hover:text-white">
@@ -62,7 +64,7 @@ export function AppShell({
           </div>
         </nav>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6">{children}</main>
+      <main className="mx-auto max-w-4xl px-4 py-4 sm:px-6">{children}</main>
     </div>
   );
 }
