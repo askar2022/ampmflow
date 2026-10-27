@@ -25,7 +25,7 @@ export function LoginFrame({
 
   return (
     <div
-      className="flex min-h-dvh items-center justify-center overflow-x-hidden overflow-y-auto bg-[#f3f4f6] px-4 py-4 short-h:py-3 sm:py-6"
+      className="flex min-h-dvh items-center justify-center overflow-x-hidden overflow-y-auto bg-[#f3f4f6] px-3 py-4 short-h:py-3 sm:px-4 sm:py-6"
       style={
         {
           "--navy": theme.navy,
@@ -33,7 +33,7 @@ export function LoginFrame({
         } as CSSProperties
       }
     >
-      <div className="login-card w-full max-w-[440px] rounded-[20px] border border-[#e8e8ea] bg-white px-6 py-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)] short-h:py-4 sm:px-8">
+      <div className="login-card w-full max-w-[440px] rounded-[20px] border border-[#e8e8ea] bg-white px-4 py-5 shadow-[0_16px_48px_rgba(15,23,42,0.08)] short-h:py-4 sm:px-8 sm:py-6">
         <div className="flex flex-col items-center text-center">
           <Link href={homeHref} className="flex flex-col items-center">
             <img

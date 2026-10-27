@@ -160,7 +160,7 @@ export function DriverLists({
                   value={to}
                   onChange={(event) => setTo(event.target.value)}
                   placeholder="Driver email"
-                  className="mt-1 block w-64 rounded-xl border border-line px-3 py-2 font-normal"
+                  className="mt-1 block w-full min-w-0 rounded-xl border border-line px-3 py-2 font-normal sm:w-64"
                 />
               </label>
               <button

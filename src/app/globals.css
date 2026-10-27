@@ -51,6 +51,24 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-weight: 400;
+  overflow-x: hidden;
+}
+
+.nav-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 639.98px) {
+  .font-serif.text-4xl {
+    font-size: 1.75rem;
+    line-height: 1.15;
+  }
 }
 
 p,

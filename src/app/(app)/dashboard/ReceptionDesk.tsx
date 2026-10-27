@@ -282,7 +282,7 @@ export function ReceptionDesk({
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-line bg-card p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-row lg:items-end">
           <label className="min-w-0 flex-1 text-xs font-semibold uppercase tracking-wider text-muted">
             Find a student
             <input

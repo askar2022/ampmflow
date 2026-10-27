@@ -15,6 +15,11 @@ export const metadata: Metadata = {
   description: "Safe arrivals. Organized dismissals.",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sans.variable} h-full antialiased`}>

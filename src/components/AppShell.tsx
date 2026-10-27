@@ -53,11 +53,13 @@ export function AppShell({
             <HeaderWelcome schoolName={schoolName} />
           </Link>
         </div>
-        <nav className="mx-auto mt-3 flex max-w-4xl items-center px-4 sm:px-6">
-          <div className="inline-flex flex-wrap items-center gap-1 rounded-full bg-navy-deep px-2 py-1 text-white">
-            <AppNav links={links} />
+        <nav className="mx-auto mt-3 flex max-w-4xl flex-col gap-2 px-4 sm:flex-row sm:items-center sm:px-6">
+          <div className="nav-scroll min-w-0">
+            <div className="inline-flex min-w-max items-center gap-1 rounded-full bg-navy-deep px-2 py-1 text-white">
+              <AppNav links={links} />
+            </div>
           </div>
-          <form action={logoutAction} className="ml-auto">
+          <form action={logoutAction} className="self-end sm:ml-auto sm:self-auto">
             <button className="rounded-full px-3 py-1.5 text-sm text-navy/70 hover:bg-line hover:text-navy">
               Sign out
             </button>

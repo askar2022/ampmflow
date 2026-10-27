@@ -8,18 +8,18 @@ export default async function Home() {
   if (session) redirect(homePath(session.role));
 
   return (
-    <div className="min-h-dvh bg-[#f3f4f6] px-4 py-6 sm:py-8">
+    <div className="min-h-dvh bg-[#f3f4f6] px-3 py-4 sm:px-4 sm:py-8">
       <div className="mx-auto w-full max-w-5xl">
-        <div className="overflow-hidden rounded-[24px] border border-[#e8e8ea] bg-white shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
+        <div className="overflow-hidden rounded-2xl border border-[#e8e8ea] bg-white shadow-[0_16px_48px_rgba(15,23,42,0.08)] sm:rounded-[24px]">
           <img
             src="/landingimage.png"
             alt=""
-            className="h-56 w-full object-cover object-center sm:h-72 md:h-96"
+            className="h-44 w-full object-cover object-[70%_center] sm:h-72 sm:object-center md:h-96"
           />
         </div>
 
         <div className="mx-auto mt-6 max-w-3xl text-center">
-          <h1 className="text-[32px] font-semibold leading-none tracking-tight text-navy">
+          <h1 className="text-[26px] font-semibold leading-none tracking-tight text-navy sm:text-[32px]">
             {APP_NAME}
           </h1>
           <p className="mt-2 text-sm font-medium text-[#4b5563]">{APP_SUBTITLE}</p>

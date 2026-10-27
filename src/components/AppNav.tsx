@@ -20,7 +20,7 @@ export function AppNav({
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+            className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3 ${
               active
                 ? "bg-nav-active text-teal-deep hover:bg-nav-active"
                 : "text-white hover:bg-white/10"
