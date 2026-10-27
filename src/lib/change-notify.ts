@@ -120,6 +120,7 @@ export async function notifyTransportationChange(args: {
   note: string;
   waiting: boolean;
   teacherEmail?: string;
+  busCompanyEmail?: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
@@ -141,11 +142,16 @@ export async function notifyTransportationChange(args: {
     args.teacherEmail,
   );
   const parent = uniqueEmails([args.student.parentEmail]);
-  const ops = await opsEmails(args.user.schoolId, [...parent, ...teachers]);
+  const company = uniqueEmails([args.busCompanyEmail]);
+  const ops = await opsEmails(args.user.schoolId, [
+    ...parent,
+    ...teachers,
+    ...company,
+  ]);
 
   if (!parent.length) skipped.push("parent (required)");
   if (!teachers.length) skipped.push("teacher (required)");
-  if (!ops.length) skipped.push("bus coordinator / leadership (add on Today’s Changes)");
+  if (!company.length) skipped.push("bus company (required)");
 
   if (!smtpConfigured()) {
     return {
@@ -158,7 +164,8 @@ export async function notifyTransportationChange(args: {
   const groups = [
     { label: "parent", to: parent },
     { label: "teacher", to: teachers },
-    { label: "bus / leadership", to: ops },
+    { label: "bus company", to: company },
+    { label: "leadership", to: ops },
   ];
 
   for (const group of groups) {

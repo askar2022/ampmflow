@@ -155,6 +155,7 @@ export function ReceptionDesk({
   canPermanent,
   canSeeEmergency,
   initialStudentId = "",
+  busCompanyEmail: startingBusCompanyEmail = "",
 }: {
   students: DeskStudent[];
   buses: string[];
@@ -163,6 +164,7 @@ export function ReceptionDesk({
   canPermanent: boolean;
   canSeeEmergency: boolean;
   initialStudentId?: string;
+  busCompanyEmail?: string;
 }) {
   const router = useRouter();
   const initial = formFromStudent(students.find((row) => row.id === initialStudentId));
@@ -184,6 +186,7 @@ export function ReceptionDesk({
   const [daycarePhone, setDaycarePhone] = useState(initial.daycarePhone);
   const [parentEmail, setParentEmail] = useState(initial.parentEmail);
   const [teacherEmail, setTeacherEmail] = useState(initial.teacherEmail);
+  const [busCompanyEmail, setBusCompanyEmail] = useState(startingBusCompanyEmail);
   const [note, setNote] = useState("");
   const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [message, setMessage] = useState("");
@@ -247,8 +250,8 @@ export function ReceptionDesk({
 
   function save() {
     if (!selected) return;
-    if (!parentEmail.trim() || !teacherEmail.trim()) {
-      setError("Parent and teacher emails are required.");
+    if (!parentEmail.trim() || !teacherEmail.trim() || !busCompanyEmail.trim()) {
+      setError("Parent, teacher, and bus company emails are required.");
       return;
     }
     setError("");
@@ -268,6 +271,7 @@ export function ReceptionDesk({
         daycarePhone,
         parentEmail,
         teacherEmail,
+        busCompanyEmail,
         note,
         confirmPermanent,
       });
@@ -717,7 +721,7 @@ export function ReceptionDesk({
                 </div>
               ) : null}
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block text-sm font-semibold">
                   Parent email
                   <input
@@ -740,11 +744,20 @@ export function ReceptionDesk({
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
+                <label className="block text-sm font-semibold">
+                  Bus company email
+                  <input
+                    type="email"
+                    required
+                    value={busCompanyEmail}
+                    onChange={(event) => setBusCompanyEmail(event.target.value)}
+                    placeholder="Required"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
               </div>
               <p className="text-sm text-muted">
-                Parent and teacher get this change now. Add bus coordinator and
-                leadership emails on Today’s Changes — they also get each
-                change, and the 2:30 list if anyone changed.
+                Parent, teacher, and the bus company get this change now.
               </p>
 
               <label className="block text-sm font-semibold">

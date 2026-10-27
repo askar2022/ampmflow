@@ -52,6 +52,9 @@ async function ensureOpsEmailColumn() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT ''`,
   );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
+  );
 }
 
 async function ensureSettingsRow(schoolId: string) {
@@ -337,7 +340,31 @@ export async function digestRecipients(
   );
 }
 
+export async function loadSchoolBusCompanyEmail(schoolId: string) {
+  try {
+    await ensureSettingsRow(schoolId);
+    const rows = await prisma.$queryRaw<Array<{ busCompanyEmail: string }>>`
+      SELECT "busCompanyEmail" FROM "SchoolSettings" WHERE "schoolId" = ${schoolId}
+    `;
+    return usableOpsEmail(rows[0]?.busCompanyEmail || "");
+  } catch {
+    return "";
+  }
+}
+
+export async function saveSchoolBusCompanyEmail(schoolId: string, email: string) {
+  const clean = usableOpsEmail(email);
+  if (!clean) return "";
+  await ensureSettingsRow(schoolId);
+  await prisma.$executeRaw`
+    UPDATE "SchoolSettings" SET "busCompanyEmail" = ${clean} WHERE "schoolId" = ${schoolId}
+  `;
+  return clean;
+}
+
 export async function defaultBusCompanyEmail(schoolId: string) {
+  const savedForSchool = await loadSchoolBusCompanyEmail(schoolId);
+  if (savedForSchool) return savedForSchool;
   const users = await prisma.user.findMany({
     where: { schoolId, active: true, role: "BUS_COMPANY" },
     select: { email: true },
@@ -345,7 +372,7 @@ export async function defaultBusCompanyEmail(schoolId: string) {
   const fromUsers = users.map((user) => usableOpsEmail(user.email)).find(Boolean);
   if (fromUsers) return fromUsers;
   const saved = await loadSavedOpsEmails(schoolId);
-  return usableOpsEmail(process.env.BUS_COMPANY_EMAIL || "") || saved[0] || "";
+  return saved[0] || "";
 }
 
 export async function lastOpsChangeEmail(schoolId: string) {
