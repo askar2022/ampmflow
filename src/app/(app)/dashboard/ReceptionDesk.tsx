@@ -485,7 +485,14 @@ export function ReceptionDesk({
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Parent" value={selected.parentName} />
+            <Field
+              label="Parent"
+              value={
+                selected.parentName && selected.parentName !== "—"
+                  ? selected.parentName
+                  : "Not on file"
+              }
+            />
             <Field
               label="Parent phone"
               value={selected.parentPhone}

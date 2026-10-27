@@ -15,6 +15,21 @@ function extraText(row: object, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+export function parentNameFromEmail(email: string) {
+  const local = email.split("@")[0] || "";
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  if (!parts.length) return "";
+  return parts
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export function displayParentName(name: string, email = "") {
+  const clean = name.trim();
+  if (clean && clean !== "—") return clean;
+  return parentNameFromEmail(email) || "";
+}
+
 export async function ensureStudentContactColumns() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentEmail" TEXT NOT NULL DEFAULT ''`,
@@ -180,7 +195,10 @@ export function toEffective(
     lastName: student.lastName,
     fullName: `${student.firstName} ${student.lastName}`,
     grade: student.grade,
-    parentName: student.parentName,
+    parentName: displayParentName(
+      student.parentName,
+      extraText(student, "parentEmail"),
+    ),
     parentPhone: student.parentPhone,
     parentEmail: extraText(student, "parentEmail"),
     emergencyName: extraText(student, "emergencyName"),

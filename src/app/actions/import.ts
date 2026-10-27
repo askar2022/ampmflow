@@ -14,7 +14,7 @@ import {
   saveImportSummary,
   usablePhone,
 } from "@/lib/gate";
-import { ensureStudentContactColumns } from "@/lib/transportation";
+import { ensureStudentContactColumns, parentNameFromEmail } from "@/lib/transportation";
 
 type Row = Record<string, string>;
 
@@ -41,6 +41,38 @@ function cell(row: Row, ...keys: string[]) {
     }
   }
   return "";
+}
+
+function parentNameFromRow(row: Row, email: string) {
+  const headers = Object.keys(row);
+  const wanted = [
+    "parent/guardian",
+    "parent name",
+    "parent_name",
+    "guardian name",
+    "guardian",
+    "mother name",
+    "father name",
+    "primary contact",
+    "contact name",
+    "parent",
+  ];
+  for (const key of wanted) {
+    const match = headers.find((header) => {
+      const name = header.trim().toLowerCase();
+      if (
+        name.includes("email") ||
+        name.includes("phone") ||
+        name.includes("address")
+      ) {
+        return false;
+      }
+      return name === key || (key.length >= 5 && name.includes(key));
+    });
+    const value = match ? String(row[match] || "").trim() : "";
+    if (value && !value.includes("@")) return value;
+  }
+  return parentNameFromEmail(email) || "—";
 }
 
 function parseType(value: string): "BUS" | "PARENT" | null {
@@ -446,12 +478,11 @@ export async function importStudents(formData: FormData) {
         "homeroom teacher",
         "classroom teacher",
       ) || "Unassigned";
-    const parentName =
-      cell(row, "parent/guardian", "parent_name", "parent") || "—";
     const parentPhone =
       cell(row, "primary phone", "parent_phone", "phone") || "—";
     const parentEmail =
       cell(row, "parent email", "parent_email", "email", "guardian email") || "";
+    const parentName = parentNameFromRow(row, parentEmail);
     const homeLine = cell(row, "home_address", "address") || "Address pending";
     const city = cell(row, "home_city", "city") || "Minneapolis";
     const state = cell(row, "home_state", "state") || "MN";
@@ -896,7 +927,10 @@ async function rowsFromUpload(
       lastName,
       grade: normalizeGrade(cell(row, "grade") || "—"),
       teacherName: cell(row, "teacher") || "Unassigned",
-      parentName: cell(row, "parent/guardian", "parent_name", "parent") || "—",
+      parentName: parentNameFromRow(
+        row,
+        cell(row, "parent email", "parent_email", "email", "guardian email"),
+      ),
       parentPhone: cell(row, "primary phone", "parent_phone", "phone") || "—",
       parentEmail: cell(row, "parent email", "parent_email", "email") || "",
       address: cell(row, "home_address", "address") || "",
