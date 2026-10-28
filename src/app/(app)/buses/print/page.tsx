@@ -95,9 +95,9 @@ export default async function BusDriverPrintPage({
               <th className="py-2">#</th>
               <th>Student name</th>
               <th>Parent name</th>
+              <th>Parent phone</th>
               <th>Teacher name</th>
               <th>Grade</th>
-              <th>Parent phone</th>
             </tr>
           </thead>
           <tbody>
@@ -106,9 +106,9 @@ export default async function BusDriverPrintPage({
                 <td className="py-2">{index + 1}</td>
                 <td className="font-semibold">{row.name}</td>
                 <td>{row.parent && row.parent !== "—" ? row.parent : "—"}</td>
-                <td>{row.teacher || "—"}</td>
-                <td>{row.grade}</td>
                 <td>{row.phone || "—"}</td>
+                <td>{row.teacher || "—"}</td>
+                <td>{String(row.grade || "").replace(/^grade\s+/i, "")}</td>
               </tr>
             ))}
           </tbody>

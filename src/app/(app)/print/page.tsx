@@ -12,9 +12,10 @@ export default async function PrintPage() {
       <div>
         <h1 className="font-serif text-4xl">Reports</h1>
         <p className="mt-1 max-w-2xl text-muted">
-          Search one bus or van at a time, like Front Desk. See the student,
-          the parent, and the parent phone, then print or email that list to
-          the driver so they can call. Parent pickup stays off these lists.
+          Search one bus or van at a time, like Front Desk. The list has
+          student name, parent name, parent phone, teacher name, and grade.
+          Print or email that list to the driver so they can call. Parent
+          pickup stays off these lists.
         </p>
         <p className="mt-2 text-sm font-semibold text-navy">
           {lists.buses.length} bus{lists.buses.length === 1 ? "" : "es"}

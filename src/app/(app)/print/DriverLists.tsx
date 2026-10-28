@@ -27,6 +27,10 @@ function hasParentPhone(value: string) {
   return Boolean(phoneHref(value));
 }
 
+function gradeOnly(value: string) {
+  return value.replace(/^grade\s+/i, "").trim() || value;
+}
+
 export function DriverLists({
   riders,
   buses,
@@ -213,14 +217,21 @@ export function DriverLists({
             <p className="no-print mt-3 text-sm text-muted">{message}</p>
           ) : null}
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[36rem] text-left text-sm">
+            <table className="w-full min-w-[40rem] table-fixed text-left text-sm">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[22%]" />
+                <col className="w-[20%]" />
+                <col className="w-[24%]" />
+                <col className="w-[12%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-line text-[11px] font-semibold uppercase tracking-wide text-muted">
                   <th className="py-2 pr-3">Student name</th>
                   <th className="py-2 pr-3">Parent name</th>
+                  <th className="py-2 pr-3">Parent phone</th>
                   <th className="py-2 pr-3">Teacher name</th>
-                  <th className="py-2 pr-3">Grade</th>
-                  <th className="py-2">Parent phone</th>
+                  <th className="py-2">Grade</th>
                 </tr>
               </thead>
               <tbody>
@@ -234,9 +245,7 @@ export function DriverLists({
                     <tr key={rider.id} className="border-b border-line last:border-0">
                       <td className="py-2.5 pr-3 font-semibold">{rider.name}</td>
                       <td className="py-2.5 pr-3">{parent}</td>
-                      <td className="py-2.5 pr-3">{rider.teacherName || "—"}</td>
-                      <td className="py-2.5 pr-3">{rider.grade}</td>
-                      <td className="py-2.5">
+                      <td className="py-2.5 pr-3">
                         {hasParentPhone(rider.parentPhone) && call ? (
                           <a
                             href={call}
@@ -248,6 +257,8 @@ export function DriverLists({
                           <span className="text-muted">Not on file</span>
                         )}
                       </td>
+                      <td className="py-2.5 pr-3">{rider.teacherName || "—"}</td>
+                      <td className="py-2.5">{gradeOnly(rider.grade)}</td>
                     </tr>
                   );
                 })}
