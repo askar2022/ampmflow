@@ -1,6 +1,6 @@
 import { ensureGateTables } from "./gate";
 import { prisma } from "./prisma";
-import { dateInRange, todayKey } from "./dates";
+import { dateInRange, schoolLocalTime, todayKey } from "./dates";
 import { formatAddress, locationFor } from "./format";
 import type {
   Destination,
@@ -221,6 +221,69 @@ export function toEffective(
     lastUpdatedBy: latestAssignment?.updatedBy.name ?? null,
     lastUpdatedAt: latestAssignment?.updatedAt.toISOString() ?? null,
   };
+}
+
+export async function loadFrontDeskChangesToday(schoolId: string) {
+  const day = todayKey();
+  const since = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000);
+  const temps = await prisma.temporaryChange.findMany({
+    where: {
+      undone: false,
+      status: "APPROVED",
+      createdAt: { gte: since },
+      student: { schoolId },
+    },
+    select: {
+      studentId: true,
+      startDate: true,
+      createdAt: true,
+      createdBy: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  const enteredToday = temps.filter(
+    (row) => schoolLocalTime(row.createdAt).dateKey === day,
+  );
+  const byStudent = new Map<
+    string,
+    { startDate: string; enteredBy: string; createdAt: string }
+  >();
+  for (const row of enteredToday) {
+    if (byStudent.has(row.studentId)) continue;
+    byStudent.set(row.studentId, {
+      startDate: row.startDate || day,
+      enteredBy: row.createdBy.name,
+      createdAt: row.createdAt.toISOString(),
+    });
+  }
+
+  const effectiveToday = changeListCompat(
+    (await loadStudents(schoolId, day)).filter(
+      (student) => !byStudent.has(student.id),
+    ),
+  );
+  const entered = await Promise.all(
+    [...byStudent.entries()].map(async ([studentId, meta]) => {
+      const loaded = await loadStudent(studentId, meta.startDate);
+      if (!loaded) return null;
+      return {
+        ...loaded.effective,
+        lastUpdatedBy: meta.enteredBy,
+        lastUpdatedAt: meta.createdAt,
+      };
+    }),
+  );
+  return [...entered.filter(Boolean), ...effectiveToday] as EffectiveStudent[];
+}
+
+function changeListCompat(students: EffectiveStudent[]) {
+  return students.filter(
+    (student) =>
+      student.am.source === "TODAY" ||
+      student.am.source === "DATE_RANGE" ||
+      student.pm.source === "TODAY" ||
+      student.pm.source === "DATE_RANGE",
+  );
 }
 
 export async function loadStudents(schoolId: string, day = todayKey()) {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getSession, isSchoolOperator } from "@/lib/auth";
-import { loadStudents } from "@/lib/transportation";
-import { changeList, groupByTeacher } from "@/lib/reports";
+import { loadFrontDeskChangesToday } from "@/lib/transportation";
+import { groupByTeacher } from "@/lib/reports";
 import { planSummary, planTone } from "@/lib/format";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatDateTime } from "@/lib/dates";
@@ -22,7 +22,7 @@ function windowLabel(start?: string | null, end?: string | null) {
 export default async function ChangesPage() {
   const session = await getSession();
   if (!session) return null;
-  const changes = changeList(await loadStudents(session.schoolId));
+  const changes = await loadFrontDeskChangesToday(session.schoolId);
   const groups = groupByTeacher(changes);
   const emails = await loadSavedOpsEmails(session.schoolId);
   const lastEmail = await lastOpsChangeEmail(session.schoolId);
@@ -32,9 +32,9 @@ export default async function ChangesPage() {
       <div>
         <h1 className="font-serif text-4xl">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          This is the list of students Front Desk changed today. Check names
-          and IDs here. If the wrong student was changed, open them and fix it
-          on Front Desk.
+          This is the list of students Front Desk changed today, including a
+          date range that starts later. Check the name here. If the wrong
+          student was changed, open them and fix it on Front Desk.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p className="text-sm font-semibold text-navy">
@@ -93,12 +93,9 @@ export default async function ChangesPage() {
                     >
                       <td className="px-4 py-3">
                         <div className="font-semibold">{student.fullName}</div>
-                        <div className="text-xs text-muted">
-                          {student.studentId}
-                        </div>
                       </td>
                       <td>
-                        Grade {student.grade}
+                        {String(student.grade).replace(/^grade\s+/i, "")}
                         {student.classroomName
                           ? ` · ${student.classroomName}`
                           : ""}
