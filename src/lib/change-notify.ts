@@ -54,7 +54,7 @@ export function changeNoticeText(args: {
     .join("\n");
 }
 
-function changeNoticeHtml(text: string) {
+function changeNoticeHtml(text: string, banner = "Transportation change") {
   return `<!DOCTYPE html>
 <html>
 <body style="margin:0;background:#f4f1ea;font-family:Georgia,serif;color:#0e2438;">
@@ -65,7 +65,7 @@ function changeNoticeHtml(text: string) {
           <tr>
             <td style="background:#0e2438;color:#ffffff;padding:16px 20px;">
               <div style="font-size:18px;font-weight:700;">AMPM Flow</div>
-              <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#c9d6c4;">Transportation change</div>
+              <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#c9d6c4;">${escapeHtml(banner)}</div>
             </td>
           </tr>
           <tr>
@@ -271,7 +271,7 @@ export async function notifyRouteRequest(args: {
       to: group.to,
       subject: group.subject,
       text: group.text,
-      html: changeNoticeHtml(group.text),
+      html: changeNoticeHtml(group.text, "Request"),
     });
     if (result.sent) {
       sent.push(...group.to.map((email) => `${group.label}: ${email}`));
