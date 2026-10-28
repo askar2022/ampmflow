@@ -217,7 +217,7 @@ export function ReceptionDesk({
     [students, query, grade, teacher, ride, studentVanId],
   );
   const browsing = Boolean(query.trim() || grade || teacher || ride);
-  const matches = browsing ? filtered.slice(0, 80) : [];
+  const matches = browsing ? filtered.slice(0, 80) : filtered.slice(0, 10);
   const selected = students.find((student) => student.id === selectedId) || null;
 
   function choose(student: DeskStudent) {
@@ -379,7 +379,7 @@ export function ReceptionDesk({
         </div>
       </section>
 
-      {browsing && !selected ? (
+      {!selected ? (
         <ul className="divide-y divide-line rounded-2xl border border-line bg-card">
           {matches.map((student) => (
             <li key={student.id}>
@@ -391,7 +391,8 @@ export function ReceptionDesk({
                 <span>
                   <span className="font-semibold">{student.fullName}</span>
                   <span className="ml-2 text-sm text-muted">
-                    Grade {student.grade} · {teacherLabel(student)}
+                    {String(student.grade).replace(/^grade\s+/i, "")} ·{" "}
+                    {teacherLabel(student)}
                   </span>
                 </span>
                 <span className="text-sm text-muted">
@@ -405,11 +406,16 @@ export function ReceptionDesk({
               </button>
             </li>
           ))}
-          {!matches.length ? (
+          {!students.length ? (
+            <li className="px-4 py-3 text-sm text-muted">
+              No students on the roster yet. Load them on Roster.
+            </li>
+          ) : !matches.length ? (
             <li className="px-4 py-3 text-sm text-muted">No student matches those filters.</li>
           ) : filtered.length > matches.length ? (
             <li className="px-4 py-2 text-xs text-muted">
-              Showing {matches.length} of {filtered.length}. Narrow the filters to see the rest.
+              Showing {matches.length} of {filtered.length}. Type a name or use
+              the filters to see the rest.
             </li>
           ) : (
             <li className="px-4 py-2 text-xs text-muted">
@@ -430,19 +436,17 @@ export function ReceptionDesk({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {browsing ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedId("");
-                    setQuery("");
-                    setOpenForm(false);
-                  }}
-                  className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
-                >
-                  Back to list
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedId("");
+                  setQuery("");
+                  setOpenForm(false);
+                }}
+                className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+              >
+                Back to list
+              </button>
               {!openForm ? (
                 <>
                   <Link
@@ -797,11 +801,7 @@ export function ReceptionDesk({
             </p>
           ) : null}
         </section>
-      ) : browsing ? null : (
-        <p className="text-sm text-muted">
-          Type a name or ID to see that student’s transportation plan.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }
