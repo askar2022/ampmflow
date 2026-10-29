@@ -73,6 +73,8 @@ function deskRows(
         student.grade,
         student.teacherName,
         student.classroomName,
+        student.parentName,
+        student.homeAddress,
         student.parentPhone,
         student.parentPhone2,
         ...studentBuses(student),
@@ -99,6 +101,22 @@ type DeskStudent = EffectiveStudent;
 function phoneHref(value: string) {
   const digits = value.replace(/[^\d+]/g, "");
   return digits ? `tel:${digits}` : "";
+}
+
+function gradeOnly(grade: string) {
+  return String(grade).replace(/^grade\s+/i, "") || "—";
+}
+
+function parentLabel(student: EffectiveStudent) {
+  return student.parentName && student.parentName !== "—"
+    ? student.parentName
+    : "—";
+}
+
+function primaryPhone(student: EffectiveStudent) {
+  return student.parentPhone && student.parentPhone !== "—"
+    ? student.parentPhone
+    : "";
 }
 
 function Field({
@@ -395,49 +413,79 @@ export function ReceptionDesk({
       </section>
 
       {!selected ? (
-        <ul className="divide-y divide-line rounded-2xl border border-line bg-card">
-          {matches.map((student) => (
-            <li key={student.id}>
-              <button
-                type="button"
-                onClick={() => choose(student)}
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-paper"
-              >
-                <span>
-                  <span className="font-semibold">{student.fullName}</span>
-                  <span className="ml-2 text-sm text-muted">
-                    {String(student.grade).replace(/^grade\s+/i, "")} ·{" "}
-                    {teacherLabel(student)}
-                  </span>
-                </span>
-                <span className="text-sm text-muted">
-                  {[
-                    ...studentBuses(student).map((number) => `Bus ${number}`),
-                    vans.find((van) => van.id === studentVanId[student.id])?.name,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "No bus or van"}
-                </span>
-              </button>
-            </li>
-          ))}
-          {!students.length ? (
-            <li className="px-4 py-3 text-sm text-muted">
-              No students on the roster yet. Load them on Roster.
-            </li>
-          ) : !matches.length ? (
-            <li className="px-4 py-3 text-sm text-muted">No student matches those filters.</li>
-          ) : filtered.length > matches.length ? (
-            <li className="px-4 py-2 text-xs text-muted">
-              Showing {matches.length} of {filtered.length}. Type a name or use
-              the filters to see the rest.
-            </li>
-          ) : (
-            <li className="px-4 py-2 text-xs text-muted">
-              {matches.length} student{matches.length === 1 ? "" : "s"}
-            </li>
-          )}
-        </ul>
+        <div className="overflow-x-auto rounded-2xl border border-line bg-card">
+          <table className="w-full min-w-[56rem] text-left text-sm">
+            <thead className="bg-paper text-[11px] font-semibold uppercase tracking-wide text-muted">
+              <tr>
+                <th className="px-4 py-3">Student name</th>
+                <th className="py-3 pr-3">Grade</th>
+                <th className="py-3 pr-3">Parent</th>
+                <th className="py-3 pr-3">Advisor</th>
+                <th className="py-3 pr-3">Address</th>
+                <th className="py-3 pr-4">Primary 1 phone</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matches.map((student) => {
+                const phone = primaryPhone(student);
+                const call = phone ? phoneHref(phone) : "";
+                return (
+                  <tr
+                    key={student.id}
+                    className="cursor-pointer border-t border-line hover:bg-paper"
+                    onClick={() => choose(student)}
+                  >
+                    <td className="px-4 py-3 font-semibold">{student.fullName}</td>
+                    <td className="py-3 pr-3">{gradeOnly(student.grade)}</td>
+                    <td className="py-3 pr-3">{parentLabel(student)}</td>
+                    <td className="py-3 pr-3">
+                      {teacherLabel(student) === "No teacher"
+                        ? "Unassigned"
+                        : teacherLabel(student)}
+                    </td>
+                    <td className="max-w-[14rem] py-3 pr-3 text-muted">
+                      {student.homeAddress || "—"}
+                    </td>
+                    <td className="py-3 pr-4">
+                      {phone && call ? (
+                        <a
+                          href={call}
+                          onClick={(event) => event.stopPropagation()}
+                          className="font-medium text-navy underline-offset-2 hover:underline"
+                        >
+                          {phone}
+                        </a>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!students.length ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-3 text-muted">
+                    No students on the roster yet. Load them on Roster.
+                  </td>
+                </tr>
+              ) : !matches.length ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-3 text-muted">
+                    No student matches those filters.
+                  </td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-4 py-2 text-xs text-muted">
+                    {filtered.length > matches.length
+                      ? `Showing ${matches.length} of ${filtered.length}. Type a name or use the filters to see the rest.`
+                      : `${matches.length} student${matches.length === 1 ? "" : "s"}`}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       ) : null}
 
       {selected ? (
