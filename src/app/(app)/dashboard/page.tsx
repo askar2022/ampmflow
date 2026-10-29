@@ -23,7 +23,7 @@ export default async function DashboardPage({
     }),
     loadVehicles(session.schoolId).catch(() => []),
     prisma.student.findMany({
-      where: { schoolId: session.schoolId, vehicleId: { not: null } },
+      where: { schoolId: session.schoolId, active: true, vehicleId: { not: null } },
       select: { id: true, vehicleId: true },
     }),
     defaultBusCompanyEmail(session.schoolId),

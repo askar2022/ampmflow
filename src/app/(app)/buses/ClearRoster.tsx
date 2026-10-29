@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { clearSchoolRoster } from "@/app/actions/roster";
+import { archiveSchoolRoster } from "@/app/actions/roster";
 
 export function ClearRoster({
   schoolName,
@@ -23,17 +23,17 @@ export function ClearRoster({
     if (!pending) setWarn(false);
   }
 
-  function removeStudents() {
+  function archiveStudents() {
     start(async () => {
-      const result = await clearSchoolRoster();
+      const result = await archiveSchoolRoster();
       if (!result.ok) {
         setMessage(result.error);
         setWarn(false);
         return;
       }
       setMessage(
-        result.removed
-          ? `Removed ${result.removed} student${result.removed === 1 ? "" : "s"}. Load the correct file.`
+        result.archived
+          ? `Moved ${result.archived} student${result.archived === 1 ? "" : "s"} to Archive. They are still saved.`
           : "This roster was already empty.",
       );
       setWarn(false);
@@ -49,14 +49,14 @@ export function ClearRoster({
         onClick={() => setOpen((value) => !value)}
         className="text-sm font-semibold text-navy"
       >
-        Wrong file? Remove students {count ? `(${count})` : ""}
+        Wrong file? Move students to Archive {count ? `(${count})` : ""}
       </button>
       {open ? (
         <div className="mt-3 space-y-3">
           <p className="text-sm text-muted">
-            This removes every student on the {schoolName} roster, plus the
-            teachers, buses, and vans that came from the file. The school and
-            staff logins stay. Then load the correct Excel.
+            This hides every student on the {schoolName} roster from Front Desk
+            and Reports. They go to Archive so the data is still safe. Then
+            load the correct Excel, or put them back from Archive.
           </p>
           <button
             type="button"
@@ -64,7 +64,7 @@ export function ClearRoster({
             onClick={() => setWarn(true)}
             className="rounded-xl border border-red px-4 py-2 text-sm font-semibold text-red disabled:opacity-50"
           >
-            Remove students
+            Move to Archive
           </button>
         </div>
       ) : null}
@@ -75,21 +75,20 @@ export function ClearRoster({
           className="fixed inset-0 z-50 flex items-center justify-center bg-navy/50 p-4"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="clear-roster-title"
+          aria-labelledby="archive-roster-title"
           onClick={closeWarn}
         >
           <div
             className="w-full max-w-md rounded-2xl bg-card p-5 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
-            <h3 id="clear-roster-title" className="font-serif text-2xl text-navy">
+            <h3 id="archive-roster-title" className="font-serif text-2xl text-navy">
               Warning
             </h3>
             <p className="mt-2 text-sm text-navy">
-              This cannot be undone. You will delete {count} student
-              {count === 1 ? "" : "s"} from {schoolName}, including their
-              teacher, bus, and van. If this is the wrong school or the right
-              file is already loaded, press Cancel.
+              {count} student{count === 1 ? "" : "s"} on {schoolName} will leave
+              Front Desk and Reports and go to Archive. They are not deleted.
+              Open Archive to put them back. Press Cancel if this is a mistake.
             </p>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
@@ -103,10 +102,10 @@ export function ClearRoster({
               <button
                 type="button"
                 disabled={pending}
-                onClick={removeStudents}
-                className="rounded-xl bg-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                onClick={archiveStudents}
+                className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {pending ? "Removing…" : "Yes, remove them"}
+                {pending ? "Moving…" : "Yes, move to Archive"}
               </button>
             </div>
           </div>

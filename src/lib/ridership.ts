@@ -83,7 +83,7 @@ export async function loadRidership(schoolId: string): Promise<Ridership> {
   const vanIds = vans.map((vehicle) => vehicle.id);
   const vanStudents = vanIds.length
     ? await prisma.student.findMany({
-        where: { schoolId, vehicleId: { in: vanIds } },
+        where: { schoolId, active: true, vehicleId: { in: vanIds } },
         select: {
           id: true,
           firstName: true,
@@ -165,7 +165,7 @@ export async function loadDriverLists(schoolId: string) {
     loadStudents(schoolId),
     loadVehicles(schoolId).catch(() => []),
     prisma.student.findMany({
-      where: { schoolId, vehicleId: { not: null } },
+      where: { schoolId, active: true, vehicleId: { not: null } },
       select: { id: true, vehicleId: true },
     }),
   ]);

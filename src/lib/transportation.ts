@@ -43,6 +43,9 @@ export async function ensureStudentContactColumns() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "Daycare" ADD COLUMN IF NOT EXISTS "phone" TEXT NOT NULL DEFAULT ''`,
   );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "active" BOOLEAN NOT NULL DEFAULT true`,
+  );
 }
 
 const studentInclude = {
@@ -231,7 +234,7 @@ export async function loadFrontDeskChangesToday(schoolId: string) {
       undone: false,
       status: "APPROVED",
       createdAt: { gte: since },
-      student: { schoolId },
+      student: { schoolId, active: true },
     },
     select: {
       studentId: true,
@@ -265,7 +268,7 @@ export async function loadFrontDeskChangesToday(schoolId: string) {
   const entered = await Promise.all(
     [...byStudent.entries()].map(async ([studentId, meta]) => {
       const loaded = await loadStudent(studentId, meta.startDate);
-      if (!loaded) return null;
+      if (!loaded || loaded.record.active === false) return null;
       return {
         ...loaded.effective,
         lastUpdatedBy: meta.enteredBy,
@@ -290,7 +293,7 @@ export async function loadStudents(schoolId: string, day = todayKey()) {
   await ensureGateTables();
   await ensureStudentContactColumns().catch(() => undefined);
   const rows = await prisma.student.findMany({
-    where: { schoolId },
+    where: { schoolId, active: true },
     include: studentInclude,
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });

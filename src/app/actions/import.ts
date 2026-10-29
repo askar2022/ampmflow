@@ -473,6 +473,7 @@ export async function importStudents(formData: FormData) {
       parentEmail: true,
       homeAddressId: true,
       vehicleId: true,
+      active: true,
       homeAddress: { select: { line1: true } },
     },
   });
@@ -715,6 +716,12 @@ export async function importStudents(formData: FormData) {
         pmDest,
         vanName,
       });
+      await prisma.student
+        .update({
+          where: { id: existingEarly.id },
+          data: { active: true },
+        })
+        .catch(() => undefined);
       filled += 1;
       continue;
     }
@@ -827,6 +834,7 @@ export async function importStudents(formData: FormData) {
             notes,
             familyId: familyId || undefined,
             enrollmentSource: rowSource,
+            active: true,
           },
         })
       : await prisma.student.create({
@@ -860,6 +868,7 @@ export async function importStudents(formData: FormData) {
       parentEmail,
       homeAddressId: homeId,
       vehicleId: existing?.vehicleId ?? null,
+      active: true,
       homeAddress: { line1: homeLine },
     });
     const nameList = existingByName.get(`${normName(firstName)}|${normName(lastName)}`) || [];
@@ -874,6 +883,7 @@ export async function importStudents(formData: FormData) {
         parentEmail,
         homeAddressId: homeId,
         vehicleId: existing?.vehicleId ?? null,
+        active: true,
         homeAddress: { line1: homeLine },
       });
       existingByName.set(`${normName(firstName)}|${normName(lastName)}`, nameList);
@@ -905,7 +915,7 @@ export async function importStudents(formData: FormData) {
   const done = next >= rows.length;
 
   const rosterStudents = await prisma.student.count({
-    where: { schoolId: user.schoolId },
+    where: { schoolId: user.schoolId, active: true },
   });
 
   if (done) {
