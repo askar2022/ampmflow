@@ -566,6 +566,19 @@ export async function importStudents(formData: FormData) {
     const parentEmail =
       cell(row, "parent email", "parent_email", "email", "guardian email") || "";
     const parentName = parentNameFromRow(row, parentEmail);
+    const emergencyName = cell(
+      row,
+      "emergency_name",
+      "emergency name",
+      "emergency contact",
+      "emergency contact name",
+    );
+    const emergencyPhone = cell(
+      row,
+      "emergency_phone",
+      "emergency phone",
+      "emergency contact phone",
+    );
     const parsedAddress = splitHomeAddress(
       cell(row, "home_address", "address") || "",
     );
@@ -647,6 +660,8 @@ export async function importStudents(formData: FormData) {
         parentName?: string;
         parentPhone?: string;
         parentEmail?: string;
+        emergencyName?: string;
+        emergencyPhone?: string;
         homeAddressId?: string;
       } = {};
       if (usablePhone(parentPhone) && !usablePhone(existingEarly.parentPhone)) {
@@ -661,6 +676,8 @@ export async function importStudents(formData: FormData) {
       ) {
         patch.parentName = parentName;
       }
+      if (emergencyName) patch.emergencyName = emergencyName;
+      if (usablePhone(emergencyPhone)) patch.emergencyPhone = emergencyPhone;
       const addressPending =
         !existingEarly.homeAddress?.line1 ||
         /pending/i.test(existingEarly.homeAddress.line1);
@@ -829,6 +846,8 @@ export async function importStudents(formData: FormData) {
             parentName,
             parentPhone,
             parentEmail,
+            emergencyName: emergencyName || undefined,
+            emergencyPhone: emergencyPhone || undefined,
             homeAddressId: homeId,
             daycareId,
             notes,
@@ -848,6 +867,8 @@ export async function importStudents(formData: FormData) {
             parentName,
             parentPhone,
             parentEmail,
+            emergencyName,
+            emergencyPhone,
             homeAddressId: homeId,
             daycareId,
             notes,
