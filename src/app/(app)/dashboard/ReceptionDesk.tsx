@@ -144,6 +144,8 @@ function formFromStudent(student: DeskStudent | undefined) {
     daycareName: student?.daycareName || "",
     daycareAddress: student?.daycareAddress || "",
     daycarePhone: student?.daycarePhone || "",
+    parentPhone: student?.parentPhone && student.parentPhone !== "—" ? student.parentPhone : "",
+    parentPhone2: student?.parentPhone2 || "",
     parentEmail: student?.parentEmail || "",
     teacherEmail: student?.teacherEmail || "",
   };
@@ -186,6 +188,8 @@ export function ReceptionDesk({
   const [daycareName, setDaycareName] = useState(initial.daycareName);
   const [daycareAddress, setDaycareAddress] = useState(initial.daycareAddress);
   const [daycarePhone, setDaycarePhone] = useState(initial.daycarePhone);
+  const [parentPhone, setParentPhone] = useState(initial.parentPhone);
+  const [parentPhone2, setParentPhone2] = useState(initial.parentPhone2);
   const [parentEmail, setParentEmail] = useState(initial.parentEmail);
   const [teacherEmail, setTeacherEmail] = useState(initial.teacherEmail);
   const [busCompanyEmail, setBusCompanyEmail] = useState(startingBusCompanyEmail);
@@ -236,6 +240,8 @@ export function ReceptionDesk({
     setDaycareName(next.daycareName);
     setDaycareAddress(next.daycareAddress);
     setDaycarePhone(next.daycarePhone);
+    setParentPhone(next.parentPhone);
+    setParentPhone2(next.parentPhone2);
     setParentEmail(next.parentEmail);
     setTeacherEmail(next.teacherEmail);
     setNote("");
@@ -253,6 +259,10 @@ export function ReceptionDesk({
 
   function save() {
     if (!selected) return;
+    if (!parentPhone.trim()) {
+      setError("Parent phone is required so we can text the change.");
+      return;
+    }
     if (!parentEmail.trim() || !teacherEmail.trim() || !busCompanyEmail.trim()) {
       setError("Parent, teacher, and bus company emails are required.");
       return;
@@ -272,6 +282,8 @@ export function ReceptionDesk({
         daycareName,
         daycareAddress,
         daycarePhone,
+        parentPhone,
+        parentPhone2,
         parentEmail,
         teacherEmail,
         busCompanyEmail,
@@ -733,6 +745,29 @@ export function ReceptionDesk({
                 </div>
               ) : null}
 
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-semibold">
+                  Parent phone
+                  <input
+                    type="tel"
+                    required
+                    value={parentPhone}
+                    onChange={(event) => setParentPhone(event.target.value)}
+                    placeholder="Gets a text"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Parent phone 2
+                  <input
+                    type="tel"
+                    value={parentPhone2}
+                    onChange={(event) => setParentPhone2(event.target.value)}
+                    placeholder="Optional second text"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+              </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block text-sm font-semibold">
                   Parent email
@@ -769,8 +804,8 @@ export function ReceptionDesk({
                 </label>
               </div>
               <p className="text-sm text-muted">
-                Parent gets email and a text. Teacher and the bus company get
-                email.
+                Parent phone gets a text. Parent email, teacher, and the bus
+                company get email.
               </p>
 
               <label className="block text-sm font-semibold">

@@ -14,6 +14,7 @@ import {
   planLine,
 } from "@/lib/change-notify";
 import { saveSchoolBusCompanyEmail, usableOpsEmail } from "@/lib/ops-change-emails";
+import { parentSmsNumbers } from "@/lib/sms";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
 
@@ -29,6 +30,8 @@ export type ReceptionChangeInput = {
   daycareName?: string;
   daycareAddress?: string;
   daycarePhone?: string;
+  parentPhone?: string;
+  parentPhone2?: string;
   parentEmail?: string;
   teacherEmail?: string;
   busCompanyEmail?: string;
@@ -121,8 +124,13 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   const parentEmail = usableOpsEmail(input.parentEmail || "");
   const teacherEmail = usableTeacherEmail(input.teacherEmail || "");
   const busCompanyEmail = usableOpsEmail(input.busCompanyEmail || "");
+  const parentPhone = input.parentPhone?.trim() || "";
+  const parentPhone2 = input.parentPhone2?.trim() || "";
   const previous = planLine(loaded.effective, input.trips);
 
+  if (!parentSmsNumbers(parentPhone, parentPhone2).length) {
+    return { ok: false as const, error: "Parent phone is required so we can text the change." };
+  }
   if (!parentEmail) {
     return { ok: false as const, error: "Parent email is required." };
   }
@@ -137,9 +145,15 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   );
 
   await prisma.$executeRaw`
-    UPDATE "Student" SET "parentEmail" = ${parentEmail} WHERE "id" = ${input.studentId}
+    UPDATE "Student"
+    SET "parentEmail" = ${parentEmail},
+        "parentPhone" = ${parentPhone || loaded.effective.parentPhone},
+        "parentPhone2" = ${parentPhone2}
+    WHERE "id" = ${input.studentId}
   `.catch(() => undefined);
   loaded.effective.parentEmail = parentEmail;
+  loaded.effective.parentPhone = parentPhone || loaded.effective.parentPhone;
+  loaded.effective.parentPhone2 = parentPhone2;
   await prisma.teacher
     .updateMany({
       where: { classroomId: loaded.effective.classroomId },
@@ -202,6 +216,8 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
 
   const after = await loadStudent(input.studentId);
   const student = after?.effective ?? loaded.effective;
+  student.parentPhone = parentPhone || student.parentPhone;
+  student.parentPhone2 = parentPhone2;
   await prisma.changeRequest
     .create({
       data: {
