@@ -7,12 +7,32 @@ function toE164(value: string) {
   return "";
 }
 
+function twilioFromNumber() {
+  return (
+    process.env.TWILIO_PHONE_NUMBER ||
+    process.env.TWILIO_FROM_NUMBER ||
+    ""
+  ).trim();
+}
+
+function twilioAuth() {
+  const apiKey = (process.env.TWILIO_API_KEY_SID || "").trim();
+  const apiSecret = (process.env.TWILIO_API_KEY_SECRET || "").trim();
+  const accountSid = (process.env.TWILIO_ACCOUNT_SID || "").trim();
+  const authToken = (process.env.TWILIO_AUTH_TOKEN || "").trim();
+  const user = apiKey || accountSid;
+  const pass = apiSecret || authToken;
+  const pathSid = accountSid.startsWith("AC")
+    ? accountSid
+    : apiKey.startsWith("AC")
+      ? apiKey
+      : accountSid || apiKey;
+  return { user, pass, pathSid };
+}
+
 export function smsConfigured() {
-  return Boolean(
-    process.env.TWILIO_ACCOUNT_SID &&
-      process.env.TWILIO_AUTH_TOKEN &&
-      process.env.TWILIO_FROM_NUMBER,
-  );
+  const { user, pass, pathSid } = twilioAuth();
+  return Boolean(user && pass && pathSid && twilioFromNumber());
 }
 
 export function parentSmsNumbers(...values: Array<string | null | undefined>) {
@@ -22,11 +42,14 @@ export function parentSmsNumbers(...values: Array<string | null | undefined>) {
 }
 
 export async function sendSms(args: { to: string | string[]; body: string }) {
-  if (!smsConfigured()) {
+  const { user, pass, pathSid } = twilioAuth();
+  const from = twilioFromNumber();
+  if (!user || !pass || !pathSid || !from) {
     return {
       sent: false as const,
       recipients: [] as string[],
-      reason: "Twilio is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER on Vercel.",
+      reason:
+        "Twilio is not configured. AMPM Flow reads TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET, and TWILIO_PHONE_NUMBER.",
     };
   }
 
@@ -41,17 +64,14 @@ export async function sendSms(args: { to: string | string[]; body: string }) {
     };
   }
 
-  const sid = process.env.TWILIO_ACCOUNT_SID || "";
-  const token = process.env.TWILIO_AUTH_TOKEN || "";
-  const from = process.env.TWILIO_FROM_NUMBER || "";
-  const auth = Buffer.from(`${sid}:${token}`).toString("base64");
+  const auth = Buffer.from(`${user}:${pass}`).toString("base64");
   const sent: string[] = [];
   const errors: string[] = [];
 
   for (const to of recipients) {
     const body = new URLSearchParams({ From: from, To: to, Body: args.body });
     const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+      `https://api.twilio.com/2010-04-01/Accounts/${pathSid}/Messages.json`,
       {
         method: "POST",
         headers: {
