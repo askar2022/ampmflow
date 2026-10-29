@@ -18,29 +18,52 @@ import { ensureStudentContactColumns, parentNameFromEmail } from "@/lib/transpor
 
 type Row = Record<string, string>;
 
+function normHeader(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[_./]+/g, " ")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function cell(row: Row, ...keys: string[]) {
   const headers = Object.keys(row);
-  for (const key of keys) {
-    const wanted = key.toLowerCase();
-    const match = headers.find((k) => {
-      const header = k.trim().toLowerCase();
-      if (header === wanted) return true;
-      return wanted.length >= 4 && header.includes(wanted);
-    });
+  const wantedList = keys.map(normHeader).filter(Boolean);
+  for (const wanted of wantedList) {
+    const match = headers.find((header) => normHeader(header) === wanted);
     if (match && row[match] != null && String(row[match]).trim()) {
       return String(row[match]).trim();
     }
   }
-  if (keys.some((key) => key.toLowerCase() === "family id")) {
-    const match = headers.find((k) => {
-      const h = k.trim().toLowerCase();
-      return h.includes("family id") || h === "fam id" || h === "famid";
+  for (const wanted of wantedList) {
+    if (wanted.length < 8) continue;
+    const match = headers.find((header) => normHeader(header).includes(wanted));
+    if (match && row[match] != null && String(row[match]).trim()) {
+      return String(row[match]).trim();
+    }
+  }
+  if (keys.some((key) => normHeader(key) === "family id")) {
+    const match = headers.find((header) => {
+      const name = normHeader(header);
+      return name.includes("family id") || name === "fam id" || name === "famid";
     });
     if (match && row[match] != null && String(row[match]).trim()) {
       return String(row[match]).trim();
     }
   }
   return "";
+}
+
+function parseCsz(raw: string) {
+  const value = raw.trim();
+  const match = value.match(/^(.*?)[,\s]+([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+  if (!match) return { city: "", state: "", zip: "" };
+  return {
+    city: match[1].replace(/,$/, "").trim(),
+    state: match[2].toUpperCase(),
+    zip: match[3],
+  };
 }
 
 function parentPhonesFromRow(row: Row) {
@@ -134,6 +157,31 @@ function parseType(value: string): "BUS" | "PARENT" | null {
   return null;
 }
 
+function studentNamesFromRow(row: Row) {
+  const fullName = cell(row, "lfname", "lf name", "full name", "student name");
+  const names = splitName(fullName);
+  return {
+    first:
+      cell(
+        row,
+        "name (first)",
+        "name first",
+        "student first name",
+        "first_name",
+        "first name",
+      ) || names.first,
+    last:
+      cell(
+        row,
+        "name (last)",
+        "name last",
+        "student last name",
+        "last_name",
+        "last name",
+      ) || names.last,
+  };
+}
+
 function splitName(fullName: string) {
   const trimmed = fullName.trim();
   if (trimmed.includes(",")) {
@@ -164,6 +212,20 @@ const HEADER_ALIASES = new Set([
   "teacher",
   "teacher_name",
   "teacher name",
+  "advisor",
+  "advisor name",
+  "name (last)",
+  "name (first)",
+  "name last",
+  "name first",
+  "prim city",
+  "prim c s z",
+  "prim_c_s_z",
+  "prim email",
+  "routebusnum",
+  "route bus num",
+  "routevannum",
+  "busloc1 routebusnum",
   "transportation_type",
   "vehicle_name",
   "parent_first_name",
@@ -218,8 +280,12 @@ function rowsFromSheet(sheet: XLSX.WorkSheet): Row[] {
       HEADER_ALIASES.has(value) ||
       value.includes("first name") ||
       value.includes("last name") ||
+      value.includes("name (") ||
       value.includes("lfname") ||
       value.includes("prim phone") ||
+      value.includes("prim address") ||
+      value.includes("advisor") ||
+      value.includes("routebus") ||
       value.includes("family id") ||
       value.includes("enrollment") ||
       value.includes("parent"),
@@ -552,15 +618,12 @@ export async function importStudents(formData: FormData) {
 
   for (const [offset, row] of workRows.entries()) {
     const index = batched ? batchStart + offset : offset;
-    const fullName = cell(row, "lfname", "lf name", "student", "name", "full name");
-    const names = splitName(fullName);
-    const firstName =
-      cell(row, "student first name", "first_name", "first name") || names.first;
-    const lastName =
-      cell(row, "student last name", "last_name", "last name") || names.last;
+    const names = studentNamesFromRow(row);
+    const firstName = names.first;
+    const lastName = names.last;
     const familyKey = cell(row, "family id", "family_id", "family");
     let studentId =
-      cell(row, "student_id", "id", "student id") ||
+      cell(row, "student id", "student_id", "id") ||
       slugStudentId(firstName, lastName, familyKey, index);
     if (!firstName || !lastName) {
       excludedNoName += 1;
@@ -590,6 +653,8 @@ export async function importStudents(formData: FormData) {
     const teacherName =
       cell(
         row,
+        "advisor",
+        "advisor name",
         "teacher_name",
         "teacher name",
         "teacher",
@@ -607,7 +672,14 @@ export async function importStudents(formData: FormData) {
     const parentPhone = phones.phone1 || "—";
     const parentPhone2 = phones.phone2;
     const parentEmail =
-      cell(row, "parent email", "parent_email", "email", "guardian email") || "";
+      cell(
+        row,
+        "prim email",
+        "parent email",
+        "parent_email",
+        "email",
+        "guardian email",
+      ) || "";
     const parentName = parentNameFromRow(row, parentEmail);
     const emergencyName = cell(
       row,
@@ -623,16 +695,30 @@ export async function importStudents(formData: FormData) {
       "emergency contact phone",
     );
     const parsedAddress = splitHomeAddress(
-      cell(row, "home_address", "address") || "",
+      cell(row, "prim address", "home_address", "home address", "address") || "",
+    );
+    const csz = parseCsz(
+      cell(row, "prim c s z", "prim_c_s_z", "prim csz", "prim city state zip"),
     );
     const homeLine =
       parsedAddress.line1 ||
-      cell(row, "home_address", "address") ||
+      cell(row, "prim address", "home_address", "home address", "address") ||
       "Address pending";
     const city =
-      cell(row, "home_city", "city") || parsedAddress.city || "Minneapolis";
-    const state = cell(row, "home_state", "state") || parsedAddress.state || "MN";
-    const zip = cell(row, "home_zip", "zip code", "zip") || parsedAddress.zip || "";
+      cell(row, "prim city", "home_city", "city") ||
+      csz.city ||
+      parsedAddress.city ||
+      "Minneapolis";
+    const state =
+      cell(row, "home_state", "state") ||
+      csz.state ||
+      parsedAddress.state ||
+      "MN";
+    const zip =
+      cell(row, "home_zip", "zip code", "zip") ||
+      csz.zip ||
+      parsedAddress.zip ||
+      "";
     const transportType = cell(
       row,
       "transportation_type",
@@ -640,7 +726,17 @@ export async function importStudents(formData: FormData) {
       "ride type",
     );
     const vehicleName = cell(row, "vehicle_name", "vehicle name");
-    const sharedBus = cell(row, "bus number", "bus", "route");
+    const sharedBus = cell(
+      row,
+      "routebusnum",
+      "route bus num",
+      "route bus number",
+      "routevannum",
+      "route van num",
+      "route van number",
+      "routenannumb",
+      "bus number",
+    );
     const rideValue =
       vehicleName ||
       cell(row, "am_type", "am bus", "am route", "morning", "am") ||
@@ -1088,27 +1184,29 @@ async function rowsFromUpload(
     workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   return rowsFromSheet(sheet).map((row) => {
-    const fullName = cell(row, "lfname", "lf name", "student", "name", "full name");
-    const names = splitName(fullName);
-    const firstName =
-      cell(row, "student first name", "first_name", "first name") || names.first;
-    const lastName =
-      cell(row, "student last name", "last_name", "last name") || names.last;
+    const names = studentNamesFromRow(row);
+    const firstName = names.first;
+    const lastName = names.last;
+    const parentEmail =
+      cell(row, "prim email", "parent email", "parent_email", "email") || "";
+    const csz = parseCsz(
+      cell(row, "prim c s z", "prim_c_s_z", "prim csz", "prim city state zip"),
+    );
     return {
-      studentId: cell(row, "student_id", "id", "student id", "family id"),
+      studentId: cell(row, "student id", "student_id", "id", "family id"),
       firstName,
       lastName,
       grade: normalizeGrade(cell(row, "grade") || "—"),
-      teacherName: cell(row, "teacher") || "Unassigned",
-      parentName: parentNameFromRow(
-        row,
-        cell(row, "parent email", "parent_email", "email", "guardian email"),
-      ),
+      teacherName:
+        cell(row, "advisor", "advisor name", "teacher") || "Unassigned",
+      parentName: parentNameFromRow(row, parentEmail),
       parentPhone: parentPhonesFromRow(row).phone1 || "—",
-      parentEmail: cell(row, "parent email", "parent_email", "email") || "",
-      address: cell(row, "home_address", "address") || "",
-      city: cell(row, "home_city", "city") || "",
-      zip: cell(row, "home_zip", "zip code", "zip") || "",
+      parentEmail,
+      address:
+        cell(row, "prim address", "home_address", "home address", "address") ||
+        "",
+      city: cell(row, "prim city", "home_city", "city") || csz.city || "",
+      zip: cell(row, "home_zip", "zip code", "zip") || csz.zip || "",
       enrollmentSource: parseEnrollment(
         cell(
           row,

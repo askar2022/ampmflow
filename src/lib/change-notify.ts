@@ -201,7 +201,12 @@ export async function notifyTransportationChange(args: {
     const texted = await sendSms({ to: parentPhones, body: smsBody });
     if (texted.sent) {
       sent.push(...texted.recipients.map((phone) => `parent text: ${phone}`));
-    } else {
+    }
+    if (texted.errors.length) {
+      skipped.push(
+        ...texted.errors.map((error) => `parent text (${error})`),
+      );
+    } else if (!texted.sent) {
       skipped.push(`parent text (${texted.reason})`);
     }
   }
@@ -311,7 +316,12 @@ export async function notifyRouteRequest(args: {
     });
     if (texted.sent) {
       sent.push(...texted.recipients.map((phone) => `parent text: ${phone}`));
-    } else {
+    }
+    if (texted.errors.length) {
+      skipped.push(
+        ...texted.errors.map((error) => `parent text (${error})`),
+      );
+    } else if (!texted.sent) {
       skipped.push(`parent text (${texted.reason})`);
     }
   }

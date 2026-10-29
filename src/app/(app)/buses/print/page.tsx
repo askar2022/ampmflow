@@ -96,7 +96,7 @@ export default async function BusDriverPrintPage({
               <th>Student name</th>
               <th>Parent name</th>
               <th>Primary 1 / 2 phone</th>
-              <th>Teacher name</th>
+              <th>Advisor</th>
               <th>Grade</th>
             </tr>
           </thead>

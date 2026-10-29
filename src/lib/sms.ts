@@ -48,6 +48,7 @@ export async function sendSms(args: { to: string | string[]; body: string }) {
     return {
       sent: false as const,
       recipients: [] as string[],
+      errors: [] as string[],
       reason:
         "Twilio is not configured. AMPM Flow reads TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET, and TWILIO_PHONE_NUMBER.",
     };
@@ -60,6 +61,7 @@ export async function sendSms(args: { to: string | string[]; body: string }) {
     return {
       sent: false as const,
       recipients,
+      errors: [] as string[],
       reason: "No parent phone that can receive a text.",
     };
   }
@@ -88,15 +90,16 @@ export async function sendSms(args: { to: string | string[]; body: string }) {
     const payload = (await response.json().catch(() => ({}))) as {
       message?: string;
     };
-    errors.push(payload.message || `Could not text ${to}.`);
+    errors.push(`${to}: ${payload.message || "Could not send the text."}`);
   }
 
   if (!sent.length) {
     return {
       sent: false as const,
       recipients,
+      errors,
       reason: errors[0] || "Could not send the text.",
     };
   }
-  return { sent: true as const, recipients: sent };
+  return { sent: true as const, recipients: sent, errors };
 }

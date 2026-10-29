@@ -343,7 +343,7 @@ export function ReceptionDesk({
             </select>
           </label>
           <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-48">
-            Teacher
+            Teacher / Advisor
             <select
               value={teacher}
               onChange={(event) => {
@@ -355,7 +355,7 @@ export function ReceptionDesk({
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
-              <option value="">All teachers</option>
+              <option value="">All advisors</option>
               {teachers.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -543,7 +543,7 @@ export function ReceptionDesk({
               </>
             ) : null}
             <Field
-              label="Teacher"
+              label="Advisor"
               value={
                 selected.teacherEmail
                   ? `${selected.teacherName} · ${selected.teacherEmail}`
@@ -779,7 +779,7 @@ export function ReceptionDesk({
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Teacher email
+                  Advisor email
                   <input
                     type="email"
                     required

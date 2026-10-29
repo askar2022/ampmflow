@@ -230,7 +230,7 @@ export function DriverLists({
                   <th className="py-2 pr-3">Student name</th>
                   <th className="py-2 pr-3">Parent name</th>
                   <th className="py-2 pr-3">Primary 1 / 2 phone</th>
-                  <th className="py-2 pr-3">Teacher name</th>
+                  <th className="py-2 pr-3">Advisor</th>
                   <th className="py-2">Grade</th>
                 </tr>
               </thead>
