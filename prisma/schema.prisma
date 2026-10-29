@@ -134,6 +134,7 @@ model Student {
   classroomId   String
   parentName    String
   parentPhone   String
+  parentPhone2     String   @default("")
   parentEmail      String   @default("")
   emergencyName    String   @default("")
   emergencyPhone   String   @default("")

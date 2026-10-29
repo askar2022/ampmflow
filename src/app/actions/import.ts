@@ -43,6 +43,30 @@ function cell(row: Row, ...keys: string[]) {
   return "";
 }
 
+function parentPhonesFromRow(row: Row) {
+  const phone1 =
+    cell(
+      row,
+      "prim phone1",
+      "primary phone 1",
+      "phone1",
+      "phone 1",
+      "parent_phone",
+      "parent phone",
+      "primary phone",
+    ) || "";
+  const phone2 = cell(
+    row,
+    "prim phone2",
+    "primary phone 2",
+    "phone2",
+    "phone 2",
+    "parent phone 2",
+    "parent_phone2",
+  );
+  return { phone1, phone2 };
+}
+
 function parentNameFromRow(row: Row, email: string) {
   const first = cell(row, "parent_first_name", "parent first name", "guardian first name");
   const last = cell(row, "parent_last_name", "parent last name", "guardian last name");
@@ -469,6 +493,7 @@ export async function importStudents(formData: FormData) {
       firstName: true,
       lastName: true,
       parentPhone: true,
+      parentPhone2: true,
       parentName: true,
       parentEmail: true,
       homeAddressId: true,
@@ -561,8 +586,9 @@ export async function importStudents(formData: FormData) {
       : teacherName !== "Unassigned"
         ? teacherName
         : `${grade} classroom`;
-    const parentPhone =
-      cell(row, "primary phone", "parent_phone", "parent phone", "phone") || "—";
+    const phones = parentPhonesFromRow(row);
+    const parentPhone = phones.phone1 || "—";
+    const parentPhone2 = phones.phone2;
     const parentEmail =
       cell(row, "parent email", "parent_email", "email", "guardian email") || "";
     const parentName = parentNameFromRow(row, parentEmail);
@@ -659,6 +685,7 @@ export async function importStudents(formData: FormData) {
       const patch: {
         parentName?: string;
         parentPhone?: string;
+        parentPhone2?: string;
         parentEmail?: string;
         emergencyName?: string;
         emergencyPhone?: string;
@@ -666,6 +693,9 @@ export async function importStudents(formData: FormData) {
       } = {};
       if (usablePhone(parentPhone) && !usablePhone(existingEarly.parentPhone)) {
         patch.parentPhone = parentPhone;
+      }
+      if (usablePhone(parentPhone2)) {
+        patch.parentPhone2 = parentPhone2;
       }
       if (parentEmail.includes("@") && !existingEarly.parentEmail) {
         patch.parentEmail = parentEmail;
@@ -845,6 +875,7 @@ export async function importStudents(formData: FormData) {
             classroomId: classroom.id,
             parentName,
             parentPhone,
+            parentPhone2: parentPhone2 || undefined,
             parentEmail,
             emergencyName: emergencyName || undefined,
             emergencyPhone: emergencyPhone || undefined,
@@ -866,6 +897,7 @@ export async function importStudents(formData: FormData) {
             classroomId: classroom.id,
             parentName,
             parentPhone,
+            parentPhone2,
             parentEmail,
             emergencyName,
             emergencyPhone,
@@ -885,6 +917,7 @@ export async function importStudents(formData: FormData) {
       firstName,
       lastName,
       parentPhone,
+      parentPhone2,
       parentName,
       parentEmail,
       homeAddressId: homeId,
@@ -900,6 +933,7 @@ export async function importStudents(formData: FormData) {
         firstName,
         lastName,
         parentPhone,
+        parentPhone2,
         parentName,
         parentEmail,
         homeAddressId: homeId,
@@ -1053,7 +1087,7 @@ async function rowsFromUpload(
         row,
         cell(row, "parent email", "parent_email", "email", "guardian email"),
       ),
-      parentPhone: cell(row, "primary phone", "parent_phone", "phone") || "—",
+      parentPhone: parentPhonesFromRow(row).phone1 || "—",
       parentEmail: cell(row, "parent email", "parent_email", "email") || "",
       address: cell(row, "home_address", "address") || "",
       city: cell(row, "home_city", "city") || "",

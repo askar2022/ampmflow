@@ -3,6 +3,7 @@ import { sendMail, smtpConfigured } from "./email";
 import { planSummary } from "./format";
 import { loadSavedOpsEmails, usableOpsEmail } from "./ops-change-emails";
 import { prisma } from "./prisma";
+import { parentSmsNumbers, sendSms, smsConfigured } from "./sms";
 import { usableTeacherEmail } from "./teacher-snapshot";
 import type { EffectiveStudent, SessionUser, Trip } from "./types";
 
@@ -38,8 +39,11 @@ export function changeNoticeText(args: {
   return [
     "AMPM Flow — transportation change",
     "",
-    `Student: ${args.student.fullName} (${args.student.studentId})`,
-    `Grade ${args.student.grade} · ${args.student.teacherName}`,
+    `Student: ${args.student.fullName}`,
+    `Parent: ${args.student.parentName && args.student.parentName !== "—" ? args.student.parentName : "—"}`,
+    `Parent phone: ${args.student.parentPhone || "—"}`,
+    args.student.parentPhone2 ? `Parent phone 2: ${args.student.parentPhone2}` : "",
+    `Grade ${String(args.student.grade).replace(/^grade\s+/i, "")} · ${args.student.teacherName}`,
     `Trip: ${trips}`,
     `Was: ${args.previous}`,
     `Now: ${args.next}`,
@@ -154,32 +158,51 @@ export async function notifyTransportationChange(args: {
   if (!company.length) skipped.push("bus company (required)");
 
   if (!smtpConfigured()) {
-    return {
-      sent,
-      skipped: [...skipped, "email is not configured"],
-      waiting: args.waiting,
-    };
+    skipped.push("email is not configured");
+  } else {
+    const groups = [
+      { label: "parent", to: parent },
+      { label: "teacher", to: teachers },
+      { label: "bus company", to: company },
+      { label: "leadership", to: ops },
+    ];
+
+    for (const group of groups) {
+      if (!group.to.length) continue;
+      const result = await sendMail({
+        to: group.to,
+        subject,
+        text,
+        html,
+      });
+      if (result.sent) {
+        sent.push(...group.to.map((email) => `${group.label}: ${email}`));
+      } else {
+        skipped.push(`${group.label} (${result.reason})`);
+      }
+    }
   }
 
-  const groups = [
-    { label: "parent", to: parent },
-    { label: "teacher", to: teachers },
-    { label: "bus company", to: company },
-    { label: "leadership", to: ops },
-  ];
-
-  for (const group of groups) {
-    if (!group.to.length) continue;
-    const result = await sendMail({
-      to: group.to,
-      subject,
-      text,
-      html,
-    });
-    if (result.sent) {
-      sent.push(...group.to.map((email) => `${group.label}: ${email}`));
+  const smsBody = [
+    `AMPM Flow: ${args.student.fullName}`,
+    `Was: ${args.previous}`,
+    `Now: ${args.next}`,
+    `When: ${args.when}`,
+  ].join(". ");
+  const parentPhones = parentSmsNumbers(
+    args.student.parentPhone,
+    args.student.parentPhone2,
+  );
+  if (!parentPhones.length) {
+    skipped.push("parent text (phone required)");
+  } else if (!smsConfigured()) {
+    skipped.push("parent text (Twilio is not set)");
+  } else {
+    const texted = await sendSms({ to: parentPhones, body: smsBody });
+    if (texted.sent) {
+      sent.push(...texted.recipients.map((phone) => `parent text: ${phone}`));
     } else {
-      skipped.push(`${group.label} (${result.reason})`);
+      skipped.push(`parent text (${texted.reason})`);
     }
   }
 
@@ -247,36 +270,49 @@ export async function notifyRouteRequest(args: {
   if (!parent.length) skipped.push("parent (email required)");
   if (!company.length) skipped.push("bus company (email required)");
   if (!smtpConfigured()) {
-    return { sent, skipped: [...skipped, "email is not configured"], waiting: true };
+    skipped.push("email is not configured");
+  } else {
+    const groups = [
+      {
+        label: "parent",
+        to: parent,
+        subject: `Bus request for ${args.studentName}`,
+        text: parentText,
+      },
+      {
+        label: "bus company",
+        to: company,
+        subject: `Request for route — ${args.studentName}`,
+        text: companyText,
+      },
+    ];
+
+    for (const group of groups) {
+      if (!group.to.length) continue;
+      const result = await sendMail({
+        to: group.to,
+        subject: group.subject,
+        text: group.text,
+        html: changeNoticeHtml(group.text, "Request"),
+      });
+      if (result.sent) {
+        sent.push(...group.to.map((email) => `${group.label}: ${email}`));
+      } else {
+        skipped.push(`${group.label} (${result.reason})`);
+      }
+    }
   }
 
-  const groups = [
-    {
-      label: "parent",
-      to: parent,
-      subject: `Bus request for ${args.studentName}`,
-      text: parentText,
-    },
-    {
-      label: "bus company",
-      to: company,
-      subject: `Request for route — ${args.studentName}`,
-      text: companyText,
-    },
-  ];
-
-  for (const group of groups) {
-    if (!group.to.length) continue;
-    const result = await sendMail({
-      to: group.to,
-      subject: group.subject,
-      text: group.text,
-      html: changeNoticeHtml(group.text, "Request"),
+  const requestPhones = parentSmsNumbers(args.parentPhone);
+  if (requestPhones.length && smsConfigured()) {
+    const texted = await sendSms({
+      to: requestPhones,
+      body: `AMPM Flow: we requested a bus or van for ${args.studentName}. The school will update you when the number is on file.`,
     });
-    if (result.sent) {
-      sent.push(...group.to.map((email) => `${group.label}: ${email}`));
+    if (texted.sent) {
+      sent.push(...texted.recipients.map((phone) => `parent text: ${phone}`));
     } else {
-      skipped.push(`${group.label} (${result.reason})`);
+      skipped.push(`parent text (${texted.reason})`);
     }
   }
 
@@ -294,11 +330,16 @@ export function noticeSummary(notice: ChangeNotice) {
   if (notice.waiting) {
     parts.push("Marked Waiting for Route until the bus company confirms it.");
   }
-  if (notice.sent.length) {
-    parts.push(`Emailed ${notice.sent.join(", ")}.`);
+  const emailed = notice.sent.filter((item) => !item.startsWith("parent text"));
+  const texted = notice.sent.filter((item) => item.startsWith("parent text"));
+  if (emailed.length) {
+    parts.push(`Emailed ${emailed.join(", ")}.`);
+  }
+  if (texted.length) {
+    parts.push(`Texted ${texted.join(", ")}.`);
   }
   if (notice.skipped.length) {
-    parts.push(`Could not email ${notice.skipped.join(", ")}.`);
+    parts.push(`Could not send ${notice.skipped.join(", ")}.`);
   }
   parts.push("Same-day changes also go out again in the 2:30 p.m. reminder.");
   return parts.join(" ");

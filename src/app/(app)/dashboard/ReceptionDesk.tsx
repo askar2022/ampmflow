@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { saveReceptionChange } from "@/app/actions/reception";
@@ -73,6 +73,8 @@ function deskRows(
         student.grade,
         student.teacherName,
         student.classroomName,
+        student.parentPhone,
+        student.parentPhone2,
         ...studentBuses(student),
       ]
         .join(" ")
@@ -212,9 +214,10 @@ export function ReceptionDesk({
       ]),
     [buses, students],
   );
+  const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(
-    () => deskRows(students, query, grade, teacher, ride, studentVanId),
-    [students, query, grade, teacher, ride, studentVanId],
+    () => deskRows(students, deferredQuery, grade, teacher, ride, studentVanId),
+    [students, deferredQuery, grade, teacher, ride, studentVanId],
   );
   const browsing = Boolean(query.trim() || grade || teacher || ride);
   const matches = browsing ? filtered.slice(0, 80) : filtered.slice(0, 10);
@@ -507,6 +510,11 @@ export function ReceptionDesk({
               href={phoneHref(selected.parentPhone)}
             />
             <Field
+              label="Parent phone 2"
+              value={selected.parentPhone2}
+              href={selected.parentPhone2 ? phoneHref(selected.parentPhone2) : undefined}
+            />
+            <Field
               label="Parent email"
               value={selected.parentEmail || "Not on file"}
             />
@@ -761,7 +769,8 @@ export function ReceptionDesk({
                 </label>
               </div>
               <p className="text-sm text-muted">
-                Parent, teacher, and the bus company get this change now.
+                Parent gets email and a text. Teacher and the bus company get
+                email.
               </p>
 
               <label className="block text-sm font-semibold">

@@ -256,6 +256,16 @@ export function DriverLists({
                         ) : (
                           <span className="text-muted">Not on file</span>
                         )}
+                        {hasParentPhone(rider.parentPhone2) ? (
+                          <span className="mt-0.5 block">
+                            <a
+                              href={phoneHref(rider.parentPhone2)}
+                              className="font-semibold text-navy underline-offset-2 hover:underline"
+                            >
+                              {rider.parentPhone2}
+                            </a>
+                          </span>
+                        ) : null}
                       </td>
                       <td className="py-2.5 pr-3">{rider.teacherName || "—"}</td>
                       <td className="py-2.5">{gradeOnly(rider.grade)}</td>

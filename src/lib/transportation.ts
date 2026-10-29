@@ -46,29 +46,31 @@ export async function ensureStudentContactColumns() {
   await prisma.$executeRawUnsafe(
     `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "active" BOOLEAN NOT NULL DEFAULT true`,
   );
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentPhone2" TEXT NOT NULL DEFAULT ''`,
+  );
 }
 
 const studentInclude = {
   classroom: {
-    include: { teachers: true },
+    include: { teachers: { select: { name: true, email: true } } },
   },
   homeAddress: true,
   daycare: { include: { address: true } },
   assignments: {
     include: {
-      busRoute: true,
-      daycare: true,
+      busRoute: { select: { number: true, loadingLocation: true } },
+      daycare: { select: { name: true } },
       customAddress: true,
-      updatedBy: true,
+      updatedBy: { select: { name: true } },
     },
   },
   tempChanges: {
+    where: { undone: false, status: "APPROVED" },
     include: {
-      busRoute: true,
-      daycare: true,
+      busRoute: { select: { number: true, loadingLocation: true } },
+      daycare: { select: { name: true } },
       customAddress: true,
-      createdBy: true,
-      approvedBy: true,
     },
   },
 } as const;
@@ -203,6 +205,7 @@ export function toEffective(
       extraText(student, "parentEmail"),
     ),
     parentPhone: student.parentPhone,
+    parentPhone2: extraText(student, "parentPhone2"),
     parentEmail: extraText(student, "parentEmail"),
     emergencyName: extraText(student, "emergencyName"),
     emergencyPhone: extraText(student, "emergencyPhone"),
@@ -324,6 +327,7 @@ export function searchStudents(students: EffectiveStudent[], query: string) {
       student.classroomName,
       student.parentName,
       student.parentPhone,
+      student.parentPhone2,
       student.am.busNumber,
       student.pm.busNumber,
       student.homeAddress,

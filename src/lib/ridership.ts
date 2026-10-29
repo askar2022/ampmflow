@@ -37,6 +37,7 @@ export type DriverRider = {
   teacherName: string;
   parentName: string;
   parentPhone: string;
+  parentPhone2: string;
   buses: string[];
   vanId: string | null;
 };
@@ -186,6 +187,7 @@ export async function loadDriverLists(schoolId: string) {
     teacherName: student.teacherName,
     parentName: student.parentName,
     parentPhone: student.parentPhone,
+    parentPhone2: student.parentPhone2,
     buses: studentBusNumbers(student),
     vanId: vanByStudent.get(student.id) || null,
   }));
@@ -219,7 +221,7 @@ export function oneVehicleText(args: {
     "Student name  |  Parent name  |  Parent phone  |  Teacher name  |  Grade",
     ...rows.map(
       (rider) =>
-        `  ${rider.name}  |  ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  |  ${rider.parentPhone || "—"}  |  ${rider.teacherName || "—"}  |  ${String(rider.grade).replace(/^grade\s+/i, "")}`,
+        `  ${rider.name}  |  ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  |  ${[rider.parentPhone, rider.parentPhone2].filter(Boolean).join(" / ") || "—"}  |  ${rider.teacherName || "—"}  |  ${String(rider.grade).replace(/^grade\s+/i, "")}`,
     ),
   ];
   if (!rows.length) lines.push("No students on this vehicle.");
