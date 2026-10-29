@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getSchoolIdentityById } from "@/lib/school";
 import { ImportForm } from "../students/import/ImportForm";
+import { ClearRoster } from "./ClearRoster";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -12,9 +14,12 @@ export default async function RosterPage() {
 
   const canUpload =
     session.role === "ADMINISTRATOR" || session.role === "COORDINATOR";
-  const students = await prisma.student.count({
-    where: { schoolId: session.schoolId },
-  });
+  const [students, school] = await Promise.all([
+    prisma.student.count({
+      where: { schoolId: session.schoolId },
+    }),
+    getSchoolIdentityById(session.schoolId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -47,6 +52,12 @@ export default async function RosterPage() {
           >
             Download sample CSV
           </a>
+          <div className="mt-6">
+            <ClearRoster
+              schoolName={school?.name || "this school"}
+              count={students}
+            />
+          </div>
         </div>
       ) : (
         <p className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
