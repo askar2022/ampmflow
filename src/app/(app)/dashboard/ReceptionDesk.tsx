@@ -413,16 +413,20 @@ export function ReceptionDesk({
       </section>
 
       {!selected ? (
-        <div className="overflow-x-auto rounded-2xl border border-line bg-card">
-          <table className="w-full min-w-[56rem] text-left text-sm">
+        <div className="min-w-0">
+          <p className="mb-2 text-xs text-muted sm:hidden">
+            Scroll left and right to see every column.
+          </p>
+          <div className="desk-table-scroll rounded-2xl border border-line bg-card">
+          <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-paper text-[11px] font-semibold uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-4 py-3">Student name</th>
-                <th className="py-3 pr-3">Grade</th>
-                <th className="py-3 pr-3">Parent</th>
-                <th className="py-3 pr-3">Advisor</th>
-                <th className="py-3 pr-3">Address</th>
-                <th className="py-3 pr-4">Primary 1 phone</th>
+                <th className="whitespace-nowrap px-4 py-3">Student name</th>
+                <th className="whitespace-nowrap py-3 pr-3">Grade</th>
+                <th className="whitespace-nowrap py-3 pr-3">Parent</th>
+                <th className="whitespace-nowrap py-3 pr-3">Advisor</th>
+                <th className="whitespace-nowrap py-3 pr-3">Address</th>
+                <th className="whitespace-nowrap py-3 pr-4">Primary 1 phone</th>
               </tr>
             </thead>
             <tbody>
@@ -435,18 +439,24 @@ export function ReceptionDesk({
                     className="cursor-pointer border-t border-line hover:bg-paper"
                     onClick={() => choose(student)}
                   >
-                    <td className="px-4 py-3 font-semibold">{student.fullName}</td>
-                    <td className="py-3 pr-3">{gradeOnly(student.grade)}</td>
-                    <td className="py-3 pr-3">{parentLabel(student)}</td>
-                    <td className="py-3 pr-3">
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold">
+                      {student.fullName}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
+                      {gradeOnly(student.grade)}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
+                      {parentLabel(student)}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
                       {teacherLabel(student) === "No teacher"
                         ? "Unassigned"
                         : teacherLabel(student)}
                     </td>
-                    <td className="max-w-[14rem] py-3 pr-3 text-muted">
+                    <td className="whitespace-nowrap py-3 pr-3 text-muted">
                       {student.homeAddress || "—"}
                     </td>
-                    <td className="py-3 pr-4">
+                    <td className="whitespace-nowrap py-3 pr-4">
                       {phone && call ? (
                         <a
                           href={call}
@@ -485,6 +495,7 @@ export function ReceptionDesk({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       ) : null}
 

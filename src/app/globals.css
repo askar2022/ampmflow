@@ -60,6 +60,15 @@ body {
   scrollbar-width: none;
 }
 
+.desk-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
 .nav-scroll::-webkit-scrollbar {
   display: none;
 }

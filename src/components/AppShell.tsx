@@ -66,7 +66,9 @@ export function AppShell({
           </form>
         </nav>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-4 sm:px-6">{children}</main>
+      <main className="mx-auto min-w-0 w-full max-w-4xl px-4 py-4 sm:px-6">
+        {children}
+      </main>
     </div>
   );
 }
