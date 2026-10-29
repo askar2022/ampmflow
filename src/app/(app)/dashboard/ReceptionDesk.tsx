@@ -745,7 +745,7 @@ export function ReceptionDesk({
                 </div>
               ) : null}
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="block text-sm font-semibold">
                   Parent phone
                   <input
@@ -753,7 +753,7 @@ export function ReceptionDesk({
                     required
                     value={parentPhone}
                     onChange={(event) => setParentPhone(event.target.value)}
-                    placeholder="Gets a text"
+                    placeholder="612-555-0109"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
@@ -767,8 +767,6 @@ export function ReceptionDesk({
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block text-sm font-semibold">
                   Parent email
                   <input
@@ -791,7 +789,7 @@ export function ReceptionDesk({
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
-                <label className="block text-sm font-semibold">
+                <label className="block text-sm font-semibold sm:col-span-2 lg:col-span-1">
                   Bus company email
                   <input
                     type="email"
@@ -803,9 +801,9 @@ export function ReceptionDesk({
                   />
                 </label>
               </div>
-              <p className="text-sm text-muted">
-                Parent phone gets a text. Parent email, teacher, and the bus
-                company get email.
+              <p className="text-sm font-medium text-navy">
+                Parent phone gets a text. Parent, teacher, and the bus company
+                get email.
               </p>
 
               <label className="block text-sm font-semibold">
