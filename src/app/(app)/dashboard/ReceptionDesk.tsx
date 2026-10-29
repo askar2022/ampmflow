@@ -177,7 +177,7 @@ export function ReceptionDesk({
   const [teacher, setTeacher] = useState("");
   const [ride, setRide] = useState("");
   const [selectedId, setSelectedId] = useState(initialStudentId);
-  const [openForm, setOpenForm] = useState(false);
+  const [openForm, setOpenForm] = useState(Boolean(initialStudentId));
   const [destination, setDestination] = useState<Destination>(initial.destination);
   const [trips, setTrips] = useState<Trip[]>(["PM"]);
   const [duration, setDuration] = useState<DurationType>("TODAY");
@@ -689,7 +689,7 @@ export function ReceptionDesk({
                   list="desk-buses"
                   value={busNumber}
                   onChange={(event) => setBusNumber(event.target.value)}
-                  placeholder="Leave blank if a new route is needed"
+                  placeholder="Type 4 if the company assigned bus 4"
                   className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                 />
               </label>

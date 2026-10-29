@@ -13,7 +13,11 @@ import {
   notifyTransportationChange,
   planLine,
 } from "@/lib/change-notify";
-import { saveSchoolBusCompanyEmail, usableOpsEmail } from "@/lib/ops-change-emails";
+import {
+  defaultBusCompanyEmail,
+  saveSchoolBusCompanyEmail,
+  usableOpsEmail,
+} from "@/lib/ops-change-emails";
 import { parentSmsNumbers } from "@/lib/sms";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
@@ -438,11 +442,125 @@ export async function requestRoute(input: RouteRequestInput) {
       "Request sent.",
       notice.sent.length ? `Emailed ${notice.sent.join(", ")}.` : "",
       notice.skipped.length ? `Could not email ${notice.skipped.join(", ")}.` : "",
-      "The student stays here until Front Desk enters the assigned bus or van.",
+      "The student stays here until the coordinator types the bus number the company assigned.",
     ]
       .filter(Boolean)
       .join(" "),
     sent: notice.sent,
     skipped: notice.skipped,
+  };
+}
+
+export async function assignRequestedBus(input: {
+  requestId?: string;
+  studentId?: string;
+  busNumber: string;
+}) {
+  const user = await getSession();
+  if (!user) return { ok: false as const, error: "Please sign in." };
+  if (!["FRONT_DESK", "COORDINATOR", "ADMINISTRATOR"].includes(user.role)) {
+    return { ok: false as const, error: "You cannot assign a bus number." };
+  }
+
+  const busNumber = input.busNumber.replace(/^Bus\s+/i, "").trim();
+  if (!busNumber) {
+    return { ok: false as const, error: "Type the bus number the company sent." };
+  }
+
+  const request = input.requestId
+    ? await prisma.changeRequest.findFirst({
+        where: { id: input.requestId, schoolId: user.schoolId },
+      })
+    : null;
+  const studentId = input.studentId || request?.studentId || "";
+  if (!studentId) {
+    return {
+      ok: false as const,
+      error: "Open Front Desk and search this student first.",
+    };
+  }
+
+  const loaded = await loadStudent(studentId);
+  if (!loaded || loaded.record.schoolId !== user.schoolId) {
+    return { ok: false as const, error: "Student not found." };
+  }
+
+  const previous = planLine(loaded.effective, ["AM", "PM"]);
+  const trips: Trip[] = [];
+  if (loaded.effective.am.waitingForAssignment || !loaded.effective.am.busNumber) {
+    trips.push("AM");
+  }
+  if (loaded.effective.pm.waitingForAssignment || !loaded.effective.pm.busNumber) {
+    trips.push("PM");
+  }
+  if (!trips.length) trips.push("AM", "PM");
+
+  for (const trip of trips) {
+    const busRouteId = await routeId(user.schoolId, busNumber, trip);
+    const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;
+    await prisma.transportationAssignment.upsert({
+      where: { studentId_trip: { studentId, trip } },
+      create: {
+        studentId,
+        trip,
+        type: "BUS",
+        destination: current.destination || "HOME",
+        busRouteId,
+        waitingForAssignment: false,
+        notes: `Bus ${busNumber} assigned by ${user.name}.`,
+        effectiveStart: new Date(),
+        updatedById: user.id,
+      },
+      update: {
+        type: "BUS",
+        busRouteId,
+        waitingForAssignment: false,
+        notes: `Bus ${busNumber} assigned by ${user.name}.`,
+        updatedById: user.id,
+      },
+    });
+  }
+
+  await prisma.changeRequest.updateMany({
+    where: {
+      schoolId: user.schoolId,
+      status: "PENDING",
+      OR: [{ id: request?.id || "" }, { studentId }],
+    },
+    data: {
+      status: "COMPLETED",
+      busNumber,
+      reviewedById: user.id,
+      reviewedAt: new Date(),
+    },
+  });
+
+  const after = await loadStudent(studentId);
+  const student = after?.effective ?? loaded.effective;
+  const busCompanyEmail = await defaultBusCompanyEmail(user.schoolId);
+  const notice = await notifyTransportationChange({
+    user,
+    student,
+    trips,
+    previous,
+    next: planLine(student, trips),
+    when: "Assigned bus",
+    note: `Bus company assigned bus ${busNumber}.`,
+    waiting: false,
+    teacherEmail: student.teacherEmail,
+    busCompanyEmail,
+  });
+
+  revalidatePath("/waiting");
+  revalidatePath("/dashboard");
+  revalidatePath("/changes");
+  revalidatePath("/buses");
+
+  return {
+    ok: true as const,
+    message: [
+      `Bus ${busNumber} is now assigned to ${student.fullName}.`,
+      noticeSummary(notice),
+    ].join(" "),
   };
 }
