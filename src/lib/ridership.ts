@@ -218,7 +218,7 @@ export function oneVehicleText(args: {
     `${rows.length} student${rows.length === 1 ? "" : "s"}`,
     "Parent pickup is not on this list.",
     "",
-    "Student name  |  Parent name  |  Parent phone  |  Teacher name  |  Grade",
+    "Student name  |  Parent name  |  Primary 1 / 2 phone  |  Teacher name  |  Grade",
     ...rows.map(
       (rider) =>
         `  ${rider.name}  |  ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  |  ${[rider.parentPhone, rider.parentPhone2].filter(Boolean).join(" / ") || "—"}  |  ${rider.teacherName || "—"}  |  ${String(rider.grade).replace(/^grade\s+/i, "")}`,

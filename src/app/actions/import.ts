@@ -48,6 +48,7 @@ function parentPhonesFromRow(row: Row) {
     cell(
       row,
       "prim phone1",
+      "primary 1 phone",
       "primary phone 1",
       "phone1",
       "phone 1",
@@ -58,6 +59,7 @@ function parentPhonesFromRow(row: Row) {
   const phone2 = cell(
     row,
     "prim phone2",
+    "primary 2 phone",
     "primary phone 2",
     "phone2",
     "phone 2",
@@ -133,7 +135,13 @@ function parseType(value: string): "BUS" | "PARENT" | null {
 }
 
 function splitName(fullName: string) {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const trimmed = fullName.trim();
+  if (trimmed.includes(",")) {
+    const [last, ...rest] = trimmed.split(",").map((part) => part.trim());
+    const first = rest.join(" ").trim();
+    if (first && last) return { first, last };
+  }
+  const parts = trimmed.split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { first: "", last: "" };
   if (parts.length === 1) return { first: parts[0], last: "—" };
   return { first: parts[0], last: parts.slice(1).join(" ") };
@@ -175,6 +183,13 @@ const HEADER_ALIASES = new Set([
   "family_id",
   "parent/guardian",
   "primary phone",
+  "prim phone1",
+  "prim phone2",
+  "primary 1 phone",
+  "primary 2 phone",
+  "lfname",
+  "lf name",
+  "prim address",
   "parent email",
   "email",
   "address",
@@ -203,6 +218,8 @@ function rowsFromSheet(sheet: XLSX.WorkSheet): Row[] {
       HEADER_ALIASES.has(value) ||
       value.includes("first name") ||
       value.includes("last name") ||
+      value.includes("lfname") ||
+      value.includes("prim phone") ||
       value.includes("family id") ||
       value.includes("enrollment") ||
       value.includes("parent"),
@@ -535,7 +552,7 @@ export async function importStudents(formData: FormData) {
 
   for (const [offset, row] of workRows.entries()) {
     const index = batched ? batchStart + offset : offset;
-    const fullName = cell(row, "student", "name", "full name");
+    const fullName = cell(row, "lfname", "lf name", "student", "name", "full name");
     const names = splitName(fullName);
     const firstName =
       cell(row, "student first name", "first_name", "first name") || names.first;
@@ -1071,7 +1088,7 @@ async function rowsFromUpload(
     workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   return rowsFromSheet(sheet).map((row) => {
-    const fullName = cell(row, "student", "name", "full name");
+    const fullName = cell(row, "lfname", "lf name", "student", "name", "full name");
     const names = splitName(fullName);
     const firstName =
       cell(row, "student first name", "first_name", "first name") || names.first;

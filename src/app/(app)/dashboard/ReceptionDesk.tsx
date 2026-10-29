@@ -260,7 +260,7 @@ export function ReceptionDesk({
   function save() {
     if (!selected) return;
     if (!parentPhone.trim()) {
-      setError("Parent phone is required so we can text the change.");
+      setError("Primary 1 phone is required so we can text the change.");
       return;
     }
     if (!parentEmail.trim() || !teacherEmail.trim() || !busCompanyEmail.trim()) {
@@ -517,12 +517,12 @@ export function ReceptionDesk({
               }
             />
             <Field
-              label="Parent phone"
+              label="Primary 1 phone"
               value={selected.parentPhone}
               href={phoneHref(selected.parentPhone)}
             />
             <Field
-              label="Parent phone 2"
+              label="Primary 2 phone"
               value={selected.parentPhone2}
               href={selected.parentPhone2 ? phoneHref(selected.parentPhone2) : undefined}
             />
@@ -747,18 +747,18 @@ export function ReceptionDesk({
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="block text-sm font-semibold">
-                  Parent phone
+                  Primary 1 phone
                   <input
                     type="tel"
                     required
                     value={parentPhone}
                     onChange={(event) => setParentPhone(event.target.value)}
-                    placeholder="612-555-0109"
+                    placeholder="Gets a text"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Parent phone 2
+                  Primary 2 phone
                   <input
                     type="tel"
                     value={parentPhone2}
@@ -802,8 +802,8 @@ export function ReceptionDesk({
                 </label>
               </div>
               <p className="text-sm font-medium text-navy">
-                Parent phone gets a text. Parent, teacher, and the bus company
-                get email.
+                Primary 1 and Primary 2 get a text. Parent, teacher, and the bus
+                company get email.
               </p>
 
               <label className="block text-sm font-semibold">

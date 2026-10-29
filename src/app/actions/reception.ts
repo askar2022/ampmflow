@@ -129,7 +129,7 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   const previous = planLine(loaded.effective, input.trips);
 
   if (!parentSmsNumbers(parentPhone, parentPhone2).length) {
-    return { ok: false as const, error: "Parent phone is required so we can text the change." };
+    return { ok: false as const, error: "Primary 1 phone is required so we can text the change." };
   }
   if (!parentEmail) {
     return { ok: false as const, error: "Parent email is required." };
@@ -304,7 +304,7 @@ export async function requestRoute(input: RouteRequestInput) {
   if (!firstName || !lastName) {
     return { ok: false as const, error: "Enter the student’s first and last name." };
   }
-  if (!parentPhone) return { ok: false as const, error: "Enter the parent phone." };
+  if (!parentPhone) return { ok: false as const, error: "Enter the Primary 1 phone." };
   if (!parentEmail) return { ok: false as const, error: "Enter the parent email." };
   if (!busCompanyEmail) {
     return { ok: false as const, error: "Enter the bus company email." };

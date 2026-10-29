@@ -229,7 +229,7 @@ export function DriverLists({
                 <tr className="border-b border-line text-[11px] font-semibold uppercase tracking-wide text-muted">
                   <th className="py-2 pr-3">Student name</th>
                   <th className="py-2 pr-3">Parent name</th>
-                  <th className="py-2 pr-3">Parent phone</th>
+                  <th className="py-2 pr-3">Primary 1 / 2 phone</th>
                   <th className="py-2 pr-3">Teacher name</th>
                   <th className="py-2">Grade</th>
                 </tr>

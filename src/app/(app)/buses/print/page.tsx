@@ -95,7 +95,7 @@ export default async function BusDriverPrintPage({
               <th className="py-2">#</th>
               <th>Student name</th>
               <th>Parent name</th>
-              <th>Parent phone</th>
+              <th>Primary 1 / 2 phone</th>
               <th>Teacher name</th>
               <th>Grade</th>
             </tr>
