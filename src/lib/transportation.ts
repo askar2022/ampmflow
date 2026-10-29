@@ -53,7 +53,7 @@ export async function ensureStudentContactColumns() {
 
 const studentInclude = {
   classroom: {
-    include: { teachers: { select: { name: true, email: true } } },
+    include: { teachers: { select: { id: true, name: true, email: true } } },
   },
   homeAddress: true,
   daycare: { include: { address: true } },

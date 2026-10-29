@@ -76,6 +76,7 @@ function asChangeStudent(row: GateStudent, plan?: EffectiveStudent): EffectiveSt
     grade: row.grade,
     parentName: row.parentName,
     parentPhone: row.parentPhone,
+    parentPhone2: "",
     parentEmail: "",
     emergencyName: "",
     emergencyPhone: "",
