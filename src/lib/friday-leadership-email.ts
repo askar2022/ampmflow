@@ -71,6 +71,7 @@ export function isFridayLeadershipWindow() {
 const METRO_FRIDAY_EMAILS = [
   "ahelmi@metroschoolsmn.org",
   "mahmed@metroschoolsmn.org",
+  "askar@automationllc.org",
 ];
 
 export async function leadershipReportEmails(schoolId: string) {
