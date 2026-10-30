@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadCoordinatorAnalytics } from "@/lib/analytics";
 import { AnalyticsBoard } from "./AnalyticsBoard";
+import { FridayTestEmail } from "./FridayTestEmail";
 
 export default async function AnalyticsPage() {
   const session = await getSession();
@@ -23,6 +24,7 @@ export default async function AnalyticsPage() {
           time — next Friday, one email per school.
         </p>
       </div>
+      <FridayTestEmail email={session.email} />
       <AnalyticsBoard data={data} />
     </div>
   );

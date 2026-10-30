@@ -172,6 +172,7 @@ export function fridayLeadershipText(args: {
 export function fridayLeadershipHtml(args: {
   schoolName: string;
   data: CoordinatorAnalytics;
+  test?: boolean;
 }) {
   const { data } = args;
   const theme = schoolTheme(args.schoolName);
@@ -226,6 +227,11 @@ export function fridayLeadershipHtml(args: {
           </tr>
           <tr>
             <td class="pad" align="center" style="background:${header};color:#ffffff;padding:16px 16px 20px;">
+              ${
+                args.test
+                  ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#ffe8a3;font-weight:700;margin:0 0 8px;">Test only — not sent to leadership</div>`
+                  : ""
+              }
               <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#d9f3ee;font-weight:700;">Friday snapshot</div>
               <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#e8eef5;margin:8px 0 2px;">Hello,</div>
               <div class="hello" style="font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:1.25;font-weight:700;margin:0 0 8px;word-break:break-word;">${escapeHtml(args.schoolName)}</div>
@@ -317,9 +323,14 @@ export async function sendFridayLeadershipReport(args: {
   schoolId: string;
   actorId: string;
   automatic?: boolean;
+  testTo?: string;
 }) {
   const dateKey = schoolLocalTime().dateKey;
-  if (args.automatic && (await alreadySent(args.schoolId, dateKey))) {
+  if (
+    !args.testTo &&
+    args.automatic &&
+    (await alreadySent(args.schoolId, dateKey))
+  ) {
     return { ok: true as const, sent: 0, alreadySent: true, recipients: [] as string[] };
   }
 
@@ -329,7 +340,10 @@ export async function sendFridayLeadershipReport(args: {
   });
   const schoolName = school?.name || "School";
   const data = await loadCoordinatorAnalytics(args.schoolId);
-  const recipients = await leadershipReportEmails(args.schoolId);
+  const testTo = usableOpsEmail(args.testTo || "");
+  const recipients = testTo
+    ? [testTo]
+    : await leadershipReportEmails(args.schoolId);
   if (!recipients.length) {
     return {
       ok: false as const,
@@ -349,9 +363,11 @@ export async function sendFridayLeadershipReport(args: {
 
   const result = await sendMail({
     to: recipients,
-    subject: `Friday snapshot — Hello, ${schoolName}`,
+    subject: testTo
+      ? `TEST Friday snapshot — Hello, ${schoolName}`
+      : `Friday snapshot — Hello, ${schoolName}`,
     text: fridayLeadershipText({ schoolName, data }),
-    html: fridayLeadershipHtml({ schoolName, data }),
+    html: fridayLeadershipHtml({ schoolName, data, test: Boolean(testTo) }),
   });
   if (!result.sent) {
     return {
@@ -362,21 +378,23 @@ export async function sendFridayLeadershipReport(args: {
     };
   }
 
-  await prisma.auditLog
-    .create({
-      data: {
-        schoolId: args.schoolId,
-        actorId: args.actorId,
-        approvedById: args.actorId,
-        action: "EMAIL_FRIDAY_LEADERSHIP",
-        newPlan: JSON.stringify({
-          dateKey,
-          sent: recipients.length,
-          automatic: Boolean(args.automatic),
-        }),
-      },
-    })
-    .catch(() => undefined);
+  if (!testTo) {
+    await prisma.auditLog
+      .create({
+        data: {
+          schoolId: args.schoolId,
+          actorId: args.actorId,
+          approvedById: args.actorId,
+          action: "EMAIL_FRIDAY_LEADERSHIP",
+          newPlan: JSON.stringify({
+            dateKey,
+            sent: recipients.length,
+            automatic: Boolean(args.automatic),
+          }),
+        },
+      })
+      .catch(() => undefined);
+  }
 
   return { ok: true as const, sent: recipients.length, recipients };
 }
