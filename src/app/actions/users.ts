@@ -280,3 +280,29 @@ export async function rejectUser(formData: FormData) {
 
   revalidatePath("/admin/users");
 }
+
+export async function resetSchoolLoginPassword(formData: FormData) {
+  const session = await getSession();
+  if (!session || !(await isPlatformAdmin(session))) return;
+
+  const id = String(formData.get("userId") || "");
+  const password = String(formData.get("password") || "");
+  if (!id || password.length < 8) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, name: true, email: true, role: true, schoolId: true },
+  });
+  if (!user) return;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(password), active: true },
+  });
+  await writeAudit({
+    user: session,
+    action: "RESET_SCHOOL_LOGIN",
+    newPlan: { name: user.name, email: user.email, role: user.role },
+  });
+  revalidatePath("/platform");
+}

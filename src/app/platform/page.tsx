@@ -2,8 +2,12 @@ import { redirect } from "next/navigation";
 import { getSession, isPlatformAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logoutAction } from "@/app/actions/auth";
-import { createSchoolForDemo } from "@/app/actions/users";
+import {
+  createSchoolForDemo,
+  resetSchoolLoginPassword,
+} from "@/app/actions/users";
 import { loadPendingInquiries } from "@/lib/inquiries";
+import { roleLabel } from "@/lib/format";
 import { APP_NAME, APP_SUBTITLE } from "@/lib/school";
 import { ensureSchoolSlugs, schoolLoginUrl } from "@/lib/school-slug";
 
@@ -26,6 +30,15 @@ export default async function PlatformSchoolsPage() {
       });
       return rows.map((row) => ({ ...row, slug: null as string | null }));
     });
+  const staff = await prisma.user.findMany({
+    where: {
+      schoolId: { in: schools.map((row) => row.id) },
+      active: true,
+      role: { in: ["ADMINISTRATOR", "COORDINATOR", "FRONT_DESK"] },
+    },
+    select: { id: true, schoolId: true, name: true, email: true, role: true },
+    orderBy: [{ role: "asc" }, { name: "asc" }],
+  });
 
   return (
     <div className="min-h-dvh bg-[#f3f4f6] px-3 py-4 sm:px-4 sm:py-8">
@@ -114,17 +127,59 @@ export default async function PlatformSchoolsPage() {
 
         <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-semibold text-navy">Schools on AMPM Flow</h2>
+          <p className="mt-2 text-sm text-[#4b5563]">
+            If you forget a school login, the admin email is here. You can also
+            set a new password for that person.
+          </p>
           <ul className="mt-4 divide-y divide-line">
-            {schools.map((row) => (
-              <li key={row.id} className="py-3">
-                <div className="font-medium text-navy">{row.name}</div>
-                {row.slug ? (
-                  <div className="mt-1 text-sm text-[#4b5563]">
-                    {schoolLoginUrl(row.slug)}
-                  </div>
-                ) : null}
-              </li>
-            ))}
+            {schools.map((row) => {
+              const logins = staff.filter((user) => user.schoolId === row.id);
+              return (
+                <li key={row.id} className="py-4">
+                  <div className="font-medium text-navy">{row.name}</div>
+                  {row.slug ? (
+                    <div className="mt-1 text-sm text-[#4b5563]">
+                      {schoolLoginUrl(row.slug)}
+                    </div>
+                  ) : null}
+                  {logins.length ? (
+                    <ul className="mt-3 space-y-3">
+                      {logins.map((user) => (
+                        <li key={user.id} className="rounded-xl bg-[#f7f7f8] px-3 py-3">
+                          <div className="text-sm font-medium text-navy">
+                            {user.name} · {roleLabel(user.role)}
+                          </div>
+                          <div className="mt-0.5 break-all text-sm text-[#4b5563]">
+                            {user.email}
+                          </div>
+                          <form
+                            action={resetSchoolLoginPassword}
+                            className="mt-2 flex flex-wrap gap-2"
+                          >
+                            <input type="hidden" name="userId" value={user.id} />
+                            <input
+                              name="password"
+                              type="password"
+                              required
+                              minLength={8}
+                              placeholder="New password (8+ characters)"
+                              className="min-w-[180px] flex-1 rounded-xl border border-line px-3 py-2 text-sm"
+                            />
+                            <button className="rounded-xl bg-navy px-3 py-2 text-sm font-semibold text-white">
+                              Set new password
+                            </button>
+                          </form>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-red">
+                      No active admin login yet for this school.
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       </div>
