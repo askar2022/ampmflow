@@ -109,6 +109,27 @@ function barWidth(part: number, whole: number) {
   return Math.min(100, Math.max(8, Math.round((part / whole) * 100)));
 }
 
+function vehicleLabel(kind: "bus" | "van", name: string) {
+  if (kind === "bus") {
+    return /^bus\b/i.test(name) ? name : `Bus ${name}`;
+  }
+  return /van/i.test(name) ? name : `Van ${name}`;
+}
+
+function riderRows(
+  rows: CoordinatorAnalytics["busCounts"],
+  kind: "bus" | "van",
+) {
+  return rows
+    .map(
+      (row) => `<tr>
+        <td style="padding:10px 0;border-top:1px solid ${LINE};font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK};">${escapeHtml(vehicleLabel(kind, row.name))}</td>
+        <td style="padding:10px 0;border-top:1px solid ${LINE};font-family:Arial,Helvetica,sans-serif;font-size:14px;text-align:right;font-weight:700;color:${INK};">${row.riders}</td>
+      </tr>`,
+    )
+    .join("");
+}
+
 function statBar(args: {
   label: string;
   value: number;
@@ -153,8 +174,20 @@ export function fridayLeadershipText(args: {
     "",
     `This week: ${data.busRiders} bus riders · ${data.vanRiders} van riders · ${data.changesWeek} changes · ${data.requestsWeek} new requests`,
     "",
-    `Bus riders: ${data.busRiders} of ${data.students} students`,
-    `Van riders: ${data.vanRiders} of ${data.students} students`,
+    "Each bus:",
+    ...(data.busCounts.length
+      ? data.busCounts.map(
+          (row) => `  ${vehicleLabel("bus", row.name)}: ${row.riders}`,
+        )
+      : ["  None on file"]),
+    "",
+    "Each van:",
+    ...(data.vanCounts.length
+      ? data.vanCounts.map(
+          (row) => `  ${vehicleLabel("van", row.name)}: ${row.riders}`,
+        )
+      : ["  None on file"]),
+    "",
     `Buses: ${data.buses} · Vans: ${data.vans}`,
     `Changes this week: ${data.changesWeek}`,
     `New route requests this week: ${data.requestsWeek}`,
@@ -174,7 +207,6 @@ export function fridayLeadershipHtml(args: {
   test?: boolean;
 }) {
   const { data } = args;
-  const students = Math.max(data.students, 1);
   const welcome = headerImageUrl();
   const weekMax = Math.max(
     1,
@@ -242,20 +274,19 @@ export function fridayLeadershipHtml(args: {
                 ${data.busRiders} bus riders · ${data.vanRiders} van riders<br>
                 ${data.buses} buses · ${data.vans} vans
               </p>
-              ${statBar({
-                label: "Bus riders",
-                value: data.busRiders,
-                of: students,
-                color: BLUE,
-                hint: `${data.students} students on the roster`,
-              })}
-              ${statBar({
-                label: "Van riders",
-                value: data.vanRiders,
-                of: students,
-                color: PINK,
-                hint: `${data.vans} van${data.vans === 1 ? "" : "s"} on file`,
-              })}
+              ${
+                data.busCounts.length || data.vanCounts.length
+                  ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;color:${MUTED};padding:4px 0 8px;">Each bus and van</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
+                <tr>
+                  <td style="padding:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">Bus or van</td>
+                  <td style="padding:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};text-align:right;">Riders</td>
+                </tr>
+                ${riderRows(data.busCounts, "bus")}
+                ${riderRows(data.vanCounts, "van")}
+              </table>`
+                  : ""
+              }
               ${statBar({
                 label: "Changes this week",
                 value: data.changesWeek,

@@ -11,12 +11,19 @@ export type WeekBars = {
   requests: number;
 };
 
+export type VehicleRiderCount = {
+  name: string;
+  riders: number;
+};
+
 export type CoordinatorAnalytics = {
   students: number;
   buses: number;
   vans: number;
   busRiders: number;
   vanRiders: number;
+  busCounts: VehicleRiderCount[];
+  vanCounts: VehicleRiderCount[];
   waiting: number;
   changesWeek: number;
   changesMonth: number;
@@ -45,6 +52,76 @@ function monthRange() {
 
 function isRouteRequest(title: string) {
   return /request for route/i.test(title);
+}
+
+function sortCounts(rows: VehicleRiderCount[]) {
+  return [...rows].sort((a, b) => {
+    if (b.riders !== a.riders) return b.riders - a.riders;
+    return a.name.localeCompare(b.name, undefined, { numeric: true });
+  });
+}
+
+async function loadVehicleCounts(schoolId: string, vans: Array<{ id: string; name: string }>) {
+  const [routes, assignments, vanStudents] = await Promise.all([
+    prisma.busRoute.findMany({
+      where: { schoolId },
+      select: { number: true },
+    }),
+    prisma.transportationAssignment.findMany({
+      where: {
+        waitingForAssignment: false,
+        busRouteId: { not: null },
+        student: { schoolId, active: true },
+      },
+      select: {
+        studentId: true,
+        busRoute: { select: { number: true } },
+      },
+    }),
+    vans.length
+      ? prisma.student.findMany({
+          where: {
+            schoolId,
+            active: true,
+            vehicleId: { in: vans.map((van) => van.id) },
+          },
+          select: { vehicleId: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const ridersByBus = new Map<string, Set<string>>();
+  for (const row of assignments) {
+    const number = row.busRoute?.number?.trim();
+    if (!number) continue;
+    const set = ridersByBus.get(number) ?? new Set<string>();
+    set.add(row.studentId);
+    ridersByBus.set(number, set);
+  }
+  const busNames = new Set([
+    ...routes.map((route) => route.number.trim()).filter(Boolean),
+    ...ridersByBus.keys(),
+  ]);
+  const busCounts = sortCounts(
+    [...busNames].map((name) => ({
+      name,
+      riders: ridersByBus.get(name)?.size || 0,
+    })),
+  );
+
+  const ridersByVan = new Map<string, number>();
+  for (const student of vanStudents) {
+    if (!student.vehicleId) continue;
+    ridersByVan.set(student.vehicleId, (ridersByVan.get(student.vehicleId) || 0) + 1);
+  }
+  const vanCounts = sortCounts(
+    vans.map((van) => ({
+      name: van.name,
+      riders: ridersByVan.get(van.id) || 0,
+    })),
+  );
+
+  return { busCounts, vanCounts };
 }
 
 async function countRequests(
@@ -131,10 +208,12 @@ export async function loadCoordinatorAnalytics(
 
   const buses = new Set(routes.map((route) => route.number.trim()).filter(Boolean))
     .size;
-  const vans = vehicles.filter(
+  const vanList = vehicles.filter(
     (vehicle) =>
       vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
-  ).length;
+  );
+  const vans = vanList.length;
+  const { busCounts, vanCounts } = await loadVehicleCounts(schoolId, vanList);
 
   return {
     students,
@@ -142,6 +221,8 @@ export async function loadCoordinatorAnalytics(
     vans,
     busRiders,
     vanRiders,
+    busCounts,
+    vanCounts,
     waiting,
     changesWeek,
     changesMonth,

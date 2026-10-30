@@ -20,6 +20,53 @@ function Dot({ color, label, value }: { color: string; label: string; value: num
   );
 }
 
+function vehicleLabel(kind: "bus" | "van", name: string) {
+  if (kind === "bus") {
+    return /^bus\b/i.test(name) ? name : `Bus ${name}`;
+  }
+  return /van/i.test(name) ? name : `Van ${name}`;
+}
+
+function RiderTable({ data }: { data: CoordinatorAnalytics }) {
+  const rows = [
+    ...data.busCounts.map((row) => ({
+      key: `bus-${row.name}`,
+      name: vehicleLabel("bus", row.name),
+      riders: row.riders,
+    })),
+    ...data.vanCounts.map((row) => ({
+      key: `van-${row.name}`,
+      name: vehicleLabel("van", row.name),
+      riders: row.riders,
+    })),
+  ];
+  if (!rows.length) return null;
+  return (
+    <div className="rounded-2xl border border-line bg-card p-5">
+      <div className="text-sm font-semibold">Each bus and van</div>
+      <p className="mt-1 text-xs text-muted">
+        Which routes have more students and which have fewer.
+      </p>
+      <table className="mt-3 w-full text-sm">
+        <thead>
+          <tr className="text-left text-muted">
+            <th className="pb-2 font-medium">Bus or van</th>
+            <th className="pb-2 text-right font-medium">Riders</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key} className="border-t border-line">
+              <td className="py-2">{row.name}</td>
+              <td className="py-2 text-right font-semibold">{row.riders}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Card({ label, value, note }: { label: string; value: number; note?: string }) {
   return (
     <div className="rounded-2xl border border-line bg-card p-5">
@@ -114,6 +161,9 @@ export function AnalyticsBoard({ data }: { data: CoordinatorAnalytics }) {
           <Dot color="bg-navy" label="Bus riders" value={data.busRiders} />
           <Dot color="bg-teal" label="Van riders" value={data.vanRiders} />
           <Dot color="bg-green" label="Waiting for a bus" value={data.waiting} />
+        </div>
+        <div className="mt-4">
+          <RiderTable data={data} />
         </div>
       </section>
 
