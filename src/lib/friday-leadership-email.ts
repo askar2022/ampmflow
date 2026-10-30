@@ -5,7 +5,6 @@ import {
 import {
   clockInWindow,
   formatLongDate,
-  isFriday,
   schoolLocalTime,
   schoolNow,
   todayKey,
@@ -24,6 +23,23 @@ const LINE = "#e6e0d4";
 const TEAL = "#087f6b";
 const WINDOW_MINUTES = 45;
 const FRIDAY_NOON = "12:00";
+const MINNESOTA_TZ = "America/Chicago";
+
+function minnesotaClock(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: MINNESOTA_TZ,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value || "00";
+  let hour = get("hour");
+  if (hour === "24") hour = "00";
+  return { weekday: get("weekday"), hhmm: `${hour}:${get("minute")}` };
+}
 
 function escapeHtml(value: string) {
   return value
@@ -38,8 +54,11 @@ function headerImageUrl() {
 }
 
 export function isFridayLeadershipWindow() {
-  const clock = schoolLocalTime();
-  return isFriday(clock.weekday) && clockInWindow(clock.hhmm, FRIDAY_NOON, WINDOW_MINUTES);
+  const clock = minnesotaClock();
+  return (
+    (clock.weekday === "Fri" || clock.weekday === "Friday") &&
+    clockInWindow(clock.hhmm, FRIDAY_NOON, WINDOW_MINUTES)
+  );
 }
 
 export async function leadershipReportEmails(schoolId: string) {
