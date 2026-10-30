@@ -8,10 +8,10 @@ export default async function SchoolSignInPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; reset?: string }>;
 }) {
   const { slug } = await params;
-  const { error } = await searchParams;
+  const { error, reset } = await searchParams;
   const school = await findSchoolBySlug(slug);
   const identity = school ? await getSchoolIdentityById(school.id) : null;
 
@@ -52,6 +52,11 @@ export default async function SchoolSignInPage({
                 : error === "1"
                   ? "That email or password is not recognized for this school."
                   : undefined
+            }
+            notice={
+              reset === "1"
+                ? "Your password is updated. Sign in with the new one."
+                : undefined
             }
           />
         </div>

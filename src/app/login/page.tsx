@@ -6,9 +6,9 @@ import { SetupForm } from "@/components/login/SetupForm";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; requested?: string }>;
+  searchParams: Promise<{ error?: string; requested?: string; reset?: string }>;
 }) {
-  const { error, requested } = await searchParams;
+  const { error, requested, reset } = await searchParams;
   const db = await checkDatabase();
   let userCount = 0;
   if (db.ok) {
@@ -92,9 +92,11 @@ export default async function LoginPage({
                     : undefined
               }
               notice={
-                requested === "school"
-                  ? "We received your message. You will get a private sign-in link after AMPM Flow sets up the school."
-                  : undefined
+                reset === "1"
+                  ? "Your password is updated. Sign in with the new one."
+                  : requested === "school"
+                    ? "We received your message. You will get a private sign-in link after AMPM Flow sets up the school."
+                    : undefined
               }
             />
           </div>

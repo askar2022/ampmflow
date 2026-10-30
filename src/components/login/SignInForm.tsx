@@ -77,7 +77,11 @@ export function SignInForm({
           Remember me
         </label>
         <Link
-          href="/login/forgot"
+          href={
+            schoolSlug
+              ? `/login/forgot?school=${encodeURIComponent(schoolSlug)}`
+              : "/login/forgot"
+          }
           className="font-medium text-teal hover:text-teal-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
         >
           Forgot password?
