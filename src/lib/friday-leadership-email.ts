@@ -10,7 +10,11 @@ import {
   todayKey,
 } from "./dates";
 import { sendMail, smtpConfigured } from "./email";
-import { loadSavedOpsEmails, usableOpsEmail } from "./ops-change-emails";
+import {
+  loadSavedOpsEmails,
+  saveOpsEmails,
+  usableOpsEmail,
+} from "./ops-change-emails";
 import { prisma } from "./prisma";
 import { schoolTheme } from "./school";
 import { APP_ORIGIN } from "./school-slug";
@@ -64,8 +68,13 @@ export function isFridayLeadershipWindow() {
   );
 }
 
+const METRO_FRIDAY_EMAILS = [
+  "ahelmi@metroschoolsmn.org",
+  "mahmed@metroschoolsmn.org",
+];
+
 export async function leadershipReportEmails(schoolId: string) {
-  const [saved, users] = await Promise.all([
+  const [saved, users, school] = await Promise.all([
     loadSavedOpsEmails(schoolId),
     prisma.user.findMany({
       where: {
@@ -75,10 +84,22 @@ export async function leadershipReportEmails(schoolId: string) {
       },
       select: { email: true },
     }),
+    prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { name: true },
+    }),
   ]);
+  const metro = /metro/i.test(school?.name || "") ? METRO_FRIDAY_EMAILS : [];
+  if (metro.some((email) => !saved.includes(email))) {
+    await saveOpsEmails(schoolId, [...saved, ...metro]).catch(() => undefined);
+  }
   return [
     ...new Set(
-      [...saved, ...users.map((user) => usableOpsEmail(user.email))].filter(Boolean),
+      [
+        ...saved,
+        ...metro,
+        ...users.map((user) => usableOpsEmail(user.email)),
+      ].filter(Boolean),
     ),
   ];
 }
