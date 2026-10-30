@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/ops-changes",
       "schedule": "30 16,17,19,20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/friday-leadership",
+      "schedule": "0 17,18 * * 5"
     }
   ]
 }

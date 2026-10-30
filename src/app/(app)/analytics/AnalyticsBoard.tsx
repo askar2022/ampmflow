@@ -111,8 +111,8 @@ export function AnalyticsBoard({ data }: { data: CoordinatorAnalytics }) {
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Dot color="bg-blue" label="Students" value={data.students} />
-          <Dot color="bg-navy" label="Buses" value={data.buses} />
-          <Dot color="bg-yellow" label="Vans" value={data.vans} />
+          <Dot color="bg-navy" label="Bus riders" value={data.busRiders} />
+          <Dot color="bg-teal" label="Van riders" value={data.vanRiders} />
           <Dot color="bg-green" label="Waiting for a bus" value={data.waiting} />
         </div>
       </section>

@@ -19,7 +19,7 @@ export default async function AnalyticsPage() {
         <p className="mt-2 max-w-2xl text-muted">
           A short picture for the bus coordinator: how many students, buses, and
           vans are on file, and how often staff change a bus or request a new
-          route.
+          route. Leadership also gets this as a Friday noon email.
         </p>
       </div>
       <AnalyticsBoard data={data} />

@@ -15,6 +15,8 @@ export type CoordinatorAnalytics = {
   students: number;
   buses: number;
   vans: number;
+  busRiders: number;
+  vanRiders: number;
   waiting: number;
   changesWeek: number;
   changesMonth: number;
@@ -75,6 +77,8 @@ export async function loadCoordinatorAnalytics(
     students,
     routes,
     vehicles,
+    busRiders,
+    vanRiders,
     waiting,
     pendingRequests,
     changesWeek,
@@ -89,6 +93,18 @@ export async function loadCoordinatorAnalytics(
       select: { number: true },
     }),
     loadVehicles(schoolId).catch(() => []),
+    prisma.student.count({
+      where: {
+        schoolId,
+        active: true,
+        assignments: {
+          some: { waitingForAssignment: false, busRouteId: { not: null } },
+        },
+      },
+    }),
+    prisma.student.count({
+      where: { schoolId, active: true, vehicleId: { not: null } },
+    }),
     prisma.student.count({
       where: {
         schoolId,
@@ -124,6 +140,8 @@ export async function loadCoordinatorAnalytics(
     students,
     buses,
     vans,
+    busRiders,
+    vanRiders,
     waiting,
     changesWeek,
     changesMonth,
