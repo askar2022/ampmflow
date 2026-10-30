@@ -145,10 +145,11 @@ export function fridayLeadershipText(args: {
 }) {
   const { data } = args;
   return [
-    `Welcome to ${args.schoolName}`,
-    `Friday snapshot · ${data.weekLabel}`,
+    "AMPM Flow",
+    "Weekly leadership email",
+    `Buses and vans · ${args.schoolName} · ${data.weekLabel}`,
     "",
-    `Thank you for keeping dismissal safe. Here is how buses and vans looked this week.`,
+    "Thank you for keeping pickup and dismissal safe. Here is how families used buses and vans this week.",
     "",
     `This week: ${data.busRiders} bus riders · ${data.vanRiders} van riders · ${data.changesWeek} changes · ${data.requestsWeek} new requests`,
     "",
@@ -206,7 +207,7 @@ export function fridayLeadershipHtml(args: {
       .email-shell { padding: 0 !important; }
       .email-card { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
       .pad { padding-left: 16px !important; padding-right: 16px !important; }
-      .hello { font-size: 18px !important; line-height: 1.25 !important; }
+      .title { font-size: 20px !important; }
     }
   </style>
 </head>
@@ -216,30 +217,25 @@ export function fridayLeadershipHtml(args: {
       <td align="center" style="padding:0;">
         <table role="presentation" class="email-card" width="100%" cellpadding="0" cellspacing="0" bgcolor="${CARD}" style="width:100%;max-width:600px;background:${CARD};">
           <tr>
-            <td bgcolor="#f7f4ee" style="padding:0;background:#f7f4ee;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;">
-                <tr>
-                  <td class="pad" width="48%" valign="middle" style="padding:18px 10px 18px 16px;font-family:Georgia,'Times New Roman',serif;color:${INK};background:#f7f4ee;">
-                    <div style="font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.3;color:${INK};">Welcome to</div>
-                    <div class="hello" style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.25;font-weight:700;color:${INK};padding-top:2px;">${escapeHtml(args.schoolName)}</div>
-                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.35;color:#3d4f5f;padding-top:6px;">Friday snapshot</div>
-                  </td>
-                  <td class="hero" width="52%" valign="bottom" style="padding:0;font-size:0;line-height:0;background:#f7f4ee;">
-                    <img src="${welcome}" alt="" width="320" style="display:block;width:100%;max-width:320px;height:auto;border:0;">
-                  </td>
-                </tr>
-              </table>
+            <td bgcolor="#f7f4ee" style="padding:0;font-size:0;line-height:0;background:#f7f4ee;">
+              <img src="${welcome}" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
             </td>
           </tr>
           <tr>
             <td class="pad" style="padding:20px 16px 8px;">
               ${
                 args.test
-                  ? `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">Test only — not sent to leadership.</p>`
+                  ? `<p style="margin:0 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">Test only — not sent to leadership.</p>`
                   : ""
               }
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.4;font-weight:700;color:${MUTED};padding-bottom:4px;">AMPM Flow</div>
+              <div class="title" style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.25;font-weight:700;color:${INK};padding-bottom:6px;">Weekly leadership email</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:${MUTED};padding-bottom:16px;">
+                Buses and vans · ${escapeHtml(args.schoolName)}<br>
+                ${escapeHtml(data.weekLabel)}
+              </div>
               <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:${INK};">
-                Thank you for keeping dismissal safe. Here is how families used buses and vans this week.
+                Thank you for keeping pickup and dismissal safe. Here is how families used buses and vans this week.
               </p>
               <p style="margin:0 0 20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${INK};">
                 <strong>This week</strong><br>
