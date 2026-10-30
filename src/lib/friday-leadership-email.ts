@@ -16,7 +16,6 @@ import {
   usableOpsEmail,
 } from "./ops-change-emails";
 import { prisma } from "./prisma";
-import { schoolTheme } from "./school";
 import { APP_ORIGIN } from "./school-slug";
 
 const PAGE = "#f4f6f8";
@@ -57,7 +56,7 @@ function escapeHtml(value: string) {
 }
 
 function headerImageUrl() {
-  return `${APP_ORIGIN.replace(/\/$/, "")}/landingimage.png`;
+  return `${APP_ORIGIN.replace(/\/$/, "")}/demo4.png`;
 }
 
 export function isFridayLeadershipWindow() {
@@ -146,9 +145,8 @@ export function fridayLeadershipText(args: {
 }) {
   const { data } = args;
   return [
-    "AMPM Flow — Friday snapshot",
-    `Hello, ${args.schoolName}`,
-    `Transportation this week · ${data.weekLabel}`,
+    `Welcome to ${args.schoolName}`,
+    `Friday snapshot · ${data.weekLabel}`,
     "",
     `Thank you for keeping dismissal safe. Here is how buses and vans looked this week.`,
     "",
@@ -175,9 +173,8 @@ export function fridayLeadershipHtml(args: {
   test?: boolean;
 }) {
   const { data } = args;
-  const theme = schoolTheme(args.schoolName);
-  const header = theme.navy;
   const students = Math.max(data.students, 1);
+  const welcome = headerImageUrl();
   const weekMax = Math.max(
     1,
     data.changesWeek,
@@ -208,10 +205,8 @@ export function fridayLeadershipHtml(args: {
     @media only screen and (max-width: 620px) {
       .email-shell { padding: 0 !important; }
       .email-card { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
-      .hero img { width: 100% !important; height: auto !important; max-height: 160px !important; object-fit: cover !important; object-position: right center !important; }
       .pad { padding-left: 16px !important; padding-right: 16px !important; }
-      .hello { font-size: 22px !important; line-height: 1.25 !important; }
-      .weekline { font-size: 13px !important; }
+      .hello { font-size: 18px !important; line-height: 1.25 !important; }
     }
   </style>
 </head>
@@ -221,25 +216,28 @@ export function fridayLeadershipHtml(args: {
       <td align="center" style="padding:0;">
         <table role="presentation" class="email-card" width="100%" cellpadding="0" cellspacing="0" bgcolor="${CARD}" style="width:100%;max-width:600px;background:${CARD};">
           <tr>
-            <td class="hero" style="padding:0;font-size:0;line-height:0;background:${header};">
-              <img src="${headerImageUrl()}" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
-            </td>
-          </tr>
-          <tr>
-            <td class="pad" align="center" style="background:${header};color:#ffffff;padding:16px 16px 20px;">
-              ${
-                args.test
-                  ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#ffe8a3;font-weight:700;margin:0 0 8px;">Test only — not sent to leadership</div>`
-                  : ""
-              }
-              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#d9f3ee;font-weight:700;">Friday snapshot</div>
-              <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#e8eef5;margin:8px 0 2px;">Hello,</div>
-              <div class="hello" style="font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:1.25;font-weight:700;margin:0 0 8px;word-break:break-word;">${escapeHtml(args.schoolName)}</div>
-              <div class="weekline" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4;color:#e8eef5;">Transportation this week<br>${escapeHtml(data.weekLabel)}</div>
+            <td bgcolor="#f7f4ee" style="padding:0;background:#f7f4ee;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;">
+                <tr>
+                  <td class="pad" width="48%" valign="middle" style="padding:18px 10px 18px 16px;font-family:Georgia,'Times New Roman',serif;color:${INK};background:#f7f4ee;">
+                    <div style="font-family:Georgia,'Times New Roman',serif;font-size:14px;line-height:1.3;color:${INK};">Welcome to</div>
+                    <div class="hello" style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.25;font-weight:700;color:${INK};padding-top:2px;">${escapeHtml(args.schoolName)}</div>
+                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.35;color:#3d4f5f;padding-top:6px;">Friday snapshot</div>
+                  </td>
+                  <td class="hero" width="52%" valign="bottom" style="padding:0;font-size:0;line-height:0;background:#f7f4ee;">
+                    <img src="${welcome}" alt="" width="320" style="display:block;width:100%;max-width:320px;height:auto;border:0;">
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <tr>
             <td class="pad" style="padding:20px 16px 8px;">
+              ${
+                args.test
+                  ? `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">Test only — not sent to leadership.</p>`
+                  : ""
+              }
               <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:${INK};">
                 Thank you for keeping dismissal safe. Here is how families used buses and vans this week.
               </p>
@@ -364,8 +362,8 @@ export async function sendFridayLeadershipReport(args: {
   const result = await sendMail({
     to: recipients,
     subject: testTo
-      ? `TEST Friday snapshot — Hello, ${schoolName}`
-      : `Friday snapshot — Hello, ${schoolName}`,
+      ? `TEST Friday snapshot — ${schoolName}`
+      : `Friday snapshot — ${schoolName}`,
     text: fridayLeadershipText({ schoolName, data }),
     html: fridayLeadershipHtml({ schoolName, data, test: Boolean(testTo) }),
   });
