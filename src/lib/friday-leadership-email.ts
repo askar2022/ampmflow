@@ -118,23 +118,24 @@ function statBar(args: {
   hint: string;
 }) {
   const width = barWidth(args.value, args.of);
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+  const rest = Math.max(0, 100 - width);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 16px;">
     <tr>
-      <td style="font-size:15px;font-weight:700;color:${INK};padding:0 0 4px;">${escapeHtml(args.label)}</td>
-      <td align="right" style="font-size:15px;font-weight:700;color:${INK};padding:0 0 4px;">${args.value}</td>
+      <td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.3;font-weight:700;color:${INK};padding:0 8px 4px 0;">${escapeHtml(args.label)}</td>
+      <td align="right" width="48" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.3;font-weight:700;color:${INK};padding:0 0 4px;white-space:nowrap;">${args.value}</td>
     </tr>
     <tr>
       <td colspan="2" style="padding:0 0 4px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f5;border-radius:999px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#eef2f5;">
           <tr>
-            <td width="${width}%" height="10" bgcolor="${args.color}" style="background:${args.color};height:10px;border-radius:999px;font-size:0;line-height:0;">&nbsp;</td>
-            <td width="${100 - width}%" height="10" style="height:10px;font-size:0;line-height:0;">&nbsp;</td>
+            <td width="${width}%" height="8" bgcolor="${args.color}" style="background:${args.color};height:8px;font-size:0;line-height:0;">&nbsp;</td>
+            <td width="${rest}%" height="8" style="height:8px;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
         </table>
       </td>
     </tr>
     <tr>
-      <td colspan="2" style="font-size:12px;color:${MUTED};">${escapeHtml(args.hint)}</td>
+      <td colspan="2" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.35;color:${MUTED};">${escapeHtml(args.hint)}</td>
     </tr>
   </table>`;
 }
@@ -185,9 +186,9 @@ export function fridayLeadershipHtml(args: {
   const weekRows = data.weeks
     .map(
       (week) => `<tr>
-        <td style="padding:10px 0;border-top:1px solid ${LINE};color:${INK};">${escapeHtml(week.label)}</td>
-        <td style="padding:10px 0;border-top:1px solid ${LINE};text-align:right;font-weight:700;color:${BLUE};">${week.changes}</td>
-        <td style="padding:10px 0;border-top:1px solid ${LINE};text-align:right;font-weight:700;color:${TEAL};">${week.requests}</td>
+        <td style="padding:10px 0;border-top:1px solid ${LINE};font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK};">${escapeHtml(week.label)}</td>
+        <td style="padding:10px 0;border-top:1px solid ${LINE};font-family:Arial,Helvetica,sans-serif;font-size:14px;text-align:right;font-weight:700;color:${BLUE};">${week.changes}</td>
+        <td style="padding:10px 8px 10px 8px;border-top:1px solid ${LINE};font-family:Arial,Helvetica,sans-serif;font-size:14px;text-align:right;font-weight:700;color:${TEAL};">${week.requests}</td>
       </tr>`,
     )
     .join("");
@@ -197,33 +198,49 @@ export function fridayLeadershipHtml(args: {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="x-apple-disable-message-reformatting">
   <title>Friday snapshot — ${escapeHtml(args.schoolName)}</title>
+  <style>
+    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    img { border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+    @media only screen and (max-width: 620px) {
+      .email-shell { padding: 0 !important; }
+      .email-card { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
+      .hero img { width: 100% !important; height: auto !important; max-height: 160px !important; object-fit: cover !important; object-position: right center !important; }
+      .pad { padding-left: 16px !important; padding-right: 16px !important; }
+      .hello { font-size: 22px !important; line-height: 1.25 !important; }
+      .weekline { font-size: 13px !important; }
+    }
+  </style>
 </head>
-<body style="margin:0;padding:0;background:${PAGE};font-family:Arial,Helvetica,sans-serif;color:${INK};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;background:${PAGE};">
+<body style="margin:0;padding:0;width:100%;background:${PAGE};font-family:Arial,Helvetica,sans-serif;color:${INK};-webkit-text-size-adjust:100%;">
+  <table role="presentation" class="email-shell" width="100%" cellpadding="0" cellspacing="0" bgcolor="${PAGE}" style="background:${PAGE};padding:16px 0;">
     <tr>
-      <td align="center">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:${CARD};border-radius:24px;overflow:hidden;">
+      <td align="center" style="padding:0;">
+        <table role="presentation" class="email-card" width="100%" cellpadding="0" cellspacing="0" bgcolor="${CARD}" style="width:100%;max-width:600px;background:${CARD};">
           <tr>
-            <td style="padding:0;font-size:0;line-height:0;">
+            <td class="hero" style="padding:0;font-size:0;line-height:0;background:${header};">
               <img src="${headerImageUrl()}" alt="" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
             </td>
           </tr>
           <tr>
-            <td align="center" style="background:${header};color:#ffffff;padding:28px 28px 32px;">
-              <div style="font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:#d9f3ee;font-weight:700;">Friday snapshot</div>
-              <div style="font-size:28px;line-height:1.2;font-weight:700;margin:10px 0 8px;">Hello, ${escapeHtml(args.schoolName)}</div>
-              <div style="font-size:15px;color:#e8eef5;">Transportation this week · ${escapeHtml(data.weekLabel)}</div>
+            <td class="pad" align="center" style="background:${header};color:#ffffff;padding:16px 16px 20px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#d9f3ee;font-weight:700;">Friday snapshot</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#e8eef5;margin:8px 0 2px;">Hello,</div>
+              <div class="hello" style="font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:1.25;font-weight:700;margin:0 0 8px;word-break:break-word;">${escapeHtml(args.schoolName)}</div>
+              <div class="weekline" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.4;color:#e8eef5;">Transportation this week<br>${escapeHtml(data.weekLabel)}</div>
             </td>
           </tr>
           <tr>
-            <td style="padding:28px 28px 8px;">
-              <p style="margin:0 0 18px;font-size:16px;line-height:1.55;color:${INK};">
+            <td class="pad" style="padding:20px 16px 8px;">
+              <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:${INK};">
                 Thank you for keeping dismissal safe. Here is how families used buses and vans this week.
               </p>
-              <p style="margin:0 0 22px;font-size:15px;line-height:1.5;color:${INK};">
+              <p style="margin:0 0 20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${INK};">
                 <strong>This week</strong><br>
-                ${data.busRiders} bus riders · ${data.vanRiders} van riders · ${data.buses} buses · ${data.vans} vans
+                ${data.busRiders} bus riders · ${data.vanRiders} van riders<br>
+                ${data.buses} buses · ${data.vans} vans
               </p>
               ${statBar({
                 label: "Bus riders",
@@ -240,14 +257,14 @@ export function fridayLeadershipHtml(args: {
                 hint: `${data.vans} van${data.vans === 1 ? "" : "s"} on file`,
               })}
               ${statBar({
-                label: "Bus or van changes this week",
+                label: "Changes this week",
                 value: data.changesWeek,
                 of: weekMax,
                 color: TEAL,
                 hint: "How often Front Desk changed a ride",
               })}
               ${statBar({
-                label: "New route requests this week",
+                label: "New route requests",
                 value: data.requestsWeek,
                 of: weekMax,
                 color: ORANGE,
@@ -256,17 +273,17 @@ export function fridayLeadershipHtml(args: {
             </td>
           </tr>
           <tr>
-            <td style="padding:8px 28px 28px;">
-              <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};font-weight:700;margin:8px 0 10px;">Each week</div>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <td class="pad" style="padding:8px 16px 24px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};font-weight:700;margin:8px 0 10px;">Each week</div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;">
                 <tr>
-                  <td style="padding:0 0 8px;font-size:12px;color:${MUTED};">Week</td>
-                  <td style="padding:0 0 8px;font-size:12px;color:${MUTED};text-align:right;">Changes</td>
-                  <td style="padding:0 0 8px;font-size:12px;color:${MUTED};text-align:right;">New requests</td>
+                  <td style="padding:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">Week</td>
+                  <td style="padding:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};text-align:right;">Changes</td>
+                  <td style="padding:0 8px 8px 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};text-align:right;white-space:nowrap;">Requests</td>
                 </tr>
                 ${weekRows}
               </table>
-              <p style="margin:18px 0 0;font-size:13px;color:${MUTED};">
+              <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.4;color:${MUTED};">
                 ${data.waiting} student${data.waiting === 1 ? "" : "s"} still waiting for a bus number.
               </p>
             </td>
