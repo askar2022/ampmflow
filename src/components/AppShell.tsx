@@ -6,6 +6,10 @@ import { HeaderWelcome } from "@/components/WelcomeBanner";
 import { schoolTheme } from "@/lib/school";
 import type { SessionUser } from "@/lib/types";
 
+function deskNavLabel(schoolName?: string | null) {
+  return /metro/i.test(schoolName || "") ? "Dashboard" : "Front Desk";
+}
+
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
   { href: "/dashboard", label: "Front Desk", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/waiting", label: "Request for Route", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
@@ -28,7 +32,12 @@ export function AppShell({
   schoolLogoUrl?: string | null;
   children: React.ReactNode;
 }) {
-  const links = NAV.filter((item) => item.roles.includes(user.role));
+  const links = NAV.filter((item) => item.roles.includes(user.role)).map(
+    (item) =>
+      item.href === "/dashboard"
+        ? { ...item, label: deskNavLabel(schoolName) }
+        : item,
+  );
   const theme = schoolTheme(schoolName);
   const home =
     user.role === "TEACHER"
