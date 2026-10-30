@@ -21,13 +21,25 @@ export function schoolLoginUrl(slug: string) {
   return `${APP_ORIGIN.replace(/\/$/, "")}${schoolLoginPath(slug)}`;
 }
 
+let slugColumnReady: Promise<void> | null = null;
+let slugsReady: Promise<void> | null = null;
+
 export async function ensureSchoolSlugColumn() {
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "slug" TEXT`,
-  ).catch(() => undefined);
-  await prisma.$executeRawUnsafe(
-    `CREATE UNIQUE INDEX IF NOT EXISTS "School_slug_key" ON "School" ("slug")`,
-  ).catch(() => undefined);
+  if (!slugColumnReady) {
+    slugColumnReady = Promise.all([
+      prisma
+        .$executeRawUnsafe(
+          `ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "slug" TEXT`,
+        )
+        .catch(() => undefined),
+      prisma
+        .$executeRawUnsafe(
+          `CREATE UNIQUE INDEX IF NOT EXISTS "School_slug_key" ON "School" ("slug")`,
+        )
+        .catch(() => undefined),
+    ]).then(() => undefined);
+  }
+  await slugColumnReady;
 }
 
 export async function findSchoolBySlug(slug: string) {
@@ -79,15 +91,20 @@ export async function assignUniqueSlug(schoolId: string, name: string, requested
 }
 
 export async function ensureSchoolSlugs() {
-  await ensureSchoolSlugColumn();
-  const schools = await prisma.school.findMany({
-    select: { id: true, name: true },
-    orderBy: { createdAt: "asc" },
-  });
-  for (const school of schools) {
-    const current = await schoolSlugForId(school.id);
-    if (!current) {
-      await assignUniqueSlug(school.id, school.name);
-    }
+  if (!slugsReady) {
+    slugsReady = (async () => {
+      await ensureSchoolSlugColumn();
+      const schools = await prisma.school.findMany({
+        select: { id: true, name: true },
+        orderBy: { createdAt: "asc" },
+      });
+      for (const school of schools) {
+        const current = await schoolSlugForId(school.id);
+        if (!current) {
+          await assignUniqueSlug(school.id, school.name);
+        }
+      }
+    })();
   }
+  await slugsReady;
 }

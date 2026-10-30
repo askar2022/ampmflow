@@ -286,9 +286,11 @@ export async function ensureGateTables() {
         `CREATE UNIQUE INDEX IF NOT EXISTS "GradeDismissalConfirm_schoolId_date_grade_key"
           ON "GradeDismissalConfirm"("schoolId", "date", "grade")`,
       ];
-      for (const sql of statements) {
-        await prisma.$executeRawUnsafe(sql).catch(() => undefined);
-      }
+      await Promise.all(
+        statements.map((sql) =>
+          prisma.$executeRawUnsafe(sql).catch(() => undefined),
+        ),
+      );
     })();
   }
   await gateReady;

@@ -141,12 +141,12 @@ export async function notifyTransportationChange(args: {
   const html = changeNoticeHtml(text);
   const subject = `Transportation change — ${args.student.fullName}`;
 
+  const parent = uniqueEmails([args.student.parentEmail]);
+  const company = uniqueEmails([args.busCompanyEmail]);
   const teachers = await teacherEmails(
     args.student.classroomId,
     args.teacherEmail,
   );
-  const parent = uniqueEmails([args.student.parentEmail]);
-  const company = uniqueEmails([args.busCompanyEmail]);
   const ops = await opsEmails(args.user.schoolId, [
     ...parent,
     ...teachers,
@@ -156,32 +156,6 @@ export async function notifyTransportationChange(args: {
   if (!parent.length) skipped.push("parent (required)");
   if (!teachers.length) skipped.push("teacher (required)");
   if (!company.length) skipped.push("bus company (required)");
-
-  if (!smtpConfigured()) {
-    skipped.push("email is not configured");
-  } else {
-    const groups = [
-      { label: "parent", to: parent },
-      { label: "teacher", to: teachers },
-      { label: "bus company", to: company },
-      { label: "leadership", to: ops },
-    ];
-
-    for (const group of groups) {
-      if (!group.to.length) continue;
-      const result = await sendMail({
-        to: group.to,
-        subject,
-        text,
-        html,
-      });
-      if (result.sent) {
-        sent.push(...group.to.map((email) => `${group.label}: ${email}`));
-      } else {
-        skipped.push(`${group.label} (${result.reason})`);
-      }
-    }
-  }
 
   const smsBody = [
     `AMPM Flow: ${args.student.fullName}`,
@@ -193,23 +167,59 @@ export async function notifyTransportationChange(args: {
     args.student.parentPhone,
     args.student.parentPhone2,
   );
+
+  const jobs: Array<Promise<void>> = [];
+  if (!smtpConfigured()) {
+    skipped.push("email is not configured");
+  } else {
+    const groups = [
+      { label: "parent", to: parent },
+      { label: "teacher", to: teachers },
+      { label: "bus company", to: company },
+      { label: "leadership", to: ops },
+    ];
+    for (const group of groups) {
+      if (!group.to.length) continue;
+      jobs.push(
+        sendMail({
+          to: group.to,
+          subject,
+          text,
+          html,
+        }).then((result) => {
+          if (result.sent) {
+            sent.push(...group.to.map((email) => `${group.label}: ${email}`));
+          } else {
+            skipped.push(`${group.label} (${result.reason})`);
+          }
+        }),
+      );
+    }
+  }
+
   if (!parentPhones.length) {
     skipped.push("parent text (phone required)");
   } else if (!smsConfigured()) {
     skipped.push("parent text (Twilio is not set)");
   } else {
-    const texted = await sendSms({ to: parentPhones, body: smsBody });
-    if (texted.sent) {
-      sent.push(...texted.recipients.map((phone) => `parent text: ${phone}`));
-    }
-    if (texted.errors.length) {
-      skipped.push(
-        ...texted.errors.map((error) => `parent text (${error})`),
-      );
-    } else if (!texted.sent) {
-      skipped.push(`parent text (${texted.reason})`);
-    }
+    jobs.push(
+      sendSms({ to: parentPhones, body: smsBody }).then((texted) => {
+        if (texted.sent) {
+          sent.push(
+            ...texted.recipients.map((phone) => `parent text: ${phone}`),
+          );
+        }
+        if (texted.errors.length) {
+          skipped.push(
+            ...texted.errors.map((error) => `parent text (${error})`),
+          );
+        } else if (!texted.sent) {
+          skipped.push(`parent text (${texted.reason})`);
+        }
+      }),
+    );
   }
+  await Promise.all(jobs);
 
   await writeAudit({
     user: args.user,

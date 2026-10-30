@@ -30,25 +30,34 @@ export function displayParentName(name: string, email = "") {
   return parentNameFromEmail(email) || "";
 }
 
+let contactReady: Promise<void> | null = null;
+
 export async function ensureStudentContactColumns() {
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentEmail" TEXT NOT NULL DEFAULT ''`,
-  );
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyName" TEXT NOT NULL DEFAULT ''`,
-  );
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyPhone" TEXT NOT NULL DEFAULT ''`,
-  );
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "Daycare" ADD COLUMN IF NOT EXISTS "phone" TEXT NOT NULL DEFAULT ''`,
-  );
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "active" BOOLEAN NOT NULL DEFAULT true`,
-  );
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentPhone2" TEXT NOT NULL DEFAULT ''`,
-  );
+  if (!contactReady) {
+    contactReady = Promise.all([
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentEmail" TEXT NOT NULL DEFAULT ''`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyName" TEXT NOT NULL DEFAULT ''`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyPhone" TEXT NOT NULL DEFAULT ''`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Daycare" ADD COLUMN IF NOT EXISTS "phone" TEXT NOT NULL DEFAULT ''`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "active" BOOLEAN NOT NULL DEFAULT true`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentPhone2" TEXT NOT NULL DEFAULT ''`,
+      ),
+    ])
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+  await contactReady;
 }
 
 const studentInclude = {

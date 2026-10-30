@@ -48,13 +48,22 @@ function parseEmailList(raw: string) {
   ];
 }
 
+let opsColumnsReady: Promise<void> | null = null;
+
 async function ensureOpsEmailColumn() {
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT ''`,
-  );
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
-  );
+  if (!opsColumnsReady) {
+    opsColumnsReady = Promise.all([
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT ''`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
+      ),
+    ])
+      .then(() => undefined)
+      .catch(() => undefined);
+  }
+  await opsColumnsReady;
 }
 
 async function ensureSettingsRow(schoolId: string) {
