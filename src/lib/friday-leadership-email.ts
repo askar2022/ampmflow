@@ -116,18 +116,74 @@ function vehicleLabel(kind: "bus" | "van", name: string) {
   return /van/i.test(name) ? name : `Van ${name}`;
 }
 
-function riderRows(
+function riderBar(args: {
+  label: string;
+  value: number;
+  of: number;
+  color: string;
+}) {
+  const width = args.value ? barWidth(args.value, args.of) : 6;
+  const rest = Math.max(0, 100 - width);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 12px;">
+    <tr>
+      <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.3;color:${INK};padding:0 8px 4px 0;">${escapeHtml(args.label)}</td>
+      <td align="right" width="36" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.3;font-weight:700;color:${INK};padding:0 0 4px;white-space:nowrap;">${args.value}</td>
+    </tr>
+    <tr>
+      <td colspan="2">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#eef2f5;">
+          <tr>
+            <td width="${width}%" height="10" bgcolor="${args.value ? args.color : "#d5dde3"}" style="background:${args.value ? args.color : "#d5dde3"};height:10px;font-size:0;line-height:0;">&nbsp;</td>
+            <td width="${rest}%" height="10" style="height:10px;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>`;
+}
+
+function riderChart(
   rows: CoordinatorAnalytics["busCounts"],
   kind: "bus" | "van",
+  max: number,
 ) {
+  const color = kind === "bus" ? BLUE : PINK;
   return rows
-    .map(
-      (row) => `<tr>
-        <td style="padding:10px 0;border-top:1px solid ${LINE};font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK};">${escapeHtml(vehicleLabel(kind, row.name))}</td>
-        <td style="padding:10px 0;border-top:1px solid ${LINE};font-family:Arial,Helvetica,sans-serif;font-size:14px;text-align:right;font-weight:700;color:${INK};">${row.riders}</td>
-      </tr>`,
+    .map((row) =>
+      riderBar({
+        label: vehicleLabel(kind, row.name),
+        value: row.riders,
+        of: max,
+        color,
+      }),
     )
     .join("");
+}
+
+function totalCard(args: {
+  label: string;
+  value: number;
+  hint: string;
+  color: string;
+  of: number;
+}) {
+  const width = args.value ? barWidth(args.value, args.of) : 6;
+  const rest = Math.max(0, 100 - width);
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f6f8fa" style="width:100%;background:#f6f8fa;">
+    <tr>
+      <td style="padding:14px 12px;">
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.3;color:${MUTED};">${escapeHtml(args.label)}</div>
+        <div style="font-family:Georgia,'Times New Roman',serif;font-size:32px;line-height:1.1;font-weight:700;color:${args.color};padding:6px 0 4px;">${args.value}</div>
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.3;color:${MUTED};padding-bottom:8px;">${escapeHtml(args.hint)}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;background:#e4ebf0;">
+          <tr>
+            <td width="${width}%" height="8" bgcolor="${args.value ? args.color : "#d5dde3"}" style="background:${args.value ? args.color : "#d5dde3"};height:8px;font-size:0;line-height:0;">&nbsp;</td>
+            <td width="${rest}%" height="8" style="height:8px;font-size:0;line-height:0;">&nbsp;</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>`;
 }
 
 function statBar(args: {
@@ -214,6 +270,11 @@ export function fridayLeadershipHtml(args: {
     data.requestsWeek,
     ...data.weeks.flatMap((week) => [week.changes, week.requests]),
   );
+  const riderMax = Math.max(
+    1,
+    ...data.busCounts.map((row) => row.riders),
+    ...data.vanCounts.map((row) => row.riders),
+  );
   const weekRows = data.weeks
     .map(
       (week) => `<tr>
@@ -269,22 +330,33 @@ export function fridayLeadershipHtml(args: {
               <p style="margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:${INK};">
                 Thank you for keeping pickup and dismissal safe. Here is how families used buses and vans this week.
               </p>
-              <p style="margin:0 0 20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:${INK};">
-                <strong>This week</strong><br>
-                ${data.busRiders} bus riders · ${data.vanRiders} van riders<br>
-                ${data.buses} buses · ${data.vans} vans
-              </p>
-              ${
-                data.busCounts.length || data.vanCounts.length
-                  ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;color:${MUTED};padding:4px 0 8px;">Each bus and van</div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px;">
                 <tr>
-                  <td style="padding:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};">Bus or van</td>
-                  <td style="padding:0 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${MUTED};text-align:right;">Riders</td>
+                  <td width="50%" valign="top" style="padding:0 6px 0 0;">
+                    ${totalCard({
+                      label: "Bus riders",
+                      value: data.busRiders,
+                      hint: `${data.buses} bus${data.buses === 1 ? "" : "es"}`,
+                      color: BLUE,
+                      of: Math.max(data.students, data.busRiders, 1),
+                    })}
+                  </td>
+                  <td width="50%" valign="top" style="padding:0 0 0 6px;">
+                    ${totalCard({
+                      label: "Van riders",
+                      value: data.vanRiders,
+                      hint: `${data.vans} van${data.vans === 1 ? "" : "s"}`,
+                      color: PINK,
+                      of: Math.max(data.students, data.vanRiders, 1),
+                    })}
+                  </td>
                 </tr>
-                ${riderRows(data.busCounts, "bus")}
-                ${riderRows(data.vanCounts, "van")}
-              </table>`
+              </table>
+              ${
+                data.busCounts.length || data.vanCounts.length
+                  ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;font-weight:700;color:${MUTED};padding:4px 0 10px;">Each bus and van</div>
+              ${riderChart(data.busCounts, "bus", riderMax)}
+              ${riderChart(data.vanCounts, "van", riderMax)}`
                   : ""
               }
               ${statBar({

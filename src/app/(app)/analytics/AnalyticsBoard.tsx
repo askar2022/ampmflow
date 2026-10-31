@@ -33,36 +33,43 @@ function RiderTable({ data }: { data: CoordinatorAnalytics }) {
       key: `bus-${row.name}`,
       name: vehicleLabel("bus", row.name),
       riders: row.riders,
+      color: "bg-blue",
     })),
     ...data.vanCounts.map((row) => ({
       key: `van-${row.name}`,
       name: vehicleLabel("van", row.name),
       riders: row.riders,
+      color: "bg-teal",
     })),
   ];
   if (!rows.length) return null;
+  const max = Math.max(1, ...rows.map((row) => row.riders));
   return (
     <div className="rounded-2xl border border-line bg-card p-5">
       <div className="text-sm font-semibold">Each bus and van</div>
       <p className="mt-1 text-xs text-muted">
-        Which routes have more students and which have fewer.
+        Longer bars mean more students on that bus or van.
       </p>
-      <table className="mt-3 w-full text-sm">
-        <thead>
-          <tr className="text-left text-muted">
-            <th className="pb-2 font-medium">Bus or van</th>
-            <th className="pb-2 text-right font-medium">Riders</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-t border-line">
-              <td className="py-2">{row.name}</td>
-              <td className="py-2 text-right font-semibold">{row.riders}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="mt-4 space-y-3">
+        {rows.map((row) => (
+          <div key={row.key}>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span>{row.name}</span>
+              <span className="font-semibold">{row.riders}</span>
+            </div>
+            <div className="mt-1 h-2.5 overflow-hidden rounded-full bg-line">
+              <div
+                className={`h-full rounded-full ${row.riders ? row.color : "bg-line"}`}
+                style={{
+                  width: row.riders
+                    ? `${Math.max(10, (row.riders / max) * 100)}%`
+                    : "6%",
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
