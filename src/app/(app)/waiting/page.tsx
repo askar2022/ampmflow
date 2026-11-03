@@ -75,17 +75,8 @@ export default async function WaitingPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-serif text-4xl">Request for Route</h1>
-        <p className="mt-2 max-w-2xl text-muted">
-          Students waiting for a first bus or van. A different bus after
-          daycare or a new address is Today’s Changes.
-        </p>
-      </div>
-
-      <AssignBusList rows={rows} buses={buses} vans={vans} />
-
       <RouteRequestForm busCompanyEmail={busCompanyEmail} />
+      <AssignBusList rows={rows} buses={buses} vans={vans} />
     </div>
   );
 }

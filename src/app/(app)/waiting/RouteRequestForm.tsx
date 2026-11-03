@@ -31,26 +31,30 @@ export function RouteRequestForm({
     setForm((current) => ({ ...current, [name]: value }));
   }
 
-  if (!open) {
-    return (
-      <div>
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-serif text-4xl">Request for Route</h1>
+          <p className="mt-2 max-w-2xl text-muted">
+            Students waiting for a first bus or van. A different bus after
+            daycare or a new address is Today’s Changes.
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+          className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
         >
-          New request
+          Submit new request
         </button>
-        {message ? (
-          <p className="mt-3 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
-            {message}
-          </p>
-        ) : null}
       </div>
-    );
-  }
-
-  return (
+      {message && !open ? (
+        <p className="rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
+          {message}
+        </p>
+      ) : null}
+      {open ? (
     <form
       className="rounded-2xl border border-line bg-card p-5"
       onSubmit={(event) => {
@@ -190,5 +194,7 @@ export function RouteRequestForm({
         </button>
       </div>
     </form>
+      ) : null}
+    </div>
   );
 }
