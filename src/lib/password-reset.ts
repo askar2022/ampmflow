@@ -68,23 +68,30 @@ export async function sendPasswordResetEmail(email: string, schoolSlug?: string)
     },
   });
 
-  if (user && user.active && user.role !== PENDING_ROLE) {
-    const slug = schoolSlug || (await schoolSlugForId(user.schoolId));
-    const token = await createPasswordResetToken(user.id, user.email);
-    const link = resetUrl(token, slug);
-    const result = await sendMail({
-      to: user.email,
-      subject: "Reset your AMPM Flow password",
-      text: [
-        `Hello ${user.name},`,
-        "",
-        "Use this link to choose a new AMPM Flow password. It expires in one hour.",
-        "",
-        link,
-        "",
-        "If you did not ask for this, you can ignore this email.",
-      ].join("\n"),
-      html: `<!DOCTYPE html>
+  if (!user || !user.active || user.role === PENDING_ROLE) {
+    return {
+      ok: false as const,
+      error:
+        "That email is not an AMPM Flow login. Use the email you actually sign in with.",
+    };
+  }
+
+  const slug = schoolSlug || (await schoolSlugForId(user.schoolId));
+  const token = await createPasswordResetToken(user.id, user.email);
+  const link = resetUrl(token, slug);
+  const result = await sendMail({
+    to: user.email,
+    subject: "Reset your AMPM Flow password",
+    text: [
+      `Hello ${user.name},`,
+      "",
+      "Use this link to choose a new AMPM Flow password. It expires in one hour.",
+      "",
+      link,
+      "",
+      "If you did not ask for this, you can ignore this email.",
+    ].join("\n"),
+    html: `<!DOCTYPE html>
 <html lang="en">
 <body style="margin:0;padding:24px;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#102a43;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;">
@@ -107,13 +114,12 @@ export async function sendPasswordResetEmail(email: string, schoolSlug?: string)
   </table>
 </body>
 </html>`,
-    });
-    if (!result.sent) {
-      return {
-        ok: false as const,
-        error: result.reason || "Could not send the reset email.",
-      };
-    }
+  });
+  if (!result.sent) {
+    return {
+      ok: false as const,
+      error: result.reason || "Could not send the reset email.",
+    };
   }
 
   return { ok: true as const };
