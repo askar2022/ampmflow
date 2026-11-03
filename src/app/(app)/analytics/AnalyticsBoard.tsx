@@ -159,11 +159,7 @@ export function AnalyticsBoard({ data }: { data: CoordinatorAnalytics }) {
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="font-serif text-2xl">Today</h2>
-        <p className="mt-1 text-sm text-muted">
-          What is on the roster right now.
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Dot color="bg-blue" label="Students" value={data.students} />
           <Dot color="bg-navy" label="Bus riders" value={data.busRiders} />
           <Dot color="bg-teal" label="Van riders" value={data.vanRiders} />

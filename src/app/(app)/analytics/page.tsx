@@ -13,15 +13,8 @@ export default async function AnalyticsPage() {
   const data = await loadCoordinatorAnalytics(session.schoolId);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-serif text-4xl">Analytics</h1>
-        <p className="mt-2 max-w-2xl text-muted">
-          A short picture for the bus coordinator: how many students, buses, and
-          vans are on file, and how often staff change a bus or request a new
-          route.
-        </p>
-      </div>
+    <div>
+      <h1 className="sr-only">Analytics</h1>
       <AnalyticsBoard data={data} />
     </div>
   );
