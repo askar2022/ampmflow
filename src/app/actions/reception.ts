@@ -587,6 +587,7 @@ export async function assignRequestedBus(input: {
   studentId?: string;
   busNumber?: string;
   vehicle?: "bus" | "van";
+  trips?: Trip[];
 }) {
   const user = await getSession();
   if (!user) return { ok: false as const, error: "Please sign in." };
@@ -624,15 +625,20 @@ export async function assignRequestedBus(input: {
     return { ok: false as const, error: "Student not found." };
   }
 
-  const previous = planLine(loaded.effective, ["AM", "PM"]);
-  const trips: Trip[] = [];
-  if (loaded.effective.am.waitingForAssignment || !loaded.effective.am.busNumber) {
-    trips.push("AM");
-  }
-  if (loaded.effective.pm.waitingForAssignment || !loaded.effective.pm.busNumber) {
-    trips.push("PM");
+  const requestedTrips = (input.trips || []).filter(
+    (trip): trip is Trip => trip === "AM" || trip === "PM",
+  );
+  const trips: Trip[] = requestedTrips.length ? requestedTrips : [];
+  if (!trips.length) {
+    if (loaded.effective.am.waitingForAssignment || !loaded.effective.am.busNumber) {
+      trips.push("AM");
+    }
+    if (loaded.effective.pm.waitingForAssignment || !loaded.effective.pm.busNumber) {
+      trips.push("PM");
+    }
   }
   if (!trips.length) trips.push("AM", "PM");
+  const previous = planLine(loaded.effective, trips);
 
   let assignedLabel = "";
   if (vehicle === "van") {

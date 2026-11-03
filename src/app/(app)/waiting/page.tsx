@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { loadVehicles } from "@/lib/gate";
 import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { prisma } from "@/lib/prisma";
+import { planSummary } from "@/lib/format";
 import { loadStudents } from "@/lib/transportation";
 import { AssignBusList, type WaitingStudent } from "./AssignBusList";
 import { CompanyUpdateSearch } from "./CompanyUpdateSearch";
@@ -75,9 +76,10 @@ export default async function WaitingPage() {
       <div>
         <h1 className="font-serif text-4xl">Request for Route</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Submit a new student to the company, then assign the bus or van they
-          send back. If they email a daycare or new address for a student
-          already on the list, use Daycare or new address below.
+          New students wait in the list and you type the bus or van the company
+          sent. If a student already rides, then moves or goes to daycare and
+          the company assigns a different bus or van, use Different bus or van
+          below.
         </p>
       </div>
 
@@ -86,10 +88,13 @@ export default async function WaitingPage() {
       <AssignBusList rows={rows} vans={vans} />
 
       <CompanyUpdateSearch
+        vans={vans}
         students={students.map((student) => ({
           id: student.id,
           name: student.fullName,
           grade: student.grade,
+          morning: planSummary(student.am, "AM"),
+          afternoon: planSummary(student.pm, "PM"),
         }))}
       />
     </div>
