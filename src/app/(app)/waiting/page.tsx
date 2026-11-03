@@ -1,15 +1,17 @@
 import { getSession } from "@/lib/auth";
+import { loadVehicles } from "@/lib/gate";
 import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { prisma } from "@/lib/prisma";
 import { loadStudents } from "@/lib/transportation";
 import { AssignBusList, type WaitingStudent } from "./AssignBusList";
+import { CompanyUpdateSearch } from "./CompanyUpdateSearch";
 import { RouteRequestForm } from "./RouteRequestForm";
 
 export default async function WaitingPage() {
   const session = await getSession();
   if (!session) return null;
   const busCompanyEmail = await defaultBusCompanyEmail(session.schoolId);
-  const [pending, students] = await Promise.all([
+  const [pending, students, vehicles] = await Promise.all([
     prisma.changeRequest.findMany({
       where: {
         schoolId: session.schoolId,
@@ -23,7 +25,14 @@ export default async function WaitingPage() {
       orderBy: { createdAt: "desc" },
     }),
     loadStudents(session.schoolId),
+    loadVehicles(session.schoolId).catch(() => []),
   ]);
+  const vans = vehicles
+    .filter(
+      (vehicle) =>
+        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
+    )
+    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
 
   const rows: WaitingStudent[] = [];
   const seen = new Set<string>();
@@ -57,7 +66,7 @@ export default async function WaitingPage() {
       studentId: student.id,
       name: student.fullName,
       grade: student.grade,
-      details: "Waiting for a bus number from the company.",
+      details: "Waiting for a bus or van number from the company.",
     });
   }
 
@@ -66,15 +75,23 @@ export default async function WaitingPage() {
       <div>
         <h1 className="font-serif text-4xl">Request for Route</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Submit a student to the bus company. When they email that the student
-          is assigned bus 4, search the name below and type 4. Parent, teacher,
-          and the bus company are notified.
+          Submit a new student to the company, then assign the bus or van they
+          send back. If they email a daycare or new address for a student
+          already on the list, use Daycare or new address below.
         </p>
       </div>
 
       <RouteRequestForm busCompanyEmail={busCompanyEmail} />
 
-      <AssignBusList rows={rows} />
+      <AssignBusList rows={rows} vans={vans} />
+
+      <CompanyUpdateSearch
+        students={students.map((student) => ({
+          id: student.id,
+          name: student.fullName,
+          grade: student.grade,
+        }))}
+      />
     </div>
   );
 }

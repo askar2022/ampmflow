@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -82,6 +83,29 @@ async function attachDaycare(
     data: { daycareId: daycare.id },
   });
   return daycare.id;
+}
+
+async function ensureVan(schoolId: string, name: string) {
+  const label = name.replace(/^Van\s+/i, "").trim();
+  const vanName = /^van\b/i.test(name.trim()) ? name.trim() : `Van ${label}`;
+  const existing = await prisma.$queryRaw<Array<{ id: string; name: string }>>`
+    SELECT "id", "name" FROM "TransportVehicle"
+    WHERE "schoolId" = ${schoolId}
+      AND (
+        lower("name") = ${vanName.toLowerCase()}
+        OR lower("name") = ${label.toLowerCase()}
+        OR lower("name") = ${`van ${label}`.toLowerCase()}
+      )
+  `.catch(() => []);
+  if (existing[0]) return existing[0];
+  const id = randomUUID();
+  await prisma.$executeRaw`
+    INSERT INTO "TransportVehicle"
+      ("id", "schoolId", "name", "vehicleType", "driverName", "driverPhone", "createdAt", "updatedAt")
+    VALUES
+      (${id}, ${schoolId}, ${vanName}, 'VAN', '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+  `;
+  return { id, name: vanName };
 }
 
 async function routeId(schoolId: string, number: string, trip: Trip) {
@@ -561,17 +585,25 @@ export async function requestRoute(input: RouteRequestInput) {
 export async function assignRequestedBus(input: {
   requestId?: string;
   studentId?: string;
-  busNumber: string;
+  busNumber?: string;
+  vehicle?: "bus" | "van";
 }) {
   const user = await getSession();
   if (!user) return { ok: false as const, error: "Please sign in." };
   if (!["FRONT_DESK", "COORDINATOR", "ADMINISTRATOR"].includes(user.role)) {
-    return { ok: false as const, error: "You cannot assign a bus number." };
+    return { ok: false as const, error: "You cannot assign a bus or van." };
   }
 
-  const busNumber = input.busNumber.replace(/^Bus\s+/i, "").trim();
-  if (!busNumber) {
-    return { ok: false as const, error: "Type the bus number the company sent." };
+  const vehicle = input.vehicle === "van" ? "van" : "bus";
+  const rideName = (input.busNumber || "").trim();
+  if (!rideName) {
+    return {
+      ok: false as const,
+      error:
+        vehicle === "van"
+          ? "Type the van the company sent."
+          : "Type the bus number the company sent.",
+    };
   }
 
   const request = input.requestId
@@ -602,30 +634,64 @@ export async function assignRequestedBus(input: {
   }
   if (!trips.length) trips.push("AM", "PM");
 
-  for (const trip of trips) {
-    const busRouteId = await routeId(user.schoolId, busNumber, trip);
-    const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;
-    await prisma.transportationAssignment.upsert({
-      where: { studentId_trip: { studentId, trip } },
-      create: {
-        studentId,
-        trip,
-        type: "BUS",
-        destination: current.destination || "HOME",
-        busRouteId,
-        waitingForAssignment: false,
-        notes: `Bus ${busNumber} assigned by ${user.name}.`,
-        effectiveStart: new Date(),
-        updatedById: user.id,
-      },
-      update: {
-        type: "BUS",
-        busRouteId,
-        waitingForAssignment: false,
-        notes: `Bus ${busNumber} assigned by ${user.name}.`,
-        updatedById: user.id,
-      },
-    });
+  let assignedLabel = "";
+  if (vehicle === "van") {
+    const van = await ensureVan(user.schoolId, rideName);
+    assignedLabel = van.name;
+    await prisma.$executeRaw`
+      UPDATE "Student"
+      SET "vehicleId" = ${van.id}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${studentId}
+    `;
+    for (const trip of trips) {
+      const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;
+      await prisma.transportationAssignment.upsert({
+        where: { studentId_trip: { studentId, trip } },
+        create: {
+          studentId,
+          trip,
+          type: "BUS",
+          destination: current.destination || "HOME",
+          waitingForAssignment: false,
+          notes: `${van.name} assigned by ${user.name}.`,
+          effectiveStart: new Date(),
+          updatedById: user.id,
+        },
+        update: {
+          waitingForAssignment: false,
+          notes: `${van.name} assigned by ${user.name}.`,
+          updatedById: user.id,
+        },
+      });
+    }
+  } else {
+    const busNumber = rideName.replace(/^Bus\s+/i, "").trim();
+    assignedLabel = `Bus ${busNumber}`;
+    for (const trip of trips) {
+      const busRouteId = await routeId(user.schoolId, busNumber, trip);
+      const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;
+      await prisma.transportationAssignment.upsert({
+        where: { studentId_trip: { studentId, trip } },
+        create: {
+          studentId,
+          trip,
+          type: "BUS",
+          destination: current.destination || "HOME",
+          busRouteId,
+          waitingForAssignment: false,
+          notes: `Bus ${busNumber} assigned by ${user.name}.`,
+          effectiveStart: new Date(),
+          updatedById: user.id,
+        },
+        update: {
+          type: "BUS",
+          busRouteId,
+          waitingForAssignment: false,
+          notes: `Bus ${busNumber} assigned by ${user.name}.`,
+          updatedById: user.id,
+        },
+      });
+    }
   }
 
   await prisma.changeRequest.updateMany({
@@ -636,7 +702,7 @@ export async function assignRequestedBus(input: {
     },
     data: {
       status: "COMPLETED",
-      busNumber,
+      busNumber: assignedLabel,
       reviewedById: user.id,
       reviewedAt: new Date(),
     },
@@ -650,9 +716,12 @@ export async function assignRequestedBus(input: {
     student,
     trips,
     previous,
-    next: planLine(student, trips),
-    when: "Assigned bus",
-    note: `Bus company assigned bus ${busNumber}.`,
+    next:
+      vehicle === "van"
+        ? `${assignedLabel} · ${planLine(student, trips)}`
+        : planLine(student, trips),
+    when: vehicle === "van" ? "Assigned van" : "Assigned bus",
+    note: `Bus company assigned ${assignedLabel}.`,
     waiting: false,
     teacherEmail: student.teacherEmail,
     busCompanyEmail,
@@ -666,7 +735,7 @@ export async function assignRequestedBus(input: {
   return {
     ok: true as const,
     message: [
-      `Bus ${busNumber} is now assigned to ${student.fullName}.`,
+      `${assignedLabel} is now assigned to ${student.fullName}.`,
       noticeSummary(notice),
     ].join(" "),
   };

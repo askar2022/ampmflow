@@ -12,10 +12,17 @@ export type WaitingStudent = {
   details: string;
 };
 
-export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
+export function AssignBusList({
+  rows,
+  vans = [],
+}: {
+  rows: WaitingStudent[];
+  vans?: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [buses, setBuses] = useState<Record<string, string>>({});
+  const [kind, setKind] = useState<"bus" | "van">("bus");
+  const [rides, setRides] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pendingKey, setPendingKey] = useState("");
@@ -35,7 +42,7 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
 
   function assign(row: WaitingStudent) {
     const key = keyFor(row);
-    const busNumber = (buses[key] || "").trim();
+    const busNumber = (rides[key] || "").trim();
     setError("");
     setMessage("");
     setPendingKey(key);
@@ -44,6 +51,7 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
         requestId: row.requestId,
         studentId: row.studentId,
         busNumber,
+        vehicle: kind,
       });
       setPendingKey("");
       if (!result.ok) {
@@ -51,7 +59,7 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
         return;
       }
       setMessage(result.message);
-      setBuses((current) => ({ ...current, [key]: "" }));
+      setRides((current) => ({ ...current, [key]: "" }));
       router.refresh();
     });
   }
@@ -60,19 +68,42 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
     <section>
       <h2 className="font-serif text-2xl">Waiting for a bus or van</h2>
       <p className="mt-1 text-sm text-muted">
-        When the bus company emails that a student is on bus 4, search the name
-        and type 4.
+        When the company emails that a student is on bus 4 or van 2, search the
+        name, choose Bus or Van, type the number, and Assign.
       </p>
 
-      <label className="mt-3 block text-xs font-semibold uppercase tracking-wider text-muted">
-        Search student
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Student name"
-          className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2.5 text-sm font-medium text-navy sm:max-w-sm"
-        />
-      </label>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="block min-w-[12rem] flex-1 text-xs font-semibold uppercase tracking-wider text-muted sm:max-w-sm">
+          Search student
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Student name"
+            className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2.5 text-sm font-medium text-navy"
+          />
+        </label>
+        <div className="flex gap-2">
+          {(
+            [
+              ["bus", "Bus"],
+              ["van", "Van"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setKind(value)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                kind === value
+                  ? "bg-navy text-white"
+                  : "border border-line bg-card"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {error ? (
         <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red">{error}</p>
@@ -85,12 +116,12 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
 
       {matches.length ? (
         <div className="mt-3 overflow-x-auto rounded-2xl border border-line bg-card">
-          <table className="w-full min-w-[36rem] text-left text-sm">
+          <table className="w-full min-w-[40rem] text-left text-sm">
             <thead className="bg-paper text-muted">
               <tr>
                 <th className="px-4 py-3">Student</th>
                 <th>Details</th>
-                <th className="px-4">Bus number</th>
+                <th className="px-4">{kind === "van" ? "Van" : "Bus number"}</th>
               </tr>
             </thead>
             <tbody>
@@ -109,9 +140,10 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <input
-                          value={buses[key] || ""}
+                          list={kind === "van" ? "assign-vans" : undefined}
+                          value={rides[key] || ""}
                           onChange={(event) =>
-                            setBuses((current) => ({
+                            setRides((current) => ({
                               ...current,
                               [key]: event.target.value,
                             }))
@@ -122,9 +154,9 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
                               assign(row);
                             }
                           }}
-                          placeholder="4"
-                          className="w-20 rounded-xl border border-line bg-paper px-3 py-2 font-medium"
-                          aria-label={`Bus number for ${row.name}`}
+                          placeholder={kind === "van" ? "Van 2" : "4"}
+                          className="w-28 rounded-xl border border-line bg-paper px-3 py-2 font-medium"
+                          aria-label={`${kind === "van" ? "Van" : "Bus number"} for ${row.name}`}
                         />
                         <button
                           type="button"
@@ -141,6 +173,13 @@ export function AssignBusList({ rows }: { rows: WaitingStudent[] }) {
               })}
             </tbody>
           </table>
+          {kind === "van" && vans.length ? (
+            <datalist id="assign-vans">
+              {vans.map((van) => (
+                <option key={van.id} value={van.name} />
+              ))}
+            </datalist>
+          ) : null}
         </div>
       ) : (
         <p className="mt-3 rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
