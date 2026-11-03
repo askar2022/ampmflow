@@ -977,7 +977,12 @@ export function ReceptionDesk({
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setDestination(value)}
+                      onClick={() => {
+                        setDestination(value);
+                        if (value === "DAYCARE" || value === "CUSTOM") {
+                          setBusNumber("");
+                        }
+                      }}
                       className={`rounded-full px-4 py-2 text-sm font-semibold ${
                         destination === value
                           ? "bg-navy text-white"
@@ -1064,26 +1069,36 @@ export function ReceptionDesk({
                 ) : null}
               </fieldset>
 
-              <label className="block text-sm font-semibold">
-                Bus number
-                <input
-                  list="desk-buses"
-                  value={busNumber}
-                  onChange={(event) => setBusNumber(event.target.value)}
-                  placeholder="Type 4 if the company assigned bus 4"
-                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                />
-              </label>
-              <datalist id="desk-buses">
-                {buses.map((bus) => (
-                  <option key={bus} value={bus} />
-                ))}
-              </datalist>
-              {!busNumber.trim() ? (
-                <p className="text-sm text-orange-800">
-                  No bus number yet — this student will be on Request for Route.
+              {destination === "HOME" ? (
+                <>
+                  <label className="block text-sm font-semibold">
+                    Bus number
+                    <input
+                      list="desk-buses"
+                      value={busNumber}
+                      onChange={(event) => setBusNumber(event.target.value)}
+                      placeholder="Type 4 if the company assigned bus 4"
+                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                    />
+                  </label>
+                  <datalist id="desk-buses">
+                    {buses.map((bus) => (
+                      <option key={bus} value={bus} />
+                    ))}
+                  </datalist>
+                  {!busNumber.trim() ? (
+                    <p className="text-sm text-orange-800">
+                      No bus number yet — this student will be on Request for
+                      Route.
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-sm text-navy">
+                  Parent is texted now. The assigned-bus text goes out after
+                  the company number is typed on Today’s Changes.
                 </p>
-              ) : null}
+              )}
 
               {destination === "CUSTOM" ? (
                 <label className="block text-sm font-semibold">

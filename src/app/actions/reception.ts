@@ -161,8 +161,11 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   }
 
   const destination = input.destination;
-  const busNumber = input.busNumber?.replace(/^Bus\s+/i, "").trim() || "";
-  const waiting = !busNumber;
+  const needsCompanyBus = destination === "DAYCARE" || destination === "CUSTOM";
+  const busNumber = needsCompanyBus
+    ? ""
+    : input.busNumber?.replace(/^Bus\s+/i, "").trim() || "";
+  const waiting = needsCompanyBus || !busNumber;
   const note = input.note?.trim() || "";
   const parentEmail = usableOpsEmail(input.parentEmail || "");
   const teacherEmail = usableTeacherEmail(input.teacherEmail || "");
