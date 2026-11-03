@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession, isSchoolOperator } from "@/lib/auth";
+import { loadVehicles } from "@/lib/gate";
 import { loadFrontDeskChangesToday } from "@/lib/transportation";
 import { groupByTeacher } from "@/lib/reports";
 import { planSummary, planTone } from "@/lib/format";
@@ -10,6 +11,7 @@ import {
   lastOpsChangeEmail,
   loadSavedOpsEmails,
 } from "@/lib/ops-change-emails";
+import { ChangeRideAssign } from "./ChangeRideAssign";
 import { OpsChangeEmails } from "./OpsChangeEmails";
 
 function windowLabel(start?: string | null, end?: string | null) {
@@ -22,19 +24,29 @@ function windowLabel(start?: string | null, end?: string | null) {
 export default async function ChangesPage() {
   const session = await getSession();
   if (!session) return null;
-  const changes = await loadFrontDeskChangesToday(session.schoolId);
+  const [changes, vehicles] = await Promise.all([
+    loadFrontDeskChangesToday(session.schoolId),
+    loadVehicles(session.schoolId).catch(() => []),
+  ]);
   const groups = groupByTeacher(changes);
   const emails = await loadSavedOpsEmails(session.schoolId);
   const lastEmail = await lastOpsChangeEmail(session.schoolId);
+  const vans = vehicles
+    .filter(
+      (vehicle) =>
+        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
+    )
+    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-4xl">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          This is the list of students Front Desk changed today, including a
-          date range that starts later. Check the name here. If the wrong
-          student was changed, open them and fix it on Front Desk.
+          This page is not a new route request. It is daycare, a new address,
+          or another ride change Front Desk entered today. When the company
+          emails the new bus or van, type it on this row and Assign. Request
+          for Route is only for a student who never had a ride yet.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p className="text-sm font-semibold text-navy">
@@ -82,6 +94,7 @@ export default async function ChangesPage() {
                     <th>Afternoon</th>
                     <th>When</th>
                     <th>Entered by</th>
+                    <th>Company assigned</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -117,6 +130,22 @@ export default async function ChangesPage() {
                         )}
                       </td>
                       <td>{student.lastUpdatedBy || "Front Desk"}</td>
+                      <td className="px-4 py-2">
+                        <ChangeRideAssign
+                          studentId={student.id}
+                          vans={vans}
+                          defaultTrips={[
+                            ...(student.am.waitingForAssignment ||
+                            !student.am.busNumber
+                              ? (["AM"] as const)
+                              : []),
+                            ...(student.pm.waitingForAssignment ||
+                            !student.pm.busNumber
+                              ? (["PM"] as const)
+                              : []),
+                          ]}
+                        />
+                      </td>
                       <td className="px-4">
                         <Link
                           href={`/dashboard?student=${student.id}`}

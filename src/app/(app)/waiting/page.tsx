@@ -76,10 +76,9 @@ export default async function WaitingPage() {
       <div>
         <h1 className="font-serif text-4xl">Request for Route</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          New students wait in the list and you type the bus or van the company
-          sent. If a student already rides, then moves or goes to daycare and
-          the company assigns a different bus or van, use Different bus or van
-          below.
+          This page is for a student who does not have a ride yet. Submit the
+          request, then type the first bus or van the company sends. Daycare,
+          a new address, or a different bus after that is Today’s Changes.
         </p>
       </div>
 
