@@ -87,7 +87,7 @@ export default async function ChangesPage() {
         <div className="overflow-hidden rounded-2xl border border-line bg-card">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-paper text-muted">
+              <thead className="bg-paper text-base font-bold text-navy">
                 <tr>
                   <th className="px-4 py-3">Student</th>
                   <th>Grade</th>

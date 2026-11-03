@@ -259,7 +259,7 @@ export function DriverLists({
                 <col className="w-[12%]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-line bg-paper text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <tr className="border-b border-line bg-paper text-base font-bold text-navy">
                   <th className="px-4 py-3">Student name</th>
                   <th className="py-3 pr-3">Parent name</th>
                   <th className="py-3 pr-3">Primary 1 / 2 phone</th>

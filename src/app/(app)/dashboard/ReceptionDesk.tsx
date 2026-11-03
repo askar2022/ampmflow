@@ -501,7 +501,7 @@ export function ReceptionDesk({
           </p>
           <div className="desk-table-scroll rounded-2xl border border-line bg-card">
           <table className="w-max min-w-full text-left text-sm">
-            <thead className="bg-paper text-[11px] font-semibold uppercase tracking-wide text-muted">
+            <thead className="bg-paper text-base font-bold text-navy">
               <tr>
                 <th className="whitespace-nowrap px-4 py-3">Student name</th>
                 <th className="whitespace-nowrap py-3 pr-3">Grade</th>
