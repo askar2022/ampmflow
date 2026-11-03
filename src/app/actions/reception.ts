@@ -301,6 +301,7 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
     when,
     note,
     waiting,
+    destination,
     teacherEmail,
     busCompanyEmail,
   });
