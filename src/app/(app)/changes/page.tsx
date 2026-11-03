@@ -1,15 +1,8 @@
-import { getSession, isSchoolOperator } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
 import { loadFrontDeskChangesToday } from "@/lib/transportation";
-import { formatDateTime } from "@/lib/dates";
-import { opsChangesClockLabel } from "@/lib/policy";
-import {
-  lastOpsChangeEmail,
-  loadSavedOpsEmails,
-} from "@/lib/ops-change-emails";
 import { ChangeRideAssign } from "./ChangeRideAssign";
-import { OpsChangeEmails } from "./OpsChangeEmails";
 
 function gradeOnly(grade: string) {
   return String(grade).replace(/^grade\s+/i, "") || "—";
@@ -31,8 +24,6 @@ export default async function ChangesPage() {
       orderBy: { number: "asc" },
     }),
   ]);
-  const emails = await loadSavedOpsEmails(session.schoolId);
-  const lastEmail = await lastOpsChangeEmail(session.schoolId);
   const buses = [...new Set(routes.map((route) => route.number))];
   const vans = vehicles
     .filter(
@@ -129,13 +120,6 @@ export default async function ChangesPage() {
           student will show here.
         </div>
       )}
-
-      <OpsChangeEmails
-        emails={emails}
-        canEdit={isSchoolOperator(session.role)}
-        lastSent={lastEmail ? formatDateTime(lastEmail.createdAt) : null}
-        sendAt={opsChangesClockLabel()}
-      />
     </div>
   );
 }
