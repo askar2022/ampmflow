@@ -26,11 +26,13 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
 export function AppShell({
   user,
   schoolName,
+  showPlatform = false,
   children,
 }: {
   user: SessionUser;
   schoolName?: string | null;
   schoolLogoUrl?: string | null;
+  showPlatform?: boolean;
   children: React.ReactNode;
 }) {
   const links = NAV.filter((item) => item.roles.includes(user.role)).map(
@@ -69,11 +71,21 @@ export function AppShell({
               <AppNav links={links} />
             </div>
           </div>
-          <form action={logoutAction} className="self-end sm:ml-auto sm:self-auto">
-            <button className="min-h-[44px] rounded-[12px] border border-navy/25 bg-white px-4 text-[14px] font-semibold text-navy sm:min-h-8 sm:rounded-full sm:px-3 sm:text-[13px]">
-              Sign Out
-            </button>
-          </form>
+          <div className="flex flex-wrap items-center justify-end gap-2 self-end sm:ml-auto sm:self-auto">
+            {showPlatform ? (
+              <Link
+                href="/platform"
+                className="inline-flex min-h-[44px] items-center rounded-[12px] border border-navy/25 bg-white px-4 text-[14px] font-semibold text-navy sm:min-h-8 sm:rounded-full sm:px-3 sm:text-[13px]"
+              >
+                Add schools
+              </Link>
+            ) : null}
+            <form action={logoutAction}>
+              <button className="min-h-[44px] rounded-[12px] border border-navy/25 bg-white px-4 text-[14px] font-semibold text-navy sm:min-h-8 sm:rounded-full sm:px-3 sm:text-[13px]">
+                Sign Out
+              </button>
+            </form>
+          </div>
         </nav>
       </header>
       <main className="mx-auto min-w-0 w-full max-w-[1100px] px-4 py-6 sm:px-6">

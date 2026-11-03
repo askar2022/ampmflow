@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession, isPlatformAdmin } from "@/lib/auth";
 import { getSchoolIdentityById } from "@/lib/school";
 import { AppShell } from "@/components/AppShell";
 
@@ -19,6 +19,7 @@ export default async function AppLayout({
       user={session}
       schoolName={school?.name ?? null}
       schoolLogoUrl={school?.logoUrl ?? null}
+      showPlatform={await isPlatformAdmin(session)}
     >
       {children}
     </AppShell>

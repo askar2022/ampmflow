@@ -10,6 +10,7 @@ import {
   loadSavedOpsEmails,
 } from "@/lib/ops-change-emails";
 import { opsChangesClockLabel } from "@/lib/policy";
+import { PLATFORM_ADMIN_EMAIL } from "@/lib/platform";
 import { PENDING_ROLE } from "@/lib/types";
 import { FridayTestEmail } from "@/app/(app)/analytics/FridayTestEmail";
 import { AddUserFields } from "./AddUserFields";
@@ -32,7 +33,10 @@ export default async function UsersPage() {
     orderBy: { name: "asc" },
   });
   const pending = users.filter((user) => user.role === PENDING_ROLE);
-  const schoolUsers = users.filter((user) => user.role !== PENDING_ROLE);
+  const schoolUsers = users.filter(
+    (user) =>
+      user.role !== PENDING_ROLE && user.email !== PLATFORM_ADMIN_EMAIL,
+  );
   const staff = schoolUsers.filter((user) => user.active);
   const takenOff = schoolUsers.filter((user) => !user.active);
   const [reminderEmails, leadershipEmails, lastEmail] = await Promise.all([

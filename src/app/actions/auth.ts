@@ -9,6 +9,7 @@ import {
   homePath,
   isPlatformAdmin,
 } from "@/lib/auth";
+import { isPlatformAdminEmail } from "@/lib/platform";
 import {
   readPasswordResetToken,
   schoolSignInPath,
@@ -52,9 +53,9 @@ export async function loginAction(formData: FormData) {
     }
   }
 
-  if (goToSchools) {
+  if (goToSchools || isPlatformAdminEmail(result.user.email)) {
     if (!(await isPlatformAdmin(result.user))) {
-      redirect("/?error=admin");
+      redirect(goToSchools ? "/?error=admin" : `${fail}?error=1`);
     }
     await createSession(result.user, {
       remember: formData.get("remember") === "1",

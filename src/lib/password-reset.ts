@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { sendMail, smtpConfigured } from "./email";
+import { ensurePlatformAdminUser, isPlatformAdminEmail } from "./platform";
 import { prisma } from "./prisma";
 import { APP_ORIGIN, schoolLoginPath, schoolSlugForId } from "./school-slug";
 import { PENDING_ROLE } from "./types";
@@ -56,7 +57,7 @@ export async function sendPasswordResetEmail(email: string, schoolSlug?: string)
     };
   }
 
-  const user = await prisma.user.findUnique({
+  let user = await prisma.user.findUnique({
     where: { email: value },
     select: {
       id: true,
@@ -67,6 +68,9 @@ export async function sendPasswordResetEmail(email: string, schoolSlug?: string)
       schoolId: true,
     },
   });
+  if ((!user || !user.active || user.role === PENDING_ROLE) && isPlatformAdminEmail(value)) {
+    user = await ensurePlatformAdminUser();
+  }
 
   if (!user || !user.active || user.role === PENDING_ROLE) {
     return {
