@@ -133,9 +133,7 @@ export function ChangeRideAssign({
           setError("");
         }}
         className={`rounded-full px-4 py-2 text-sm font-semibold ${
-          changed
-            ? "bg-gold text-navy"
-            : "bg-navy text-white"
+          changed ? "bg-green text-white" : "bg-navy text-white"
         }`}
       >
         {changed ? "Changed" : "Update"}

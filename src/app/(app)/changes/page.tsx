@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
+import { schoolLocalTime, todayKey } from "@/lib/dates";
 import { loadFrontDeskChangesToday } from "@/lib/transportation";
 import { ChangeRideAssign } from "./ChangeRideAssign";
 
@@ -39,6 +40,24 @@ export default async function ChangesPage() {
       a.firstName.localeCompare(b.firstName)
     );
   });
+  const day = todayKey();
+  const assignedToday = await prisma.changeRequest.findMany({
+    where: {
+      schoolId: session.schoolId,
+      status: "COMPLETED",
+      studentId: { in: rows.map((student) => student.id) },
+      busNumber: { not: null },
+    },
+    select: { studentId: true, reviewedAt: true, updatedAt: true },
+  });
+  const assignedIds = new Set(
+    assignedToday
+      .filter((row) =>
+        schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey === day,
+      )
+      .map((row) => row.studentId)
+      .filter(Boolean),
+  );
 
   return (
     <div className="space-y-6">
@@ -96,13 +115,7 @@ export default async function ChangesPage() {
                         grade={gradeOnly(student.grade)}
                         buses={buses}
                         vans={vans}
-                        companyAssigned={
-                          !student.am.waitingForAssignment &&
-                          !student.pm.waitingForAssignment &&
-                          Boolean(
-                            student.am.busNumber || student.pm.busNumber,
-                          )
-                        }
+                        companyAssigned={assignedIds.has(student.id)}
                         parentEmail={student.parentEmail}
                         parentPhone={
                           student.parentPhone && student.parentPhone !== "—"
