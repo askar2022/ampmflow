@@ -64,7 +64,7 @@ export default async function ChangesPage() {
       <div>
         <h1 className="font-serif text-4xl">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Tap Update when the company sends the bus or van.
+          Tap Need Update when the company sends the bus or van.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p className="text-sm font-semibold text-navy">
