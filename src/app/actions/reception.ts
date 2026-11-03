@@ -420,6 +420,78 @@ export async function removeReceptionStudent(input: {
   };
 }
 
+async function createRequestedStudent(args: {
+  schoolId: string;
+  firstName: string;
+  lastName: string;
+  grade: string;
+  teacherName: string;
+  parentPhone: string;
+  parentEmail: string;
+  address: string;
+  emergency: string;
+}) {
+  const teacherName = args.teacherName.trim() || "Unassigned";
+  const classroomName =
+    teacherName === "Unassigned" ? `${args.grade} classroom` : teacherName;
+  let classroom = await prisma.classroom.findFirst({
+    where: { schoolId: args.schoolId, name: classroomName },
+    select: { id: true },
+  });
+  if (!classroom) {
+    classroom = await prisma.classroom.create({
+      data: {
+        schoolId: args.schoolId,
+        name: classroomName,
+        grade: args.grade,
+      },
+      select: { id: true },
+    });
+  }
+  const teacher = await prisma.teacher.findFirst({
+    where: { classroomId: classroom.id },
+    select: { id: true },
+  });
+  if (!teacher) {
+    await prisma.teacher.create({
+      data: {
+        schoolId: args.schoolId,
+        classroomId: classroom.id,
+        name: teacherName,
+        email: "",
+      },
+    });
+  }
+  const home = await prisma.address.create({
+    data: {
+      schoolId: args.schoolId,
+      line1: args.address,
+      city: "Minneapolis",
+      state: "MN",
+      zip: "",
+      label: "home",
+    },
+  });
+  const student = await prisma.student.create({
+    data: {
+      schoolId: args.schoolId,
+      studentId: `REQ-${randomUUID().slice(0, 8)}`,
+      firstName: args.firstName,
+      lastName: args.lastName,
+      grade: args.grade,
+      classroomId: classroom.id,
+      parentName: "",
+      parentPhone: args.parentPhone,
+      parentEmail: args.parentEmail,
+      emergencyName: args.emergency,
+      emergencyPhone: args.emergency,
+      homeAddressId: home.id,
+      enrollmentSource: "ROUTE_REQUEST",
+    },
+  });
+  return loadStudent(student.id);
+}
+
 export type RouteRequestInput = {
   studentId?: string;
   firstName: string;
@@ -459,6 +531,7 @@ export async function requestRoute(input: RouteRequestInput) {
     return { ok: false as const, error: "Enter the bus company email." };
   }
   if (!address) return { ok: false as const, error: "Enter the student address." };
+  if (!grade) return { ok: false as const, error: "Enter the grade." };
 
   let loaded = input.studentId
     ? await loadStudent(input.studentId)
@@ -473,6 +546,20 @@ export async function requestRoute(input: RouteRequestInput) {
       select: { id: true },
     });
     loaded = match ? await loadStudent(match.id) : null;
+  }
+
+  if (!loaded || loaded.record.schoolId !== user.schoolId) {
+    loaded = await createRequestedStudent({
+      schoolId: user.schoolId,
+      firstName,
+      lastName,
+      grade,
+      teacherName,
+      parentPhone,
+      parentEmail,
+      address,
+      emergency,
+    });
   }
 
   if (loaded && loaded.record.schoolId === user.schoolId) {

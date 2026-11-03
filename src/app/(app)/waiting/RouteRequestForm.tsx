@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { requestRoute } from "@/app/actions/reception";
 
 const empty = {
@@ -21,6 +22,7 @@ export function RouteRequestForm({
 }: {
   busCompanyEmail?: string;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...empty, busCompanyEmail });
   const [message, setMessage] = useState("");
@@ -70,6 +72,7 @@ export function RouteRequestForm({
           setMessage(result.message);
           setForm({ ...empty, busCompanyEmail: form.busCompanyEmail });
           setOpen(false);
+          router.refresh();
         });
       }}
     >
@@ -101,6 +104,7 @@ export function RouteRequestForm({
         <label className="text-sm font-semibold">
           Grade
           <input
+            required
             value={form.grade}
             onChange={(event) => setField("grade", event.target.value)}
             className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"

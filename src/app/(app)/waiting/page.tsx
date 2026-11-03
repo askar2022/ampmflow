@@ -6,6 +6,16 @@ import { loadStudents } from "@/lib/transportation";
 import { AssignBusList, type WaitingStudent } from "./AssignBusList";
 import { RouteRequestForm } from "./RouteRequestForm";
 
+function requestGrade(row: {
+  student?: { grade: string } | null;
+  details: string;
+}) {
+  const fromStudent = row.student?.grade?.trim();
+  if (fromStudent && fromStudent !== "—") return fromStudent;
+  const match = row.details.match(/Grade\s+([^·]+)/i);
+  return match?.[1].trim() || "";
+}
+
 export default async function WaitingPage() {
   const session = await getSession();
   if (!session) return null;
@@ -54,7 +64,7 @@ export default async function WaitingPage() {
       requestId: row.id,
       studentId: studentId || undefined,
       name,
-      grade: row.student?.grade || "",
+      grade: requestGrade(row),
     });
   }
 
