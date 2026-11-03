@@ -78,14 +78,14 @@ export default async function WaitingPage() {
       <div>
         <h1 className="font-serif text-4xl">Request for Route</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Use this for a student who does not have a ride yet. A different bus
-          after daycare or a new address is Today’s Changes.
+          Students waiting for a first bus or van. A different bus after
+          daycare or a new address is Today’s Changes.
         </p>
       </div>
 
-      <RouteRequestForm busCompanyEmail={busCompanyEmail} />
-
       <AssignBusList rows={rows} buses={buses} vans={vans} />
+
+      <RouteRequestForm busCompanyEmail={busCompanyEmail} />
     </div>
   );
 }

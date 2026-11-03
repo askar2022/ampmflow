@@ -21,6 +21,7 @@ export function RouteRequestForm({
 }: {
   busCompanyEmail?: string;
 }) {
+  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...empty, busCompanyEmail });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -28,6 +29,25 @@ export function RouteRequestForm({
 
   function setField(name: keyof typeof empty, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+        >
+          New request
+        </button>
+        {message ? (
+          <p className="mt-3 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
+            {message}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -45,13 +65,14 @@ export function RouteRequestForm({
           }
           setMessage(result.message);
           setForm({ ...empty, busCompanyEmail: form.busCompanyEmail });
+          setOpen(false);
         });
       }}
     >
       <h2 className="font-serif text-2xl">Submit a route request</h2>
       <p className="mt-1 text-sm text-muted">
-        Fill this form. The button emails the parent and the bus company.
-        Submitted requests stay in the list below.
+        Fill this form. The button emails the parent and the bus company. The
+        student then stays in the list above.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -148,13 +169,26 @@ export function RouteRequestForm({
         </p>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="mt-4 rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-      >
-        {pending ? "Sending both emails…" : "Email parent and bus company"}
-      </button>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {pending ? "Sending both emails…" : "Email parent and bus company"}
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => {
+            setOpen(false);
+            setError("");
+          }}
+          className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+        >
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }
