@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadCoordinatorAnalytics } from "@/lib/analytics";
+import { loadLeadershipEmails } from "@/lib/ops-change-emails";
+import { LeadershipEmails } from "@/app/(app)/admin/users/OpsChangeEmails";
 import { AnalyticsBoard } from "./AnalyticsBoard";
 import { FridayTestEmail } from "./FridayTestEmail";
 
@@ -11,7 +13,10 @@ export default async function AnalyticsPage() {
     redirect("/dashboard");
   }
 
-  const data = await loadCoordinatorAnalytics(session.schoolId);
+  const [data, leadershipEmails] = await Promise.all([
+    loadCoordinatorAnalytics(session.schoolId),
+    loadLeadershipEmails(session.schoolId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -24,6 +29,7 @@ export default async function AnalyticsPage() {
           time — next Friday, one email per school.
         </p>
       </div>
+      <LeadershipEmails emails={leadershipEmails} />
       <FridayTestEmail email={session.email} />
       <AnalyticsBoard data={data} />
     </div>

@@ -303,6 +303,7 @@ model SchoolSettings {
   snapshotTime      String @default("14:45")
   weeklyReportTime  String @default("12:00")
   opsChangeEmails   String @default("")
+  leadershipEmails  String @default("")
   school            School @relation(fields: [schoolId], references: [id])
 }
 

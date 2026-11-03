@@ -3,13 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { getSession, isSchoolOperator } from "@/lib/auth";
 import {
+  addLeadershipEmail,
   addOpsEmail,
+  removeLeadershipEmail,
   removeOpsEmail,
   sendOpsChangeDigest,
 } from "@/lib/ops-change-emails";
 
 function refresh() {
   revalidatePath("/changes");
+  revalidatePath("/admin/users");
+  revalidatePath("/analytics");
 }
 
 export async function addChangeListEmail(formData: FormData) {
@@ -28,6 +32,29 @@ export async function removeChangeListEmail(email: string) {
     return { ok: false, error: "Only a bus coordinator or admin can remove emails." };
   }
   const result = await removeOpsEmail(user.schoolId, email);
+  refresh();
+  return result;
+}
+
+export async function addLeadershipListEmail(formData: FormData) {
+  const user = await getSession();
+  if (!user || !isSchoolOperator(user.role)) {
+    return { ok: false, error: "Only a bus coordinator or admin can add emails." };
+  }
+  const result = await addLeadershipEmail(
+    user.schoolId,
+    String(formData.get("email") || ""),
+  );
+  refresh();
+  return result;
+}
+
+export async function removeLeadershipListEmail(email: string) {
+  const user = await getSession();
+  if (!user || !isSchoolOperator(user.role)) {
+    return { ok: false, error: "Only a bus coordinator or admin can remove emails." };
+  }
+  const result = await removeLeadershipEmail(user.schoolId, email);
   refresh();
   return result;
 }

@@ -11,8 +11,8 @@ import {
 } from "./dates";
 import { sendMail, smtpConfigured } from "./email";
 import {
-  loadSavedOpsEmails,
-  saveOpsEmails,
+  loadLeadershipEmails,
+  saveLeadershipEmails,
   usableOpsEmail,
 } from "./ops-change-emails";
 import { prisma } from "./prisma";
@@ -74,16 +74,8 @@ const METRO_FRIDAY_EMAILS = [
 ];
 
 export async function leadershipReportEmails(schoolId: string) {
-  const [saved, users, school] = await Promise.all([
-    loadSavedOpsEmails(schoolId),
-    prisma.user.findMany({
-      where: {
-        schoolId,
-        active: true,
-        role: { in: ["ADMINISTRATOR", "COORDINATOR"] },
-      },
-      select: { email: true },
-    }),
+  const [saved, school] = await Promise.all([
+    loadLeadershipEmails(schoolId),
     prisma.school.findUnique({
       where: { id: schoolId },
       select: { name: true },
@@ -91,17 +83,9 @@ export async function leadershipReportEmails(schoolId: string) {
   ]);
   const metro = /metro/i.test(school?.name || "") ? METRO_FRIDAY_EMAILS : [];
   if (metro.some((email) => !saved.includes(email))) {
-    await saveOpsEmails(schoolId, [...saved, ...metro]).catch(() => undefined);
+    await saveLeadershipEmails(schoolId, [...saved, ...metro]).catch(() => undefined);
   }
-  return [
-    ...new Set(
-      [
-        ...saved,
-        ...metro,
-        ...users.map((user) => usableOpsEmail(user.email)),
-      ].filter(Boolean),
-    ),
-  ];
+  return [...new Set([...saved, ...metro].filter(Boolean))];
 }
 
 function barWidth(part: number, whole: number) {
@@ -446,7 +430,7 @@ export async function sendFridayLeadershipReport(args: {
       ok: false as const,
       sent: 0,
       recipients,
-      error: "Add a leadership email on Today’s Changes first.",
+      error: "Add a leadership email on Users or Analytics first.",
     };
   }
   if (!smtpConfigured()) {

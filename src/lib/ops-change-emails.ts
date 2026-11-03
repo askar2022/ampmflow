@@ -57,6 +57,9 @@ async function ensureOpsEmailColumn() {
         `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT ''`,
       ),
       prisma.$executeRawUnsafe(
+        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "leadershipEmails" TEXT NOT NULL DEFAULT ''`,
+      ),
+      prisma.$executeRawUnsafe(
         `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
       ),
     ])
@@ -120,6 +123,53 @@ export async function addOpsEmail(schoolId: string, email: string) {
       emails: [],
     };
   }
+}
+
+export async function loadLeadershipEmails(schoolId: string) {
+  try {
+    await ensureSettingsRow(schoolId);
+    const rows = await prisma.$queryRaw<Array<{ leadershipEmails: string }>>`
+      SELECT "leadershipEmails" FROM "SchoolSettings" WHERE "schoolId" = ${schoolId}
+    `;
+    return parseEmailList(rows[0]?.leadershipEmails || "");
+  } catch {
+    return [];
+  }
+}
+
+export async function saveLeadershipEmails(schoolId: string, emails: string[]) {
+  const next = [...new Set(emails.map((email) => usableOpsEmail(email)).filter(Boolean))];
+  await ensureSettingsRow(schoolId);
+  const value = next.join("\n");
+  await prisma.$executeRaw`
+    UPDATE "SchoolSettings" SET "leadershipEmails" = ${value} WHERE "schoolId" = ${schoolId}
+  `;
+  return next;
+}
+
+export async function addLeadershipEmail(schoolId: string, email: string) {
+  const clean = usableOpsEmail(email);
+  if (!clean) {
+    return {
+      ok: false as const,
+      error: "Enter a real email address.",
+      emails: await loadLeadershipEmails(schoolId),
+    };
+  }
+  const emails = await loadLeadershipEmails(schoolId);
+  if (emails.includes(clean)) return { ok: true as const, emails };
+  return { ok: true as const, emails: await saveLeadershipEmails(schoolId, [...emails, clean]) };
+}
+
+export async function removeLeadershipEmail(schoolId: string, email: string) {
+  const emails = await loadLeadershipEmails(schoolId);
+  return {
+    ok: true as const,
+    emails: await saveLeadershipEmails(
+      schoolId,
+      emails.filter((item) => item !== usableOpsEmail(email)),
+    ),
+  };
 }
 
 export async function removeOpsEmail(schoolId: string, email: string) {
@@ -328,23 +378,26 @@ export async function digestRecipients(
   schoolId: string,
   changed: EffectiveStudent[],
 ) {
-  const [saved, users] = await Promise.all([
+  const [saved, users, company] = await Promise.all([
     loadSavedOpsEmails(schoolId),
     prisma.user.findMany({
       where: {
         schoolId,
         active: true,
-        role: { in: ["BUS_COMPANY", "COORDINATOR", "ADMINISTRATOR"] },
+        role: { in: ["BUS_COMPANY", "COORDINATOR"] },
       },
       select: { email: true },
     }),
+    defaultBusCompanyEmail(schoolId),
   ]);
   return parseEmailList(
     [
       ...saved,
+      company,
       process.env.BUS_COMPANY_EMAIL || "",
       ...users.map((user) => user.email),
       ...changed.map((student) => usableTeacherEmail(student.teacherEmail)),
+      ...changed.map((student) => usableOpsEmail(student.parentEmail)),
     ].join("\n"),
   );
 }
@@ -423,7 +476,7 @@ export async function sendOpsChangeDigest(args: {
       ok: false,
       sent: 0,
       recipients,
-      error: "Add a bus, teacher, or leadership email first.",
+      error: "No parent, teacher, bus company, or coordinator email on today’s changes.",
     };
   }
 

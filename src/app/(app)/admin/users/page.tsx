@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/dates";
 import { roleLabel } from "@/lib/format";
 import {
   lastOpsChangeEmail,
+  loadLeadershipEmails,
   loadSavedOpsEmails,
 } from "@/lib/ops-change-emails";
 import { opsChangesClockLabel } from "@/lib/policy";
@@ -33,8 +34,9 @@ export default async function UsersPage() {
   const schoolUsers = users.filter((user) => user.role !== PENDING_ROLE);
   const staff = schoolUsers.filter((user) => user.active);
   const takenOff = schoolUsers.filter((user) => !user.active);
-  const [emails, lastEmail] = await Promise.all([
+  const [reminderEmails, leadershipEmails, lastEmail] = await Promise.all([
     loadSavedOpsEmails(session.schoolId),
+    loadLeadershipEmails(session.schoolId),
     lastOpsChangeEmail(session.schoolId),
   ]);
 
@@ -48,7 +50,8 @@ export default async function UsersPage() {
         </p>
       </section>
       <OpsChangeEmails
-        emails={emails}
+        reminderEmails={reminderEmails}
+        leadershipEmails={leadershipEmails}
         lastSent={lastEmail ? formatDateTime(lastEmail.createdAt) : null}
         sendAt={opsChangesClockLabel()}
       />

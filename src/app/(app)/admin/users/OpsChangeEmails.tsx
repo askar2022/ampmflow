@@ -3,18 +3,32 @@
 import { useState, useTransition } from "react";
 import {
   addChangeListEmail,
+  addLeadershipListEmail,
   emailOpsChangeListNow,
   removeChangeListEmail,
+  removeLeadershipListEmail,
 } from "@/app/actions/ops-emails";
 
-export function OpsChangeEmails({
+function EmailBox({
+  title,
+  help,
   emails,
   lastSent,
-  sendAt,
+  add,
+  remove,
+  sendNowLabel,
+  onSendNow,
+  empty,
 }: {
+  title: string;
+  help: string;
   emails: string[];
   lastSent?: string | null;
-  sendAt: string;
+  add: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
+  remove: (email: string) => Promise<{ ok: boolean; error?: string }>;
+  sendNowLabel?: string;
+  onSendNow?: () => Promise<string>;
+  empty: string;
 }) {
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
@@ -22,15 +36,8 @@ export function OpsChangeEmails({
 
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
-      <h2 className="text-xl font-semibold text-navy">
-        Who gets change emails
-      </h2>
-      <p className="mt-1 max-w-2xl text-sm text-muted">
-        Add the leadership or bus coordinator email here. They get the{" "}
-        {sendAt} list if anyone changed, and the Friday noon leadership
-        report. Each Front Desk change still goes only to parent, teacher,
-        and the bus company.
-      </p>
+      <h2 className="text-xl font-semibold text-navy">{title}</h2>
+      <p className="mt-1 max-w-2xl text-sm text-muted">{help}</p>
       {emails.length ? (
         <ul className="mt-4 space-y-2">
           {emails.map((address) => (
@@ -44,7 +51,7 @@ export function OpsChangeEmails({
                 disabled={pending}
                 onClick={() =>
                   start(async () => {
-                    const result = await removeChangeListEmail(address);
+                    const result = await remove(address);
                     setMessage(
                       result.ok ? "Removed." : result.error || "Could not remove.",
                     );
@@ -58,20 +65,16 @@ export function OpsChangeEmails({
           ))}
         </ul>
       ) : (
-        <p className="mt-4 text-sm text-red">
-          No emails saved yet. The 2:30 send waits until you add them.
-        </p>
+        <p className="mt-4 text-sm text-muted">{empty}</p>
       )}
       <form
         className="mt-4 flex flex-wrap gap-2"
         action={(formData) =>
           start(async () => {
-            const result = await addChangeListEmail(formData);
+            const result = await add(formData);
             if (result.ok) setEmail("");
             setMessage(
-              result.ok
-                ? "Saved. That person will get the next 2:30 list."
-                : result.error || "Could not save.",
+              result.ok ? "Saved." : result.error || "Could not save.",
             );
           })
         }
@@ -92,37 +95,83 @@ export function OpsChangeEmails({
         >
           {pending ? "Saving…" : "Add email"}
         </button>
-        <button
-          type="button"
-          disabled={pending || emails.length === 0}
-          onClick={() =>
-            start(async () => {
-              const result = await emailOpsChangeListNow();
-              if (!result.ok) {
-                setMessage(result.error || "Could not send.");
-                return;
-              }
-              if (result.skippedEmpty) {
-                setMessage("No students changed today, so no email was sent.");
-                return;
-              }
-              const sentTo = result.recipients.join(", ");
-              setMessage(
-                sentTo
-                  ? `Sent from dismissal@ampmflow.com to ${sentTo}.`
-                  : "Sent.",
-              );
-            })
-          }
-          className="rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold disabled:opacity-50"
-        >
-          {pending ? "Sending…" : "Email today’s changes now"}
-        </button>
+        {onSendNow ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                setMessage(await onSendNow());
+              })
+            }
+            className="rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            {pending ? "Sending…" : sendNowLabel}
+          </button>
+        ) : null}
       </form>
       {lastSent ? (
         <p className="mt-3 text-sm text-muted">Last emailed {lastSent}.</p>
       ) : null}
       {message ? <p className="mt-2 text-sm text-muted">{message}</p> : null}
     </section>
+  );
+}
+
+export function OpsChangeEmails({
+  reminderEmails,
+  leadershipEmails,
+  lastSent,
+  sendAt,
+}: {
+  reminderEmails: string[];
+  leadershipEmails: string[];
+  lastSent?: string | null;
+  sendAt: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <EmailBox
+        title="2:30 reminder"
+        help={`If anyone changed today, this reminder goes at ${sendAt} to the parent, teacher, bus company, and bus coordinator on the student form. Add extra reminder emails here. Daily Front Desk changes still go out right away from the student form.`}
+        emails={reminderEmails}
+        lastSent={lastSent}
+        add={addChangeListEmail}
+        remove={removeChangeListEmail}
+        empty="No extra reminder emails yet. Parents, teachers, the bus company, and coordinators still get the 2:30 list from the student form."
+        sendNowLabel="Send 2:30 reminder now"
+        onSendNow={async () => {
+          const result = await emailOpsChangeListNow();
+          if (!result.ok) return result.error || "Could not send.";
+          if (result.skippedEmpty) {
+            return "No students changed today, so no email was sent.";
+          }
+          return result.recipients.length
+            ? `Sent to ${result.recipients.join(", ")}.`
+            : "Sent.";
+        }}
+      />
+      <EmailBox
+        title="Friday leadership email"
+        help="These emails get the Friday noon analytics snapshot only. They do not get each Front Desk change or the 2:30 reminder."
+        emails={leadershipEmails}
+        add={addLeadershipListEmail}
+        remove={removeLeadershipListEmail}
+        empty="Add the leadership emails that should get Friday analytics."
+      />
+    </div>
+  );
+}
+
+export function LeadershipEmails({ emails }: { emails: string[] }) {
+  return (
+    <EmailBox
+      title="Friday leadership email"
+      help="These emails get the Friday noon analytics snapshot only. They do not get each Front Desk change or the 2:30 reminder."
+      emails={emails}
+      add={addLeadershipListEmail}
+      remove={removeLeadershipListEmail}
+      empty="Add the leadership emails that should get Friday analytics."
+    />
   );
 }
