@@ -3,6 +3,7 @@ import { completePasswordReset } from "@/app/actions/auth";
 import { LoginFrame } from "@/components/login/LoginFrame";
 import { fieldClass, SubmitButton } from "@/components/login/SignInForm";
 import { readPasswordResetToken } from "@/lib/password-reset";
+import { isPlatformAdminEmail } from "@/lib/platform";
 import { getSchoolIdentityById } from "@/lib/school";
 import { findSchoolBySlug, schoolLoginPath } from "@/lib/school-slug";
 
@@ -16,17 +17,18 @@ export default async function ResetPasswordPage({
   }>;
 }) {
   const { token = "", school: slug, error } = await searchParams;
-  const school = slug ? await findSchoolBySlug(slug) : null;
+  const payload = token ? await readPasswordResetToken(token) : null;
+  const platform = Boolean(payload && isPlatformAdminEmail(payload.email));
+  const school = !platform && slug ? await findSchoolBySlug(slug) : null;
   const identity = school ? await getSchoolIdentityById(school.id) : null;
   const signIn = school ? schoolLoginPath(school.slug || slug || "") : "/login";
-  const payload = token ? await readPasswordResetToken(token) : null;
   const expired = !payload || error === "expired";
 
   return (
     <LoginFrame
-      schoolName={identity?.name || school?.name}
-      logoUrl={identity?.logoUrl}
-      homeHref={signIn}
+      schoolName={platform ? null : identity?.name || school?.name}
+      logoUrl={platform ? null : identity?.logoUrl}
+      homeHref={platform ? "/" : signIn}
     >
       <div className="text-left">
         <h2 className="text-lg font-semibold text-navy short-h:text-base">
@@ -38,7 +40,11 @@ export default async function ResetPasswordPage({
               This reset link is missing or expired. Ask for a new one.
             </p>
             <Link
-              href={slug ? `/login/forgot?school=${encodeURIComponent(slug)}` : "/login/forgot"}
+              href={
+                platform || !slug
+                  ? "/login/forgot"
+                  : `/login/forgot?school=${encodeURIComponent(slug)}`
+              }
               className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] bg-navy px-4 py-2.5 text-[16px] font-semibold text-white"
             >
               Send a new reset email
@@ -47,7 +53,9 @@ export default async function ResetPasswordPage({
         ) : (
           <form action={completePasswordReset} className="mt-4 space-y-3">
             <input type="hidden" name="token" value={token} />
-            {slug ? <input type="hidden" name="schoolSlug" value={slug} /> : null}
+            {platform || !slug ? null : (
+              <input type="hidden" name="schoolSlug" value={slug} />
+            )}
             <label
               className="block text-left text-sm font-semibold text-navy"
               htmlFor="new-password"
@@ -90,7 +98,7 @@ export default async function ResetPasswordPage({
           </form>
         )}
         <Link
-          href={signIn}
+          href={platform ? "/" : signIn}
           className="mt-4 inline-flex min-h-11 w-full items-center justify-center text-sm font-semibold text-navy"
         >
           Back to Sign in

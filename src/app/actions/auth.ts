@@ -90,10 +90,14 @@ export async function requestPasswordReset(formData: FormData) {
 }
 
 export async function completePasswordReset(formData: FormData) {
-  const slug = String(formData.get("schoolSlug") || "").trim();
   const token = String(formData.get("token") || "");
   const password = String(formData.get("password") || "");
   const confirm = String(formData.get("confirm") || "");
+  const payloadEarly = token ? await readPasswordResetToken(token) : null;
+  const platform = Boolean(
+    payloadEarly && isPlatformAdminEmail(payloadEarly.email),
+  );
+  const slug = platform ? "" : String(formData.get("schoolSlug") || "").trim();
   const fail = slug
     ? `/login/reset?school=${encodeURIComponent(slug)}&token=${encodeURIComponent(token)}`
     : `/login/reset?token=${encodeURIComponent(token)}`;
@@ -105,7 +109,7 @@ export async function completePasswordReset(formData: FormData) {
     redirect(`${fail}&error=match`);
   }
 
-  const payload = await readPasswordResetToken(token);
+  const payload = payloadEarly;
   if (!payload) {
     redirect(`${fail}&error=expired`);
   }
@@ -123,6 +127,6 @@ export async function completePasswordReset(formData: FormData) {
     data: { passwordHash: await hashPassword(password) },
   });
 
-  const signIn = schoolSignInPath(slug);
+  const signIn = platform ? "/login" : schoolSignInPath(slug);
   redirect(`${signIn}${signIn.includes("?") ? "&" : "?"}reset=1`);
 }

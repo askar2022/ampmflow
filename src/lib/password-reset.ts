@@ -80,7 +80,9 @@ export async function sendPasswordResetEmail(email: string, schoolSlug?: string)
     };
   }
 
-  const slug = schoolSlug || (await schoolSlugForId(user.schoolId));
+  const slug = isPlatformAdminEmail(user.email)
+    ? undefined
+    : schoolSlug || (await schoolSlugForId(user.schoolId));
   const token = await createPasswordResetToken(user.id, user.email);
   const link = resetUrl(token, slug);
   const result = await sendMail({
