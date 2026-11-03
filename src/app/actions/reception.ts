@@ -305,6 +305,14 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
     note,
     waiting,
     destination,
+    parentSms:
+      destination === "DAYCARE"
+        ? "daycare-request"
+        : destination === "CUSTOM"
+          ? "address-request"
+          : waiting
+            ? "ride-request"
+            : "assigned",
     teacherEmail,
     busCompanyEmail,
   });
@@ -834,6 +842,7 @@ export async function assignRequestedBus(input: {
     when: vehicle === "van" ? "Assigned van" : "Assigned bus",
     note: `Bus company assigned ${assignedLabel}.`,
     waiting: false,
+    parentSms: "assigned",
     teacherEmail: student.teacherEmail,
     busCompanyEmail,
   });

@@ -7,40 +7,40 @@ import { parentSmsNumbers, sendSms, smsConfigured } from "./sms";
 import { usableTeacherEmail } from "./teacher-snapshot";
 import type { Destination, EffectiveStudent, SessionUser, Trip } from "./types";
 
+export type ParentSmsKind =
+  | "daycare-request"
+  | "address-request"
+  | "ride-request"
+  | "assigned";
+
 function parentChangeSms(args: {
   student: EffectiveStudent;
-  trips: Trip[];
   next: string;
   note: string;
   when: string;
-  waiting: boolean;
-  destination?: Destination;
+  kind: ParentSmsKind;
 }) {
   const name = args.student.fullName;
-  const dest =
-    args.destination ||
-    (args.trips.includes("PM")
-      ? args.student.pm.destination
-      : args.student.am.destination);
-  if (args.waiting && dest === "DAYCARE") {
+  if (args.kind === "daycare-request") {
     return `AMPM Flow: we asked the bus company to add a daycare route for ${name}. We will text you when a bus or van is assigned.`;
   }
-  if (args.waiting && dest === "CUSTOM") {
+  if (args.kind === "address-request") {
     return `AMPM Flow: we sent ${name}'s new address to the bus company. We will text you when a bus or van is assigned.`;
   }
-  if (args.waiting) {
+  if (args.kind === "ride-request") {
     return `AMPM Flow: we asked the bus company for a bus or van for ${name}. We will text you when it is assigned.`;
   }
-  const van = `${args.next} ${args.note} ${args.when}`.match(/Van\s+[A-Za-z0-9-]+/i)?.[0];
+  const van = `${args.next} ${args.note} ${args.when}`.match(
+    /Van\s+[A-Za-z0-9-]+/i,
+  )?.[0];
   if (van) return `AMPM Flow: ${name} is assigned ${van}.`;
   const bus =
-    args.student.pm.busNumber ||
-    args.student.am.busNumber ||
-    args.next.match(/Bus\s+\d+/i)?.[0];
-  if (bus) {
-    return `AMPM Flow: ${name} is assigned ${/bus/i.test(bus) ? bus : `bus ${bus}`}.`;
-  }
-  return `AMPM Flow: ${name}'s ride is updated.`;
+    args.next.match(/Bus\s+\d+/i)?.[0] ||
+    args.note.match(/Bus\s+\d+/i)?.[0];
+  if (bus) return `AMPM Flow: ${name} is assigned ${bus}.`;
+  const vanName = args.note.match(/Van\s+[A-Za-z0-9-]+/i)?.[0];
+  if (vanName) return `AMPM Flow: ${name} is assigned ${vanName}.`;
+  return `AMPM Flow: ${name} is assigned a bus or van.`;
 }
 
 export type ChangeNotice = {
@@ -140,6 +140,7 @@ export async function notifyTransportationChange(args: {
   note: string;
   waiting: boolean;
   destination?: Destination;
+  parentSms?: ParentSmsKind;
   teacherEmail?: string;
   busCompanyEmail?: string;
 }): Promise<ChangeNotice> {
@@ -169,14 +170,21 @@ export async function notifyTransportationChange(args: {
   if (!teachers.length) skipped.push("teacher (required)");
   if (!company.length) skipped.push("bus company (required)");
 
+  const smsKind =
+    args.parentSms ||
+    (args.waiting && args.destination === "DAYCARE"
+      ? "daycare-request"
+      : args.waiting && args.destination === "CUSTOM"
+        ? "address-request"
+        : args.waiting
+          ? "ride-request"
+          : "assigned");
   const smsBody = parentChangeSms({
     student: args.student,
-    trips: args.trips,
     next: args.next,
     note: args.note,
     when: args.when,
-    waiting: args.waiting,
-    destination: args.destination,
+    kind: smsKind,
   });
   const parentPhones = parentSmsNumbers(
     args.student.parentPhone,
