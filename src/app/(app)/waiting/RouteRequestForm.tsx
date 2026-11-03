@@ -35,14 +35,8 @@ export function RouteRequestForm({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-4xl">Request for Route</h1>
-          <p className="mt-2 max-w-2xl text-muted">
-            Students waiting for a first bus or van. A different bus after
-            daycare or a new address is Today’s Changes.
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-serif text-4xl">Request for Route</h1>
         <button
           type="button"
           onClick={() => setOpen(true)}

@@ -68,11 +68,6 @@ export function AssignBusList({
 
   return (
     <section>
-      <h2 className="font-serif text-2xl">Waiting for a bus or van</h2>
-      <p className="mt-1 text-sm text-muted">
-        Type the bus or van the company sent, then Assign.
-      </p>
-
       {error ? (
         <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red">{error}</p>
       ) : null}
