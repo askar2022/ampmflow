@@ -63,13 +63,6 @@ export default async function ChangesPage() {
         </div>
       </div>
 
-      <OpsChangeEmails
-        emails={emails}
-        canEdit={isSchoolOperator(session.role)}
-        lastSent={lastEmail ? formatDateTime(lastEmail.createdAt) : null}
-        sendAt={opsChangesClockLabel()}
-      />
-
       {groups.length ? (
         groups.map(([name, rows]) => (
           <div
@@ -175,6 +168,13 @@ export default async function ChangesPage() {
           student will show here so you can confirm it was the right child.
         </div>
       )}
+
+      <OpsChangeEmails
+        emails={emails}
+        canEdit={isSchoolOperator(session.role)}
+        lastSent={lastEmail ? formatDateTime(lastEmail.createdAt) : null}
+        sendAt={opsChangesClockLabel()}
+      />
     </div>
   );
 }
