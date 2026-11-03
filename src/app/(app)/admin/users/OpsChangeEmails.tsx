@@ -26,10 +26,10 @@ export function OpsChangeEmails({
         Who gets change emails
       </h2>
       <p className="mt-1 max-w-2xl text-sm text-muted">
-        Add the leadership or bus coordinator email here. They get each Front
-        Desk change, the {sendAt} list if anyone changed, and the Friday noon
-        leadership report. Parent and teacher emails stay on the student form
-        on Front Desk.
+        Add the leadership or bus coordinator email here. They get the{" "}
+        {sendAt} list if anyone changed, and the Friday noon leadership
+        report. Each Front Desk change still goes only to parent, teacher,
+        and the bus company.
       </p>
       {emails.length ? (
         <ul className="mt-4 space-y-2">

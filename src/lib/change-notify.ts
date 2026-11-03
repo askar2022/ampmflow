@@ -1,7 +1,7 @@
 import { writeAudit } from "./audit";
 import { sendMail, smtpConfigured } from "./email";
 import { planSummary } from "./format";
-import { loadSavedOpsEmails, usableOpsEmail } from "./ops-change-emails";
+import { usableOpsEmail } from "./ops-change-emails";
 import { prisma } from "./prisma";
 import { parentSmsNumbers, sendSms, smsConfigured } from "./sms";
 import { usableTeacherEmail } from "./teacher-snapshot";
@@ -130,26 +130,6 @@ async function teacherEmails(classroomId: string, extra?: string) {
   ]);
 }
 
-async function opsEmails(schoolId: string, already: string[]) {
-  const [saved, users] = await Promise.all([
-    loadSavedOpsEmails(schoolId),
-    prisma.user.findMany({
-      where: {
-        schoolId,
-        active: true,
-        role: { in: ["BUS_COMPANY", "COORDINATOR", "ADMINISTRATOR"] },
-      },
-      select: { email: true },
-    }),
-  ]);
-  const used = new Set(already);
-  return uniqueEmails([
-    ...saved,
-    process.env.BUS_COMPANY_EMAIL,
-    ...users.map((user) => user.email),
-  ]).filter((email) => !used.has(email));
-}
-
 export async function notifyTransportationChange(args: {
   user: SessionUser;
   student: EffectiveStudent;
@@ -184,11 +164,6 @@ export async function notifyTransportationChange(args: {
     args.student.classroomId,
     args.teacherEmail,
   );
-  const ops = await opsEmails(args.user.schoolId, [
-    ...parent,
-    ...teachers,
-    ...company,
-  ]);
 
   if (!parent.length) skipped.push("parent (required)");
   if (!teachers.length) skipped.push("teacher (required)");
@@ -216,7 +191,6 @@ export async function notifyTransportationChange(args: {
       { label: "parent", to: parent },
       { label: "teacher", to: teachers },
       { label: "bus company", to: company },
-      { label: "leadership", to: ops },
     ];
     for (const group of groups) {
       if (!group.to.length) continue;
@@ -315,11 +289,6 @@ export async function notifyStudentLeft(args: {
     args.student.classroomId,
     args.teacherEmail,
   );
-  const ops = await opsEmails(args.user.schoolId, [
-    ...parent,
-    ...teachers,
-    ...company,
-  ]);
 
   if (!parent.length) skipped.push("parent (required)");
   if (!teachers.length) skipped.push("teacher (required)");
@@ -342,7 +311,6 @@ export async function notifyStudentLeft(args: {
       { label: "parent", to: parent },
       { label: "teacher", to: teachers },
       { label: "bus company", to: company },
-      { label: "leadership", to: ops },
     ];
     for (const group of groups) {
       if (!group.to.length) continue;
