@@ -237,6 +237,126 @@ export async function notifyTransportationChange(args: {
   return { sent, skipped, waiting: args.waiting };
 }
 
+export async function notifyStudentLeft(args: {
+  user: SessionUser;
+  student: EffectiveStudent;
+  previous: string;
+  reason: string;
+  note: string;
+  teacherEmail?: string;
+  busCompanyEmail?: string;
+}): Promise<ChangeNotice> {
+  const sent: string[] = [];
+  const skipped: string[] = [];
+  const text = [
+    "AMPM Flow — student left",
+    "",
+    `Student: ${args.student.fullName}`,
+    `Parent: ${args.student.parentName && args.student.parentName !== "—" ? args.student.parentName : "—"}`,
+    `Primary 1 phone: ${args.student.parentPhone || "—"}`,
+    args.student.parentPhone2 ? `Primary 2 phone: ${args.student.parentPhone2}` : "",
+    `Grade ${String(args.student.grade).replace(/^grade\s+/i, "")} · ${args.student.teacherName}`,
+    `Was: ${args.previous}`,
+    `Now: Removed from the transportation list`,
+    `Reason: ${args.reason}`,
+    args.note ? `Note: ${args.note}` : "",
+    `Entered by: ${args.user.name}`,
+    "",
+    "Please take this student off morning pickup and afternoon dismissal.",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+  const html = changeNoticeHtml(text, "Student left");
+  const subject = `Student left — ${args.student.fullName}`;
+
+  const parent = uniqueEmails([args.student.parentEmail]);
+  const company = uniqueEmails([args.busCompanyEmail]);
+  const teachers = await teacherEmails(
+    args.student.classroomId,
+    args.teacherEmail,
+  );
+  const ops = await opsEmails(args.user.schoolId, [
+    ...parent,
+    ...teachers,
+    ...company,
+  ]);
+
+  if (!parent.length) skipped.push("parent (required)");
+  if (!teachers.length) skipped.push("teacher (required)");
+  if (!company.length) skipped.push("bus company (required)");
+
+  const smsBody = [
+    `AMPM Flow: ${args.student.fullName} is no longer on the school transportation list`,
+    args.reason,
+  ].join(". ");
+  const parentPhones = parentSmsNumbers(
+    args.student.parentPhone,
+    args.student.parentPhone2,
+  );
+
+  const jobs: Array<Promise<void>> = [];
+  if (!smtpConfigured()) {
+    skipped.push("email is not configured");
+  } else {
+    const groups = [
+      { label: "parent", to: parent },
+      { label: "teacher", to: teachers },
+      { label: "bus company", to: company },
+      { label: "leadership", to: ops },
+    ];
+    for (const group of groups) {
+      if (!group.to.length) continue;
+      jobs.push(
+        sendMail({
+          to: group.to,
+          subject,
+          text,
+          html,
+        }).then((result) => {
+          if (result.sent) {
+            sent.push(...group.to.map((email) => `${group.label}: ${email}`));
+          } else {
+            skipped.push(`${group.label} (${result.reason})`);
+          }
+        }),
+      );
+    }
+  }
+
+  if (!parentPhones.length) {
+    skipped.push("parent text (phone required)");
+  } else if (!smsConfigured()) {
+    skipped.push("parent text (Twilio is not set)");
+  } else {
+    jobs.push(
+      sendSms({ to: parentPhones, body: smsBody }).then((texted) => {
+        if (texted.sent) {
+          sent.push(
+            ...texted.recipients.map((phone) => `parent text: ${phone}`),
+          );
+        }
+        if (texted.errors.length) {
+          skipped.push(
+            ...texted.errors.map((error) => `parent text (${error})`),
+          );
+        } else if (!texted.sent) {
+          skipped.push(`parent text (${texted.reason})`);
+        }
+      }),
+    );
+  }
+  await Promise.all(jobs);
+
+  await writeAudit({
+    user: args.user,
+    studentId: args.student.id,
+    action: "EMAIL_STUDENT_LEFT",
+    newPlan: { sent, skipped, reason: args.reason, note: args.note },
+  }).catch(() => undefined);
+
+  return { sent, skipped, waiting: false };
+}
+
 export async function notifyRouteRequest(args: {
   user: SessionUser;
   studentName: string;
@@ -345,7 +465,7 @@ export async function notifyRouteRequest(args: {
   return { sent, skipped, waiting: true };
 }
 
-export function noticeSummary(notice: ChangeNotice) {
+export function noticeSummary(notice: ChangeNotice, extra?: string) {
   const parts = [];
   if (notice.waiting) {
     parts.push("Marked Waiting for Route until the bus company confirms it.");
@@ -361,7 +481,7 @@ export function noticeSummary(notice: ChangeNotice) {
   if (notice.skipped.length) {
     parts.push(`Could not send ${notice.skipped.join(", ")}.`);
   }
-  parts.push("Same-day changes also go out again in the 2:30 p.m. reminder.");
+  parts.push(extra || "Same-day changes also go out again in the 2:30 p.m. reminder.");
   return parts.join(" ");
 }
 

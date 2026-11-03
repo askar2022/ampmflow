@@ -3,7 +3,10 @@
 import { useDeferredValue, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { saveReceptionChange } from "@/app/actions/reception";
+import {
+  removeReceptionStudent,
+  saveReceptionChange,
+} from "@/app/actions/reception";
 import { planSummary, planTone } from "@/lib/format";
 import type { Destination, DurationType, EffectiveStudent, Trip } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -196,6 +199,9 @@ export function ReceptionDesk({
   const [ride, setRide] = useState("");
   const [selectedId, setSelectedId] = useState(initialStudentId);
   const [openForm, setOpenForm] = useState(Boolean(initialStudentId));
+  const [openLeave, setOpenLeave] = useState(false);
+  const [leaveReason, setLeaveReason] = useState("Transferred to another school");
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [destination, setDestination] = useState<Destination>(initial.destination);
   const [trips, setTrips] = useState<Trip[]>(["PM"]);
   const [duration, setDuration] = useState<DurationType>("TODAY");
@@ -249,6 +255,9 @@ export function ReceptionDesk({
     setSelectedId(student.id);
     setQuery(`${student.firstName} ${student.lastName}`);
     setOpenForm(false);
+    setOpenLeave(false);
+    setConfirmLeave(false);
+    setLeaveReason("Transferred to another school");
     setMessage("");
     setError("");
     const next = formFromStudent(student);
@@ -272,6 +281,45 @@ export function ReceptionDesk({
         return current.filter((item) => item !== trip);
       }
       return [...current, trip];
+    });
+  }
+
+  function removeStudent() {
+    if (!selected) return;
+    if (!confirmLeave) {
+      setError("Check the box to confirm this student is leaving.");
+      return;
+    }
+    if (!parentPhone.trim()) {
+      setError("Primary 1 phone is required so we can text the parent.");
+      return;
+    }
+    if (!parentEmail.trim() || !teacherEmail.trim() || !busCompanyEmail.trim()) {
+      setError("Parent, teacher, and bus company emails are required.");
+      return;
+    }
+    setError("");
+    setMessage("");
+    startTransition(async () => {
+      const result = await removeReceptionStudent({
+        studentId: selected.id,
+        reason: leaveReason,
+        note,
+        parentPhone,
+        parentPhone2,
+        parentEmail,
+        teacherEmail,
+        busCompanyEmail,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setMessage(result.message);
+      setOpenLeave(false);
+      setSelectedId("");
+      setQuery("");
+      router.refresh();
     });
   }
 
@@ -516,12 +564,13 @@ export function ReceptionDesk({
                   setSelectedId("");
                   setQuery("");
                   setOpenForm(false);
+                  setOpenLeave(false);
                 }}
                 className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
               >
                 Back to list
               </button>
-              {!openForm ? (
+              {!openForm && !openLeave ? (
                 <>
                   <Link
                     href={`/waiting?student=${selected.id}`}
@@ -531,10 +580,25 @@ export function ReceptionDesk({
                   </Link>
                   <button
                     type="button"
-                    onClick={() => setOpenForm(true)}
+                    onClick={() => {
+                      setOpenLeave(false);
+                      setOpenForm(true);
+                    }}
                     className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
                   >
                     Change Transportation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenForm(false);
+                      setOpenLeave(true);
+                      setConfirmLeave(false);
+                      setError("");
+                    }}
+                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-red"
+                  >
+                    Student left school
                   </button>
                 </>
               ) : null}
@@ -627,6 +691,149 @@ export function ReceptionDesk({
               </>
             ) : null}
           </div>
+
+          {openLeave ? (
+            <form
+              className="mt-6 space-y-4 rounded-2xl border border-gold bg-paper p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                removeStudent();
+              }}
+            >
+              <h3 className="font-serif text-2xl">Student left school</h3>
+              <p className="text-sm text-muted">
+                Use this when a student transfers or enrolls at another school.
+                They leave Front Desk, Reports, and the bus list. Parent,
+                teacher, and the bus company get the same notice as a
+                transportation change. You can put them back from Roster
+                Archive.
+              </p>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-semibold">Why they left</legend>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      "Transferred to another school",
+                      "Enrolled at another school",
+                      "No longer needs transportation",
+                    ] as const
+                  ).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setLeaveReason(value)}
+                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        leaveReason === value
+                          ? "bg-navy text-white"
+                          : "border border-line bg-card"
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <label className="block text-sm font-semibold">
+                  Primary 1 phone
+                  <input
+                    type="tel"
+                    required
+                    value={parentPhone}
+                    onChange={(event) => setParentPhone(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Primary 2 phone
+                  <input
+                    type="tel"
+                    value={parentPhone2}
+                    onChange={(event) => setParentPhone2(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Parent email
+                  <input
+                    type="email"
+                    required
+                    value={parentEmail}
+                    onChange={(event) => setParentEmail(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Advisor email
+                  <input
+                    type="email"
+                    required
+                    value={teacherEmail}
+                    onChange={(event) => setTeacherEmail(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold sm:col-span-2 lg:col-span-1">
+                  Bus company email
+                  <input
+                    type="email"
+                    required
+                    value={busCompanyEmail}
+                    onChange={(event) => setBusCompanyEmail(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+              </div>
+
+              <label className="block text-sm font-semibold">
+                Note (optional new school name)
+                <textarea
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                />
+              </label>
+
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={confirmLeave}
+                  onChange={(event) => setConfirmLeave(event.target.checked)}
+                />
+                <span>
+                  I confirm this student is leaving. Notify parent, teacher, and
+                  the bus company, then take them off the list.
+                </span>
+              </label>
+
+              {error ? <p className="text-sm text-red">{error}</p> : null}
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={pending || !confirmLeave}
+                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {pending ? "Removing…" : "Remove and notify"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenLeave(false);
+                    setConfirmLeave(false);
+                    setError("");
+                  }}
+                  className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : null}
 
           {openForm ? (
             <form

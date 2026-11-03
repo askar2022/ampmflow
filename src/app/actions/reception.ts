@@ -10,6 +10,7 @@ import { loadStudent } from "@/lib/transportation";
 import {
   noticeSummary,
   notifyRouteRequest,
+  notifyStudentLeft,
   notifyTransportationChange,
   planLine,
 } from "@/lib/change-notify";
@@ -272,6 +273,112 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
     message: noticeSummary(notice),
     sent: notice.sent,
     skipped: notice.skipped,
+  };
+}
+
+export async function removeReceptionStudent(input: {
+  studentId: string;
+  reason: string;
+  note?: string;
+  parentPhone?: string;
+  parentPhone2?: string;
+  parentEmail?: string;
+  teacherEmail?: string;
+  busCompanyEmail?: string;
+}) {
+  const user = await getSession();
+  if (!user) return { ok: false as const, error: "Please sign in." };
+  if (!["FRONT_DESK", "COORDINATOR", "ADMINISTRATOR"].includes(user.role)) {
+    return { ok: false as const, error: "You cannot remove a student." };
+  }
+
+  const loaded = await loadStudent(input.studentId);
+  if (!loaded || loaded.record.schoolId !== user.schoolId) {
+    return { ok: false as const, error: "Student not found." };
+  }
+  if (!loaded.record.active) {
+    return { ok: false as const, error: "This student is already off the list." };
+  }
+
+  const parentEmail = usableOpsEmail(input.parentEmail || "");
+  const teacherEmail = usableTeacherEmail(input.teacherEmail || "");
+  const busCompanyEmail = usableOpsEmail(input.busCompanyEmail || "");
+  const parentPhone = input.parentPhone?.trim() || "";
+  const parentPhone2 = input.parentPhone2?.trim() || "";
+  const reason = input.reason.trim();
+  const note = input.note?.trim() || "";
+  if (!reason) {
+    return { ok: false as const, error: "Choose why this student is leaving." };
+  }
+  if (!parentSmsNumbers(parentPhone, parentPhone2).length) {
+    return { ok: false as const, error: "Primary 1 phone is required so we can text the parent." };
+  }
+  if (!parentEmail) return { ok: false as const, error: "Parent email is required." };
+  if (!teacherEmail) return { ok: false as const, error: "Teacher email is required." };
+  if (!busCompanyEmail) {
+    return { ok: false as const, error: "Bus company email is required." };
+  }
+
+  await saveSchoolBusCompanyEmail(user.schoolId, busCompanyEmail).catch(
+    () => undefined,
+  );
+  await prisma.$executeRaw`
+    UPDATE "Student"
+    SET "parentEmail" = ${parentEmail},
+        "parentPhone" = ${parentPhone || loaded.effective.parentPhone},
+        "parentPhone2" = ${parentPhone2},
+        "active" = false
+    WHERE "id" = ${input.studentId}
+  `;
+
+  const student = loaded.effective;
+  student.parentEmail = parentEmail;
+  student.parentPhone = parentPhone || student.parentPhone;
+  student.parentPhone2 = parentPhone2;
+  const previous = planLine(student, ["AM", "PM"]);
+
+  await prisma.changeRequest
+    .create({
+      data: {
+        schoolId: user.schoolId,
+        studentId: input.studentId,
+        trip: "AM+PM",
+        source: user.role,
+        title: `Student left — ${student.fullName}`,
+        details: [reason, note, `Entered by ${user.name}.`]
+          .filter(Boolean)
+          .join(" "),
+        status: "COMPLETED",
+        payload: JSON.stringify({ left: true, reason }),
+        createdById: user.id,
+        reviewedById: user.id,
+        reviewedAt: new Date(),
+      },
+    })
+    .catch(() => undefined);
+
+  const notice = await notifyStudentLeft({
+    user,
+    student,
+    previous,
+    reason,
+    note,
+    teacherEmail,
+    busCompanyEmail,
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/buses");
+  revalidatePath("/print");
+  revalidatePath("/changes");
+  revalidatePath("/waiting");
+
+  return {
+    ok: true as const,
+    message: noticeSummary(
+      notice,
+      `${student.fullName} is off Front Desk and Reports. Put them back from Roster Archive if this was a mistake.`,
+    ),
   };
 }
 
