@@ -430,7 +430,7 @@ export async function sendFridayLeadershipReport(args: {
       ok: false as const,
       sent: 0,
       recipients,
-      error: "Add a leadership email on Users or Analytics first.",
+      error: "Add a leadership email on Users first.",
     };
   }
   if (!smtpConfigured()) {

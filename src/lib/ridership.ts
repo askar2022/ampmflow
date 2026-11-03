@@ -45,6 +45,7 @@ export type DriverRider = {
 export type DriverVan = {
   id: string;
   name: string;
+  driverName?: string;
 };
 
 export function studentBusNumbers(student: EffectiveStudent) {
@@ -178,7 +179,19 @@ export async function loadDriverLists(schoolId: string) {
       (vehicle) =>
         vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
     )
-    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+    .map((vehicle) => ({
+      id: vehicle.id,
+      name: vehicle.name,
+      driverName: vehicle.driverName || "",
+    }));
+  const busDrivers: Record<string, string> = {};
+  for (const vehicle of vehicles) {
+    const isBus =
+      vehicle.vehicleType.toUpperCase() === "BUS" && !/van/i.test(vehicle.name);
+    if (!isBus) continue;
+    const number = vehicle.name.replace(/^Bus\s+/i, "").trim();
+    if (number) busDrivers[number] = vehicle.driverName || "";
+  }
   const riders: DriverRider[] = students.map((student) => ({
     id: student.id,
     name: student.fullName,
@@ -194,7 +207,7 @@ export async function loadDriverLists(schoolId: string) {
   const buses = [
     ...new Set(riders.flatMap((rider) => rider.buses)),
   ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  return { riders, buses, vans };
+  return { riders, buses, vans, busDrivers };
 }
 
 export function oneVehicleText(args: {

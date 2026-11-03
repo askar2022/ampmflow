@@ -11,6 +11,7 @@ import {
 } from "@/lib/ops-change-emails";
 import { opsChangesClockLabel } from "@/lib/policy";
 import { PENDING_ROLE } from "@/lib/types";
+import { FridayTestEmail } from "@/app/(app)/analytics/FridayTestEmail";
 import { AddUserFields } from "./AddUserFields";
 import { OpsChangeEmails } from "./OpsChangeEmails";
 import { UserArchive } from "./UserArchive";
@@ -55,6 +56,7 @@ export default async function UsersPage() {
         lastSent={lastEmail ? formatDateTime(lastEmail.createdAt) : null}
         sendAt={opsChangesClockLabel()}
       />
+      <FridayTestEmail email={session.email} />
       {pending.length ? (
         <section>
           <h2 className="text-2xl font-semibold tracking-tight text-navy">

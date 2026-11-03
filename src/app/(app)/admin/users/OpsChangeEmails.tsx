@@ -162,16 +162,3 @@ export function OpsChangeEmails({
     </div>
   );
 }
-
-export function LeadershipEmails({ emails }: { emails: string[] }) {
-  return (
-    <EmailBox
-      title="Friday leadership email"
-      help="These emails get the Friday noon analytics snapshot only. They do not get each Front Desk change or the 2:30 reminder."
-      emails={emails}
-      add={addLeadershipListEmail}
-      remove={removeLeadershipListEmail}
-      empty="Add the leadership emails that should get Friday analytics."
-    />
-  );
-}

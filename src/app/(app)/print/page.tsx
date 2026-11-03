@@ -10,23 +10,43 @@ export default async function PrintPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-4xl">Reports</h1>
-        <p className="mt-1 max-w-2xl text-muted">
-          Search one bus or van at a time, like Front Desk. The list has
-          student name, parent name, parent phone, teacher name, and grade.
-          Print or email that list to the driver so they can call. Parent
-          pickup stays off these lists.
-        </p>
-        <p className="mt-2 text-sm font-semibold text-navy">
-          {lists.buses.length} bus{lists.buses.length === 1 ? "" : "es"}
-          {lists.vans.length ? ` · ${lists.vans.length} van${lists.vans.length === 1 ? "" : "s"}` : ""}
-          {` · ${lists.riders.length} on the roster`}
+        <h1 className="font-serif text-4xl text-navy">Reports</h1>
+        <p className="mt-2 max-w-3xl text-muted">
+          Select a bus or van to view its student roster. You can print the
+          roster or email it directly to the driver. Parent Pickup students
+          are excluded.
         </p>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-[12px] border border-line bg-card px-4 py-3 shadow-sm">
+          <p className="font-serif text-3xl leading-none text-navy">
+            {lists.buses.length}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-muted">Buses</p>
+        </div>
+        <div className="rounded-[12px] border border-line bg-card px-4 py-3 shadow-sm">
+          <p className="font-serif text-3xl leading-none text-navy">
+            {lists.vans.length}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-muted">Vans</p>
+        </div>
+        <div className="rounded-[12px] border border-line bg-card px-4 py-3 shadow-sm">
+          <p className="font-serif text-3xl leading-none text-navy">
+            {lists.riders.length}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-muted">
+            Students Assigned
+          </p>
+          <span className="mt-2 block h-1 w-8 rounded-full bg-[#f4d35e]" />
+        </div>
+      </div>
+
       <DriverLists
         riders={lists.riders}
         buses={lists.buses}
         vans={lists.vans}
+        busDrivers={lists.busDrivers}
       />
     </div>
   );

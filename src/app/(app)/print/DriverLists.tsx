@@ -31,14 +31,36 @@ function gradeOnly(value: string) {
   return value.replace(/^grade\s+/i, "").trim() || value;
 }
 
+function BusIcon() {
+  return (
+    <svg
+      viewBox="0 0 64 40"
+      className="mx-auto h-14 w-20 text-navy"
+      aria-hidden="true"
+    >
+      <rect x="4" y="8" width="48" height="22" rx="4" fill="#087f6b" />
+      <rect x="10" y="12" width="12" height="8" rx="1" fill="#ffffff" />
+      <rect x="26" y="12" width="12" height="8" rx="1" fill="#ffffff" />
+      <rect x="42" y="12" width="6" height="8" rx="1" fill="#f4d35e" />
+      <rect x="52" y="16" width="8" height="14" rx="2" fill="#0b2942" />
+      <circle cx="16" cy="32" r="5" fill="#0b2942" />
+      <circle cx="16" cy="32" r="2" fill="#f4d35e" />
+      <circle cx="44" cy="32" r="5" fill="#0b2942" />
+      <circle cx="44" cy="32" r="2" fill="#f4d35e" />
+    </svg>
+  );
+}
+
 export function DriverLists({
   riders,
   buses,
   vans,
+  busDrivers = {},
 }: {
   riders: DriverRider[];
   buses: string[];
   vans: DriverVan[];
+  busDrivers?: Record<string, string>;
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Selected>(null);
@@ -96,6 +118,11 @@ export function DriverLists({
       )
     : [];
   const title = active ? vehicleLabel(active.kind, active.id, vans) : "";
+  const driverName = active
+    ? active.kind === "bus"
+      ? busDrivers[active.id] || ""
+      : vans.find((van) => van.id === active.id)?.driverName || ""
+    : "";
 
   function choose(next: Selected) {
     setSelected(next);
@@ -107,11 +134,19 @@ export function DriverLists({
     }
   }
 
+  function vehicleButtonClass(on: boolean) {
+    return `min-h-[44px] rounded-[12px] px-4 text-[14px] font-semibold ${
+      on
+        ? "bg-teal-deep text-white"
+        : "border border-line bg-paper text-navy"
+    }`;
+  }
+
   return (
-    <div className="space-y-4">
-      <section className="no-print rounded-2xl border border-line bg-card p-4 shadow-sm">
+    <div className="space-y-5">
+      <section className="no-print rounded-[12px] border border-line bg-card p-5 shadow-sm">
         <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
-          Find a bus or van
+          Select a Vehicle
           <input
             type="search"
             value={query}
@@ -121,20 +156,18 @@ export function DriverLists({
               setMessage("");
             }}
             placeholder="Bus 1 or Van 1"
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-4 py-2.5 text-base font-medium text-navy outline-none focus:border-gold"
+            className="mt-2 min-h-[44px] w-full rounded-[12px] border border-line bg-paper px-4 text-base font-medium text-navy outline-none focus:border-teal"
           />
         </label>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {visibleBuses.map((number) => (
             <button
               key={`bus-${number}`}
               type="button"
               onClick={() => choose({ kind: "bus", id: number })}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                active?.kind === "bus" && active.id === number
-                  ? "bg-navy text-white"
-                  : "border border-line bg-paper text-navy"
-              }`}
+              className={vehicleButtonClass(
+                Boolean(active?.kind === "bus" && active.id === number),
+              )}
             >
               Bus {number}
             </button>
@@ -144,11 +177,9 @@ export function DriverLists({
               key={van.id}
               type="button"
               onClick={() => choose({ kind: "van", id: van.id })}
-              className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
-                active?.kind === "van" && active.id === van.id
-                  ? "bg-navy text-white"
-                  : "border border-line bg-paper text-navy"
-              }`}
+              className={vehicleButtonClass(
+                Boolean(active?.kind === "van" && active.id === van.id),
+              )}
             >
               {van.name}
             </button>
@@ -163,24 +194,26 @@ export function DriverLists({
       </section>
 
       {active ? (
-        <section className="print-sheet rounded-2xl border border-line bg-card p-5">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+        <section className="print-sheet rounded-[12px] border border-line bg-card p-5 shadow-sm sm:p-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="font-serif text-2xl">{title}</h2>
-              <p className="text-sm text-muted">
-                {rows.length} student{rows.length === 1 ? "" : "s"} · give this
-                list to the driver
+              <h2 className="font-serif text-3xl text-navy">{title}</h2>
+              <p className="mt-1 text-sm text-muted">
+                Driver {driverName || "not on file"}
+              </p>
+              <p className="mt-1 text-sm font-semibold text-navy">
+                {rows.length} student{rows.length === 1 ? "" : "s"}
               </p>
             </div>
-            <div className="no-print flex flex-wrap items-end gap-2">
+            <div className="no-print flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
               <label className="text-sm font-semibold text-navy">
-                Email this {active.kind}
+                Driver email
                 <input
                   type="email"
                   value={to}
                   onChange={(event) => setTo(event.target.value)}
                   placeholder="Driver email"
-                  className="mt-1 block w-full min-w-0 rounded-xl border border-line px-3 py-2 font-normal sm:w-64"
+                  className="mt-1 block min-h-[44px] w-full min-w-0 rounded-[12px] border border-line px-3 font-normal sm:w-64"
                 />
               </label>
               <button
@@ -200,23 +233,23 @@ export function DriverLists({
                     );
                   })
                 }
-                className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="min-h-[44px] rounded-[12px] bg-teal px-5 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {pending ? "Sending…" : "Email driver"}
+                {pending ? "Sending…" : "Email Driver"}
               </button>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="rounded-xl border border-line px-4 py-2 text-sm font-semibold"
+                className="min-h-[44px] rounded-[12px] border border-navy/20 bg-white px-5 text-sm font-semibold text-navy"
               >
-                Print for driver
+                Print Roster
               </button>
             </div>
           </div>
           {message ? (
             <p className="no-print mt-3 text-sm text-muted">{message}</p>
           ) : null}
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-5 overflow-x-auto rounded-[12px] border border-line">
             <table className="w-full min-w-[40rem] table-fixed text-left text-sm">
               <colgroup>
                 <col className="w-[22%]" />
@@ -226,12 +259,12 @@ export function DriverLists({
                 <col className="w-[12%]" />
               </colgroup>
               <thead>
-                <tr className="border-b border-line text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  <th className="py-2 pr-3">Student name</th>
-                  <th className="py-2 pr-3">Parent name</th>
-                  <th className="py-2 pr-3">Primary 1 / 2 phone</th>
-                  <th className="py-2 pr-3">Teacher</th>
-                  <th className="py-2">Grade</th>
+                <tr className="border-b border-line bg-paper text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  <th className="px-4 py-3">Student name</th>
+                  <th className="py-3 pr-3">Parent name</th>
+                  <th className="py-3 pr-3">Primary 1 / 2 phone</th>
+                  <th className="py-3 pr-3">Teacher</th>
+                  <th className="py-3 pr-4">Grade</th>
                 </tr>
               </thead>
               <tbody>
@@ -243,9 +276,9 @@ export function DriverLists({
                       : "Not on file";
                   return (
                     <tr key={rider.id} className="border-b border-line last:border-0">
-                      <td className="py-2.5 pr-3 font-semibold">{rider.name}</td>
-                      <td className="py-2.5 pr-3">{parent}</td>
-                      <td className="py-2.5 pr-3">
+                      <td className="px-4 py-3 font-semibold">{rider.name}</td>
+                      <td className="py-3 pr-3">{parent}</td>
+                      <td className="py-3 pr-3">
                         {hasParentPhone(rider.parentPhone) && call ? (
                           <a
                             href={call}
@@ -267,8 +300,8 @@ export function DriverLists({
                           </span>
                         ) : null}
                       </td>
-                      <td className="py-2.5 pr-3">{rider.teacherName || "—"}</td>
-                      <td className="py-2.5">{gradeOnly(rider.grade)}</td>
+                      <td className="py-3 pr-3">{rider.teacherName || "—"}</td>
+                      <td className="py-3 pr-4">{gradeOnly(rider.grade)}</td>
                     </tr>
                   );
                 })}
@@ -282,10 +315,15 @@ export function DriverLists({
           ) : null}
         </section>
       ) : (
-        <p className="no-print rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-          Type Bus 1 or click a bus or van. The student list for that vehicle
-          shows here. Then print it or email that driver only.
-        </p>
+        <section className="no-print rounded-[12px] border border-dashed border-line bg-card px-6 py-14 text-center shadow-sm">
+          <BusIcon />
+          <h2 className="mt-4 font-serif text-2xl text-navy">
+            No vehicle selected
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            Choose a bus or van above to view its student roster.
+          </p>
+        </section>
       )}
     </div>
   );
