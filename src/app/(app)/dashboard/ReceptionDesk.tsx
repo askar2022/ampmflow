@@ -409,7 +409,7 @@ export function ReceptionDesk({
             </select>
           </label>
           <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-48">
-            Teacher / Advisor
+            Teacher
             <select
               value={teacher}
               onChange={(event) => {
@@ -421,7 +421,7 @@ export function ReceptionDesk({
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
-              <option value="">All advisors</option>
+              <option value="">All teachers</option>
               {teachers.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -472,7 +472,7 @@ export function ReceptionDesk({
                 <th className="whitespace-nowrap px-4 py-3">Student name</th>
                 <th className="whitespace-nowrap py-3 pr-3">Grade</th>
                 <th className="whitespace-nowrap py-3 pr-3">Parent</th>
-                <th className="whitespace-nowrap py-3 pr-3">Advisor</th>
+                <th className="whitespace-nowrap py-3 pr-3">Teacher</th>
                 <th className="whitespace-nowrap py-3 pr-3">Address</th>
                 <th className="whitespace-nowrap py-3 pr-4">Primary 1 phone</th>
               </tr>
@@ -666,7 +666,7 @@ export function ReceptionDesk({
               </>
             ) : null}
             <Field
-              label="Advisor"
+              label="Teacher"
               value={
                 selected.teacherEmail
                   ? `${selected.teacherName} · ${selected.teacherEmail}`
@@ -766,7 +766,7 @@ export function ReceptionDesk({
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Advisor email
+                  Teacher email
                   <input
                     type="email"
                     required
@@ -1045,7 +1045,7 @@ export function ReceptionDesk({
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Advisor email
+                  Teacher email
                   <input
                     type="email"
                     required
