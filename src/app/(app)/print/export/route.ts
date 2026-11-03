@@ -13,7 +13,7 @@ import {
   loadGateRoster,
   parentPickupToday,
 } from "@/lib/gate";
-import type { ReportKind } from "@/lib/reports";
+import { teacherGroupLabel, type ReportKind } from "@/lib/reports";
 
 const KINDS: ReportKind[] = [
   "teacher",
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
   }
   if (kind === "teacher" && group) {
     students = students.filter(
-      (row) => `${row.teacherName} · ${row.classroomName}` === group,
+      (row) => teacherGroupLabel(row) === group,
     );
   }
 

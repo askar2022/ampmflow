@@ -41,10 +41,17 @@ export function stamp() {
   };
 }
 
+export function teacherGroupLabel(student: EffectiveStudent) {
+  const teacher = student.teacherName?.trim() || "Unassigned";
+  const room = student.classroomName?.trim() || "";
+  if (!room || room.toLowerCase() === teacher.toLowerCase()) return teacher;
+  return `${teacher} · ${room}`;
+}
+
 export function groupByTeacher(students: EffectiveStudent[]) {
   const map = new Map<string, EffectiveStudent[]>();
   for (const student of students) {
-    const key = `${student.teacherName} · ${student.classroomName}`;
+    const key = teacherGroupLabel(student);
     const list = map.get(key) ?? [];
     list.push(student);
     map.set(key, list);

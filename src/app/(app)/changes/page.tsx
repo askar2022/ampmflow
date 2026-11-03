@@ -104,10 +104,17 @@ export default async function ChangesPage() {
                     >
                       <td className="px-4 py-3">
                         <div className="font-semibold">{student.fullName}</div>
+                        {student.parentName && student.parentName !== "—" ? (
+                          <div className="text-xs text-muted">
+                            Parent {student.parentName}
+                          </div>
+                        ) : null}
                       </td>
                       <td>
                         {String(student.grade).replace(/^grade\s+/i, "")}
-                        {student.classroomName
+                        {student.classroomName &&
+                        student.classroomName.toLowerCase() !==
+                          student.teacherName.toLowerCase()
                           ? ` · ${student.classroomName}`
                           : ""}
                       </td>

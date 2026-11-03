@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { updateTransportation } from "@/app/actions/transportation";
 import { canRecordChange } from "@/lib/policy";
-import { durationLabel } from "@/lib/format";
+import { durationLabel, planSummary } from "@/lib/format";
 import { loadStudent } from "@/lib/transportation";
 import {
   noticeSummary,
@@ -43,6 +43,7 @@ export type ReceptionChangeInput = {
   busCompanyEmail?: string;
   note?: string;
   confirmPermanent?: boolean;
+  confirmReplaceChange?: boolean;
 };
 
 async function attachDaycare(
@@ -144,6 +145,19 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   const loaded = await loadStudent(input.studentId);
   if (!loaded || loaded.record.schoolId !== user.schoolId) {
     return { ok: false as const, error: "Student not found." };
+  }
+
+  const alreadyChanged =
+    loaded.effective.am.source === "TODAY" ||
+    loaded.effective.am.source === "DATE_RANGE" ||
+    loaded.effective.pm.source === "TODAY" ||
+    loaded.effective.pm.source === "DATE_RANGE";
+  if (alreadyChanged && !input.confirmReplaceChange) {
+    return {
+      ok: false as const,
+      needsConfirm: true as const,
+      error: `${loaded.effective.fullName} already has a change. Morning: ${planSummary(loaded.effective.am, "AM")}. Afternoon: ${planSummary(loaded.effective.pm, "PM")}. Was that a mistake? Confirm to save a new change.`,
+    };
   }
 
   const destination = input.destination;

@@ -116,6 +116,15 @@ function parentLabel(student: EffectiveStudent) {
     : "—";
 }
 
+function hasDeskChange(student: EffectiveStudent) {
+  return (
+    student.am.source === "TODAY" ||
+    student.am.source === "DATE_RANGE" ||
+    student.pm.source === "TODAY" ||
+    student.pm.source === "DATE_RANGE"
+  );
+}
+
 function primaryPhone(student: EffectiveStudent) {
   return student.parentPhone && student.parentPhone !== "—"
     ? student.parentPhone
@@ -192,13 +201,21 @@ export function ReceptionDesk({
   busCompanyEmail?: string;
 }) {
   const router = useRouter();
-  const initial = formFromStudent(students.find((row) => row.id === initialStudentId));
+  const startingStudent = students.find((row) => row.id === initialStudentId);
+  const initial = formFromStudent(startingStudent);
+  const startedWithChange = Boolean(
+    startingStudent && hasDeskChange(startingStudent),
+  );
   const [query, setQuery] = useState(() => startingQuery(students, initialStudentId));
   const [grade, setGrade] = useState("");
   const [teacher, setTeacher] = useState("");
   const [ride, setRide] = useState("");
   const [selectedId, setSelectedId] = useState(initialStudentId);
-  const [openForm, setOpenForm] = useState(Boolean(initialStudentId));
+  const [openForm, setOpenForm] = useState(
+    Boolean(initialStudentId) && !startedWithChange,
+  );
+  const [openReplaceWarn, setOpenReplaceWarn] = useState(startedWithChange);
+  const [replaceChange, setReplaceChange] = useState(false);
   const [openLeave, setOpenLeave] = useState(false);
   const [leaveReason, setLeaveReason] = useState("Transferred to another school");
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -255,6 +272,8 @@ export function ReceptionDesk({
     setSelectedId(student.id);
     setQuery(`${student.firstName} ${student.lastName}`);
     setOpenForm(false);
+    setOpenReplaceWarn(false);
+    setReplaceChange(false);
     setOpenLeave(false);
     setConfirmLeave(false);
     setLeaveReason("Transferred to another school");
@@ -355,13 +374,20 @@ export function ReceptionDesk({
         busCompanyEmail,
         note,
         confirmPermanent,
+        confirmReplaceChange: replaceChange || !hasDeskChange(selected),
       });
       if (!result.ok) {
+        if ("needsConfirm" in result && result.needsConfirm) {
+          setOpenForm(false);
+          setOpenReplaceWarn(true);
+          return;
+        }
         setError(result.error);
         return;
       }
       setMessage(result.message);
       setOpenForm(false);
+      setReplaceChange(false);
       router.refresh();
     });
   }
@@ -381,6 +407,8 @@ export function ReceptionDesk({
                 setQuery(event.target.value);
                 setSelectedId("");
                 setOpenForm(false);
+                setOpenReplaceWarn(false);
+                setReplaceChange(false);
                 setMessage("");
               }}
               placeholder="Name or student ID"
@@ -396,6 +424,8 @@ export function ReceptionDesk({
                 setGrade(value);
                 setSelectedId("");
                 setOpenForm(false);
+                setOpenReplaceWarn(false);
+                setReplaceChange(false);
                 if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
@@ -417,6 +447,8 @@ export function ReceptionDesk({
                 setTeacher(value);
                 setSelectedId("");
                 setOpenForm(false);
+                setOpenReplaceWarn(false);
+                setReplaceChange(false);
                 if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
@@ -438,6 +470,8 @@ export function ReceptionDesk({
                 setRide(value);
                 setSelectedId("");
                 setOpenForm(false);
+                setOpenReplaceWarn(false);
+                setReplaceChange(false);
                 if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
@@ -489,6 +523,11 @@ export function ReceptionDesk({
                   >
                     <td className="whitespace-nowrap px-4 py-3 font-semibold">
                       {student.fullName}
+                      {hasDeskChange(student) ? (
+                        <div className="text-[11px] font-semibold text-amber-800">
+                          Changed today
+                        </div>
+                      ) : null}
                     </td>
                     <td className="whitespace-nowrap py-3 pr-3">
                       {gradeOnly(student.grade)}
@@ -555,7 +594,17 @@ export function ReceptionDesk({
               <p className="mt-1 text-muted">
                 {selected.studentId} · Grade {selected.grade}
                 {selected.teacherName ? ` · ${selected.teacherName}` : ""}
+                {selected.parentName && selected.parentName !== "—"
+                  ? ` · Parent ${selected.parentName}`
+                  : ""}
               </p>
+              {hasDeskChange(selected) ? (
+                <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                  Already changed today
+                  {selected.lastUpdatedBy ? ` by ${selected.lastUpdatedBy}` : ""}.
+                  Open Change Transportation only if that was a mistake.
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -564,13 +613,15 @@ export function ReceptionDesk({
                   setSelectedId("");
                   setQuery("");
                   setOpenForm(false);
+                  setOpenReplaceWarn(false);
+                  setReplaceChange(false);
                   setOpenLeave(false);
                 }}
                 className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
               >
                 Back to list
               </button>
-              {!openForm && !openLeave ? (
+              {!openForm && !openLeave && !openReplaceWarn ? (
                 <>
                   <Link
                     href={`/waiting?student=${selected.id}`}
@@ -582,6 +633,11 @@ export function ReceptionDesk({
                     type="button"
                     onClick={() => {
                       setOpenLeave(false);
+                      setError("");
+                      if (hasDeskChange(selected) && !replaceChange) {
+                        setOpenReplaceWarn(true);
+                        return;
+                      }
                       setOpenForm(true);
                     }}
                     className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
@@ -691,6 +747,65 @@ export function ReceptionDesk({
               </>
             ) : null}
           </div>
+
+          {openReplaceWarn ? (
+            <div className="mt-6 space-y-4 rounded-2xl border border-gold bg-amber-50 p-4">
+              <h3 className="font-serif text-2xl">This student already has a change</h3>
+              <p className="text-sm text-navy">
+                {selected.fullName}
+                {selected.parentName && selected.parentName !== "—"
+                  ? ` · Parent ${selected.parentName}`
+                  : ""}{" "}
+                was already changed
+                {selected.lastUpdatedBy ? ` by ${selected.lastUpdatedBy}` : ""}.
+                Was that a mistake? If you make a new change, parent, teacher,
+                and the bus company get another notice.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-line bg-card p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    Morning now
+                  </div>
+                  <p className="mt-1 font-medium">
+                    {planSummary(selected.am, "AM")}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-line bg-card p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted">
+                    Afternoon now
+                  </div>
+                  <p className="mt-1 font-medium">
+                    {planSummary(selected.pm, "PM")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplaceChange(true);
+                    setOpenReplaceWarn(false);
+                    setOpenForm(true);
+                    setError("");
+                  }}
+                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
+                >
+                  Yes, make a new change
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenReplaceWarn(false);
+                    setReplaceChange(false);
+                    setError("");
+                  }}
+                  className="rounded-full border border-line bg-card px-5 py-2.5 text-sm font-semibold"
+                >
+                  Keep previous change
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {openLeave ? (
             <form
