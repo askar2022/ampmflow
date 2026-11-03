@@ -43,10 +43,10 @@ export default async function ChangesPage() {
       <div>
         <h1 className="font-serif text-4xl">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          This page is not a new route request. It is daycare, a new address,
-          or another ride change Front Desk entered today. When the company
-          emails the new bus or van, type it on this row and Assign. Request
-          for Route is only for a student who never had a ride yet.
+          Daycare and new address stay on this page. When the company emails
+          the correct bus or van, type it here and Assign — same as a new
+          request. Do not use Check / fix for that. Check / fix is only if the
+          wrong student was changed.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p className="text-sm font-semibold text-navy">
@@ -94,7 +94,7 @@ export default async function ChangesPage() {
                     <th>Afternoon</th>
                     <th>When</th>
                     <th>Entered by</th>
-                    <th>Company assigned</th>
+                    <th>Bus or van</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -106,6 +106,9 @@ export default async function ChangesPage() {
                     >
                       <td className="px-4 py-3">
                         <div className="font-semibold">{student.fullName}</div>
+                        <p className="mt-1 text-xs text-muted">
+                          Type the bus or van the company sent, then Assign.
+                        </p>
                       </td>
                       <td>
                         {String(student.grade).replace(/^grade\s+/i, "")}
@@ -149,9 +152,9 @@ export default async function ChangesPage() {
                       <td className="px-4">
                         <Link
                           href={`/dashboard?student=${student.id}`}
-                          className="font-semibold text-blue"
+                          className="text-xs font-medium text-muted underline"
                         >
-                          Check / fix
+                          Wrong student?
                         </Link>
                       </td>
                     </tr>
