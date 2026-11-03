@@ -96,6 +96,20 @@ export default async function ChangesPage() {
                         grade={gradeOnly(student.grade)}
                         buses={buses}
                         vans={vans}
+                        companyAssigned={
+                          !student.am.waitingForAssignment &&
+                          !student.pm.waitingForAssignment &&
+                          Boolean(
+                            student.am.busNumber || student.pm.busNumber,
+                          )
+                        }
+                        parentEmail={student.parentEmail}
+                        parentPhone={
+                          student.parentPhone && student.parentPhone !== "—"
+                            ? student.parentPhone
+                            : ""
+                        }
+                        teacherEmail={student.teacherEmail}
                         defaultTrips={[
                           ...(student.am.waitingForAssignment ||
                           !student.am.busNumber

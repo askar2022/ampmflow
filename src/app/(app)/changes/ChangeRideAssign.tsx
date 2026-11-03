@@ -8,12 +8,35 @@ import type { Trip } from "@/lib/types";
 
 type TripChoice = "AM" | "PM" | "BOTH";
 
+type Receipt = {
+  assigned: string;
+  sent: string[];
+  skipped: string[];
+  parentEmail: string;
+  parentPhone: string;
+  parentPhone2?: string;
+  teacherEmail: string;
+  busCompanyEmail: string;
+};
+
 function startingTrip(defaultTrips?: Trip[]): TripChoice {
   const am = defaultTrips?.includes("AM");
   const pm = defaultTrips?.includes("PM");
   if (am && pm) return "BOTH";
   if (am) return "AM";
   return "PM";
+}
+
+function statusFor(receipt: Receipt, label: string) {
+  const sent = receipt.sent.find((item) =>
+    item.toLowerCase().startsWith(label.toLowerCase()),
+  );
+  const skipped = receipt.skipped.find((item) =>
+    item.toLowerCase().includes(label.toLowerCase()),
+  );
+  if (sent) return "Sent";
+  if (skipped) return "Not sent";
+  return "—";
 }
 
 export function ChangeRideAssign({
@@ -23,6 +46,10 @@ export function ChangeRideAssign({
   buses = [],
   vans = [],
   defaultTrips,
+  companyAssigned = false,
+  parentEmail = "",
+  parentPhone = "",
+  teacherEmail = "",
 }: {
   studentId: string;
   studentName: string;
@@ -30,19 +57,26 @@ export function ChangeRideAssign({
   buses?: string[];
   vans?: { id: string; name: string }[];
   defaultTrips?: Trip[];
+  companyAssigned?: boolean;
+  parentEmail?: string;
+  parentPhone?: string;
+  teacherEmail?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [review, setReview] = useState(false);
+  const [done, setDone] = useState(companyAssigned);
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [trip, setTrip] = useState<TripChoice>(startingTrip(defaultTrips));
   const [busNumber, setBusNumber] = useState("");
   const [vanNumber, setVanNumber] = useState("");
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
 
   function close() {
     if (pending) return;
     setOpen(false);
+    setReview(false);
     setError("");
   }
 
@@ -58,7 +92,6 @@ export function ChangeRideAssign({
       return;
     }
     setError("");
-    setMessage("");
     start(async () => {
       const result = await assignRequestedBus({
         studentId,
@@ -70,13 +103,25 @@ export function ChangeRideAssign({
         setError(result.error);
         return;
       }
-      setMessage(result.message);
+      setReceipt({
+        assigned: result.assigned,
+        sent: result.sent,
+        skipped: result.skipped,
+        parentEmail: result.parentEmail || parentEmail,
+        parentPhone: result.parentPhone || parentPhone,
+        parentPhone2: result.parentPhone2,
+        teacherEmail: result.teacherEmail || teacherEmail,
+        busCompanyEmail: result.busCompanyEmail || "",
+      });
       setBusNumber("");
       setVanNumber("");
-      setOpen(false);
+      setDone(true);
+      setReview(true);
       router.refresh();
     });
   }
+
+  const changed = done || companyAssigned;
 
   return (
     <>
@@ -84,16 +129,17 @@ export function ChangeRideAssign({
         type="button"
         onClick={() => {
           setOpen(true);
+          setReview(changed && Boolean(receipt));
           setError("");
-          setMessage("");
         }}
-        className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"
+        className={`rounded-full px-4 py-2 text-sm font-semibold ${
+          changed
+            ? "bg-gold text-navy"
+            : "bg-navy text-white"
+        }`}
       >
-        Update
+        {changed ? "Changed" : "Update"}
       </button>
-      {message ? (
-        <p className="mt-2 text-xs text-green-800">{message}</p>
-      ) : null}
 
       {open ? (
         <div
@@ -115,114 +161,175 @@ export function ChangeRideAssign({
             </h3>
             <p className="mt-1 text-muted">Grade {grade}</p>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm font-semibold">
-                Bus number
-                <input
-                  autoFocus
-                  list={`company-buses-${studentId}`}
-                  value={busNumber}
-                  onChange={(event) => {
-                    setBusNumber(event.target.value);
-                    if (event.target.value.trim()) setVanNumber("");
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      assign();
-                    }
-                  }}
-                  placeholder="4"
-                  className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
-                />
-              </label>
-              <label className="block text-sm font-semibold">
-                Van number
-                <input
-                  list={`company-vans-${studentId}`}
-                  value={vanNumber}
-                  onChange={(event) => {
-                    setVanNumber(event.target.value);
-                    if (event.target.value.trim()) setBusNumber("");
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      assign();
-                    }
-                  }}
-                  placeholder="2"
-                  className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
-                />
-              </label>
-            </div>
-            {buses.length ? (
-              <datalist id={`company-buses-${studentId}`}>
-                {buses.map((number) => (
-                  <option key={number} value={number} />
-                ))}
-              </datalist>
-            ) : null}
-            {vans.length ? (
-              <datalist id={`company-vans-${studentId}`}>
-                {vans.map((van) => (
-                  <option key={van.id} value={van.name} />
-                ))}
-              </datalist>
-            ) : null}
-
-            <div className="mt-5">
-              <div className="text-sm font-semibold">Trip</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(
-                  [
-                    ["AM", "Morning"],
-                    ["PM", "Afternoon"],
-                    ["BOTH", "Both"],
-                  ] as const
-                ).map(([value, label]) => (
+            {review && receipt ? (
+              <div className="mt-5 space-y-4">
+                <p className="font-semibold text-navy">
+                  {receipt.assigned} assigned
+                </p>
+                <div>
+                  <div className="text-sm font-semibold">Who got the update</div>
+                  <ul className="mt-2 space-y-2 text-sm">
+                    <li className="flex flex-wrap justify-between gap-2 rounded-xl border border-line bg-paper px-3 py-2">
+                      <span>Parent text · {receipt.parentPhone || "—"}</span>
+                      <span className="font-semibold">
+                        {statusFor(receipt, "parent text")}
+                      </span>
+                    </li>
+                    <li className="flex flex-wrap justify-between gap-2 rounded-xl border border-line bg-paper px-3 py-2">
+                      <span>Parent email · {receipt.parentEmail || "—"}</span>
+                      <span className="font-semibold">
+                        {statusFor(receipt, "parent:")}
+                      </span>
+                    </li>
+                    <li className="flex flex-wrap justify-between gap-2 rounded-xl border border-line bg-paper px-3 py-2">
+                      <span>Teacher · {receipt.teacherEmail || "—"}</span>
+                      <span className="font-semibold">
+                        {statusFor(receipt, "teacher")}
+                      </span>
+                    </li>
+                    <li className="flex flex-wrap justify-between gap-2 rounded-xl border border-line bg-paper px-3 py-2">
+                      <span>
+                        Bus company · {receipt.busCompanyEmail || "—"}
+                      </span>
+                      <span className="font-semibold">
+                        {statusFor(receipt, "bus company")}
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+                <p className="text-sm text-muted">
+                  If the family did not get it, check these and fix them on
+                  Front Desk.
+                </p>
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={value}
                     type="button"
-                    onClick={() => setTrip(value)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                      trip === value
-                        ? "bg-navy text-white"
-                        : "border border-line bg-paper"
-                    }`}
+                    onClick={close}
+                    className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
                   >
-                    {label}
+                    Done
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setReview(false)}
+                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                  >
+                    Update again
+                  </button>
+                  <Link
+                    href={`/dashboard?student=${studentId}`}
+                    className="rounded-full px-5 py-2.5 text-sm font-semibold text-muted underline"
+                  >
+                    Fix contacts
+                  </Link>
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <label className="block text-sm font-semibold">
+                    Bus number
+                    <input
+                      autoFocus
+                      list={`company-buses-${studentId}`}
+                      value={busNumber}
+                      onChange={(event) => {
+                        setBusNumber(event.target.value);
+                        if (event.target.value.trim()) setVanNumber("");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          assign();
+                        }
+                      }}
+                      placeholder="4"
+                      className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                    />
+                  </label>
+                  <label className="block text-sm font-semibold">
+                    Van number
+                    <input
+                      list={`company-vans-${studentId}`}
+                      value={vanNumber}
+                      onChange={(event) => {
+                        setVanNumber(event.target.value);
+                        if (event.target.value.trim()) setBusNumber("");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          assign();
+                        }
+                      }}
+                      placeholder="2"
+                      className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                    />
+                  </label>
+                </div>
+                {buses.length ? (
+                  <datalist id={`company-buses-${studentId}`}>
+                    {buses.map((number) => (
+                      <option key={number} value={number} />
+                    ))}
+                  </datalist>
+                ) : null}
+                {vans.length ? (
+                  <datalist id={`company-vans-${studentId}`}>
+                    {vans.map((van) => (
+                      <option key={van.id} value={van.name} />
+                    ))}
+                  </datalist>
+                ) : null}
 
-            {error ? <p className="mt-4 text-sm text-red">{error}</p> : null}
+                <div className="mt-5">
+                  <div className="text-sm font-semibold">Trip</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(
+                      [
+                        ["AM", "Morning"],
+                        ["PM", "Afternoon"],
+                        ["BOTH", "Both"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setTrip(value)}
+                        className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                          trip === value
+                            ? "bg-navy text-white"
+                            : "border border-line bg-paper"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={assign}
-                className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {pending ? "Saving…" : "Assign"}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={close}
-                className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
-              >
-                Cancel
-              </button>
-            </div>
-            <Link
-              href={`/dashboard?student=${studentId}`}
-              className="mt-4 inline-block text-xs text-muted underline"
-            >
-              Wrong student?
-            </Link>
+                {error ? <p className="mt-4 text-sm text-red">{error}</p> : null}
+
+                <div className="mt-6 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={assign}
+                    className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {pending ? "Saving…" : "Assign"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={close}
+                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       ) : null}

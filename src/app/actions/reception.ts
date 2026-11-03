@@ -854,9 +854,14 @@ export async function assignRequestedBus(input: {
 
   return {
     ok: true as const,
-    message: [
-      `${assignedLabel} is now assigned to ${student.fullName}.`,
-      noticeSummary(notice),
-    ].join(" "),
+    assigned: assignedLabel,
+    sent: notice.sent,
+    skipped: notice.skipped,
+    parentEmail: student.parentEmail,
+    parentPhone: student.parentPhone,
+    parentPhone2: student.parentPhone2,
+    teacherEmail: student.teacherEmail,
+    busCompanyEmail,
+    message: `${assignedLabel} is now assigned to ${student.fullName}.`,
   };
 }
