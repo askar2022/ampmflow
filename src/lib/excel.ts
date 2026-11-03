@@ -38,6 +38,10 @@ function studentRow(student: EffectiveStudent, extra: Record<string, string> = {
     Parent: student.parentName,
     Phone: student.parentPhone,
     "Today PM": planSummary(student.pm, "PM"),
+    "Daycare name":
+      student.pm.destination === "DAYCARE"
+        ? student.pm.daycareName || student.daycareName || ""
+        : "",
     Location: student.pm.location,
     Address: student.homeAddress,
     ...extra,

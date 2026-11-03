@@ -74,8 +74,10 @@ export function planSummary(plan: PlanSnapshot, trip: Trip = plan.trip) {
     return typeLabel("PARENT", trip);
   }
   const dest =
-    plan.destination === "DAYCARE" && plan.daycareName
-      ? ` to ${plan.daycareName}`
+    plan.destination === "DAYCARE"
+      ? plan.daycareName
+        ? ` to daycare ${plan.daycareName}`
+        : " to daycare"
       : plan.destination === "HOME"
         ? " from/to home".replace("from/to", trip === "AM" ? "from" : "to")
         : plan.customAddress
