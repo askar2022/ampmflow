@@ -4,8 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
 import { schoolLocalTime, todayKey } from "@/lib/dates";
 import { loadCompanySchools, type CompanySchool } from "@/lib/company-access";
+import { planLine } from "@/lib/change-notify";
 import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
-import type { EffectiveStudent } from "@/lib/types";
+import type { EffectiveStudent, Trip } from "@/lib/types";
 import { CompanyBoard, type CompanyDesk, type CompanyRequest } from "./CompanyBoard";
 
 function gradeOnly(grade: string) {
@@ -42,6 +43,39 @@ function requestFor(student: EffectiveStudent) {
   }
   if (isWaiting(student)) return "New request";
   return "Bus or van";
+}
+
+function companyEmail(student: EffectiveStudent, trips: Trip[], request: string) {
+  const used = trips.length ? trips : (["PM"] as Trip[]);
+  const subject = request.startsWith("New student")
+    ? `Request for route — ${student.fullName}`
+    : `Transportation change — ${student.fullName}`;
+  const body = [
+    request.startsWith("New student")
+      ? "AMPM Flow — request for route"
+      : "AMPM Flow — transportation change",
+    "",
+    `Student: ${student.fullName}`,
+    `Parent: ${
+      student.parentName && student.parentName !== "—"
+        ? student.parentName
+        : "—"
+    }`,
+    `Primary 1 phone: ${student.parentPhone || "—"}`,
+    student.parentPhone2 ? `Primary 2 phone: ${student.parentPhone2}` : "",
+    `Parent email: ${student.parentEmail || "—"}`,
+    `Grade ${gradeOnly(student.grade)} · ${student.teacherName}`,
+    `Trip: ${used.join(" and ")}`,
+    `Request: ${request}`,
+    `Now: ${planLine(student, used)}`,
+    student.lastUpdatedBy ? `Entered by: ${student.lastUpdatedBy}` : "",
+    isWaiting(student)
+      ? "Status: Waiting for a bus or van from the company."
+      : "Status: Bus or van assigned.",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+  return { subject, body };
 }
 
 async function loadCompanyNeedUpdate(schoolId: string) {
@@ -107,26 +141,31 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     )
     .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
 
-  const rows: CompanyRequest[] = changes.map((student) => ({
-    studentId: student.id,
-    name: student.fullName,
-    grade: gradeOnly(student.grade),
-    teacher: student.teacherName || "—",
-    parent:
-      student.parentName && student.parentName !== "—"
-        ? student.parentName
-        : "—",
-    request: requestFor(student),
-    trips: [
+  const rows: CompanyRequest[] = changes.map((student) => {
+    const request = requestFor(student);
+    const trips: Trip[] = [
       ...(student.am.waitingForAssignment || !student.am.busNumber
         ? (["AM"] as const)
         : []),
       ...(student.pm.waitingForAssignment || !student.pm.busNumber
         ? (["PM"] as const)
         : []),
-    ],
-    changed: assignedIds.has(student.id),
-  }));
+    ];
+    return {
+      studentId: student.id,
+      name: student.fullName,
+      grade: gradeOnly(student.grade),
+      teacher: student.teacherName || "—",
+      parent:
+        student.parentName && student.parentName !== "—"
+          ? student.parentName
+          : "—",
+      request,
+      email: companyEmail(student, trips, request),
+      trips,
+      changed: assignedIds.has(student.id),
+    };
+  });
 
   return {
     schoolId: school.id,

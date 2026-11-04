@@ -12,9 +12,66 @@ export type CompanyRequest = {
   teacher: string;
   parent: string;
   request: string;
+  email: { subject: string; body: string };
   trips: Trip[];
   changed: boolean;
 };
+
+function ReadEmailButton({
+  studentName,
+  email,
+}: {
+  studentName: string;
+  email: { subject: string; body: string };
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-full border border-navy/25 bg-white px-4 py-2 text-sm font-semibold text-navy"
+      >
+        Read email
+      </button>
+      {open ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-navy/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`email-${studentName}`}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-card p-6 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3
+              id={`email-${studentName}`}
+              className="font-serif text-3xl text-navy"
+            >
+              Email from the school
+            </h3>
+            <p className="mt-2 text-sm font-semibold text-navy">{email.subject}</p>
+            <pre className="mt-4 max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-paper px-3 py-3 text-sm leading-6 text-navy">
+              {email.body}
+            </pre>
+            <p className="mt-3 text-sm text-muted">
+              Use this if the phone that got the email is not available.
+            </p>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="mt-4 min-h-[44px] rounded-full bg-navy px-5 text-sm font-semibold text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 export type CompanyDesk = {
   schoolId: string;
@@ -95,16 +152,22 @@ export function CompanyBoard({
                     <td>{row.parent}</td>
                     <td className="max-w-[220px]">{row.request}</td>
                     <td className="px-4 py-2">
-                      <ChangeRideAssign
-                        studentId={row.studentId}
-                        studentName={row.name}
-                        grade={row.grade}
-                        request={row.request}
-                        buses={desk.buses}
-                        vans={desk.vans}
-                        companyAssigned={row.changed}
-                        defaultTrips={row.trips}
-                      />
+                      <div className="flex flex-wrap gap-2">
+                        <ReadEmailButton
+                          studentName={row.name}
+                          email={row.email}
+                        />
+                        <ChangeRideAssign
+                          studentId={row.studentId}
+                          studentName={row.name}
+                          grade={row.grade}
+                          request={row.request}
+                          buses={desk.buses}
+                          vans={desk.vans}
+                          companyAssigned={row.changed}
+                          defaultTrips={row.trips}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
