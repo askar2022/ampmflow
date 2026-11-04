@@ -8,18 +8,27 @@ import {
   resetSchoolLoginPassword,
   updateBusCompanySchools,
 } from "@/app/actions/users";
-import { loadSchoolsByCompanyEmail } from "@/lib/company-access";
+import {
+  ensureCompanyColumns,
+  loadSchoolsByCompanyEmail,
+} from "@/lib/company-access";
 import { loadPendingInquiries } from "@/lib/inquiries";
 import { roleLabel } from "@/lib/format";
 import { APP_NAME, APP_SUBTITLE } from "@/lib/school";
 import { APP_ORIGIN, ensureSchoolSlugs, schoolLoginUrl } from "@/lib/school-slug";
 
-export default async function PlatformSchoolsPage() {
+export default async function PlatformSchoolsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; saved?: string }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/");
   if (!(await isPlatformAdmin(session))) redirect("/");
 
+  const { error, saved } = await searchParams;
   await ensureSchoolSlugs().catch(() => undefined);
+  await ensureCompanyColumns();
   const inquiries = await loadPendingInquiries();
   const schools = await prisma.school
     .findMany({
@@ -126,6 +135,29 @@ export default async function PlatformSchoolsPage() {
             in at the same page and only see those schools.
           </p>
           <p className="mt-2 break-all text-sm text-[#4b5563]">{companyLogin}</p>
+          {saved === "company" ? (
+            <p className="mt-3 text-sm font-medium text-teal-deep">
+              The bus company is saved. It will show under Bus companies below.
+            </p>
+          ) : null}
+          {error === "exists" ? (
+            <p className="mt-3 text-sm text-red">
+              That email is already a login. Use a different company email.
+            </p>
+          ) : error === "name" ? (
+            <p className="mt-3 text-sm text-red">
+              Company name, email, and a password with 8 or more characters
+              are required.
+            </p>
+          ) : error === "schools" ? (
+            <p className="mt-3 text-sm text-red">
+              Add a school first, then add the bus company.
+            </p>
+          ) : error === "save" ? (
+            <p className="mt-3 text-sm text-red">
+              Could not save the bus company. Try again.
+            </p>
+          ) : null}
           {schools.length ? (
             <form
               action={createBusCompanyForDemo}

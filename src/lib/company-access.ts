@@ -11,9 +11,18 @@ export type CompanySchool = {
   slug: string | null;
 };
 
+export async function ensureCompanyColumns() {
+  await prisma
+    .$executeRawUnsafe(
+      `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
+    )
+    .catch(() => undefined);
+}
+
 export async function loadSchoolsByCompanyEmail(email: string) {
   const value = usableOpsEmail(email);
   if (!value) return [] as CompanySchool[];
+  await ensureCompanyColumns();
   try {
     return await prisma.$queryRaw<CompanySchool[]>`
       SELECT s."id", s."name", s."slug"

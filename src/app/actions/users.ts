@@ -2,14 +2,19 @@
 
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { canManageUsers, getSession, hashPassword, isPlatformAdmin } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { markInquirySetup } from "@/lib/inquiries";
 import { emailSchoolApproved } from "@/lib/school-request-email";
-import { assignCompanySchools } from "@/lib/company-access";
+import { assignCompanySchools, ensureCompanyColumns } from "@/lib/company-access";
 import { assignUniqueSlug, schoolLoginUrl } from "@/lib/school-slug";
 import { PENDING_ROLE, ROLES, type Role } from "@/lib/types";
+
+function companyFail(reason: string): never {
+  redirect(`/platform?error=${encodeURIComponent(reason)}`);
+}
 
 export async function createUser(formData: FormData): Promise<void> {
   const session = await getSession();
@@ -258,32 +263,57 @@ export async function createBusCompanyForDemo(formData: FormData) {
     .map((value) => String(value || "").trim())
     .filter(Boolean);
 
-  if (!companyName || !email || password.length < 8) return;
+  if (!companyName || !email || password.length < 8) {
+    companyFail("name");
+  }
 
-  const taken = await prisma.user.findUnique({
-    where: { email },
-    select: { id: true },
-  });
-  if (taken) return;
+  await ensureCompanyColumns();
 
   const schools = await prisma.school.findMany({ select: { id: true } });
   const allowed = new Set(schools.map((row) => row.id));
   const selected = schoolIds.filter((id) => allowed.has(id));
-  if (!selected.length) return;
+  const homeId = selected[0] || schools[0]?.id;
+  if (!homeId) companyFail("schools");
 
-  await prisma.user.create({
-    data: {
-      schoolId: selected[0],
-      name: companyName,
-      email,
-      role: "BUS_COMPANY",
-      passwordHash: await hashPassword(password),
-      active: true,
-    },
+  const taken = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, role: true },
   });
 
-  await assignCompanySchools(email, selected);
+  try {
+    if (taken?.role === "BUS_COMPANY") {
+      await prisma.user.update({
+        where: { id: taken.id },
+        data: {
+          name: companyName,
+          schoolId: homeId,
+          passwordHash: await hashPassword(password),
+          active: true,
+        },
+      });
+    } else if (taken) {
+      companyFail("exists");
+    } else {
+      await prisma.user.create({
+        data: {
+          schoolId: homeId,
+          name: companyName,
+          email,
+          role: "BUS_COMPANY",
+          passwordHash: await hashPassword(password),
+          active: true,
+        },
+      });
+    }
+  } catch {
+    companyFail("save");
+  }
+
+  if (selected.length) {
+    await assignCompanySchools(email, selected);
+  }
   revalidatePath("/platform");
+  redirect("/platform?saved=company");
 }
 
 export async function updateBusCompanySchools(formData: FormData) {
