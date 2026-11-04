@@ -41,13 +41,14 @@ export function AppShell({
         ? { ...item, label: deskNavLabel(schoolName) }
         : item,
   );
-  const theme = schoolTheme(schoolName);
+  const company = user.role === "BUS_COMPANY";
+  const theme = schoolTheme(company ? null : schoolName);
   const home =
     user.role === "TEACHER"
       ? "/teacher"
       : user.role === "BUS_ASSISTANT"
         ? "/checkin"
-        : user.role === "BUS_COMPANY"
+        : company
           ? "/company"
           : "/dashboard";
 
@@ -64,7 +65,10 @@ export function AppShell({
       <header className="no-print">
         <div className="mx-auto max-w-[1100px] px-4 pt-3 sm:px-6">
           <Link href={home} className="block">
-            <HeaderWelcome schoolName={schoolName} />
+            <HeaderWelcome
+              name={company ? user.name : schoolName}
+              subtitle={company ? "Bus company" : "Transportation Desk"}
+            />
           </Link>
         </div>
         <nav className="mx-auto mt-3 flex max-w-[1100px] flex-col gap-2 px-4 sm:flex-row sm:items-center sm:px-6">

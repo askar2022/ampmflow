@@ -53,9 +53,20 @@ function ReadEmailButton({
               Email from the school
             </h3>
             <p className="mt-2 text-sm font-semibold text-navy">{email.subject}</p>
-            <pre className="mt-4 max-h-[50vh] overflow-auto whitespace-pre-wrap rounded-xl border border-line bg-paper px-3 py-3 text-sm leading-6 text-navy">
-              {email.body}
-            </pre>
+            <div className="mt-4 max-h-[50vh] overflow-auto rounded-xl border border-line bg-paper px-3 py-3 text-sm font-normal leading-6 text-muted">
+              {email.body.split("\n").map((line, index) => (
+                <div
+                  key={`${index}-${line}`}
+                  className={
+                    line.startsWith("Request:")
+                      ? "font-extrabold text-navy"
+                      : "font-normal"
+                  }
+                >
+                  {line || "\u00a0"}
+                </div>
+              ))}
+            </div>
             <p className="mt-3 text-sm text-muted">
               Use this if the phone that got the email is not available.
             </p>
@@ -82,10 +93,12 @@ export type CompanyDesk = {
 };
 
 export function CompanyBoard({
+  companyName,
   schools,
   schoolId,
   desks,
 }: {
+  companyName: string;
   schools: CompanySchool[];
   schoolId: string;
   desks: CompanyDesk[];
@@ -103,7 +116,8 @@ export function CompanyBoard({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-4xl text-navy">Today’s Changes</h1>
+        <h1 className="font-serif text-4xl text-navy">{companyName}</h1>
+        <p className="mt-1 text-lg font-semibold text-navy">Today’s Changes</p>
         <p className="mt-2 max-w-2xl text-muted">
           The school already emailed you the student — daycare, new
           address, or a new student. Here you only assign the bus or van.
@@ -146,11 +160,13 @@ export function CompanyBoard({
               <tbody>
                 {desk.rows.map((row) => (
                   <tr key={row.studentId} className="row-yellow border-t border-line">
-                    <td className="px-4 py-3 font-semibold">{row.name}</td>
-                    <td>{row.grade}</td>
-                    <td>{row.teacher || "—"}</td>
-                    <td>{row.parent}</td>
-                    <td className="max-w-[220px]">{row.request}</td>
+                    <td className="px-4 py-3 font-normal">{row.name}</td>
+                    <td className="font-normal">{row.grade}</td>
+                    <td className="font-normal">{row.teacher || "—"}</td>
+                    <td className="font-normal">{row.parent}</td>
+                    <td className="max-w-[220px] font-extrabold text-navy">
+                      {row.request}
+                    </td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap gap-2">
                         <ReadEmailButton

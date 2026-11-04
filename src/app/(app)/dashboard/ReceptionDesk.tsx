@@ -319,8 +319,16 @@ export function ReceptionDesk({
       setError("Primary 1 phone is required so we can text the parent.");
       return;
     }
-    if (!parentEmail.trim() || !teacherEmail.trim() || !busCompanyEmail.trim()) {
-      setError("Parent, teacher, and bus company emails are required.");
+    if (!parentEmail.trim()) {
+      setError("Parent email is required.");
+      return;
+    }
+    if (!teacherEmail.trim()) {
+      setError("Teacher email is required.");
+      return;
+    }
+    if (!busCompanyEmail.trim()) {
+      setError("Bus company email is required.");
       return;
     }
     setError("");
@@ -354,16 +362,32 @@ export function ReceptionDesk({
       setError("Primary 1 phone is required so we can text the change.");
       return;
     }
-    if (
-      !parentEmail.trim() ||
-      !teacherEmail.trim() ||
-      !busCompanyEmail.trim() ||
-      !coordinatorEmail.trim() ||
-      !frontDeskEmail.trim()
-    ) {
-      setError(
-        "Parent, teacher, bus company, coordinator, and Front Desk emails are required.",
-      );
+    if (!parentEmail.trim()) {
+      setError("Parent email is required.");
+      return;
+    }
+    if (!teacherEmail.trim()) {
+      setError("Teacher email is required.");
+      return;
+    }
+    if (!busCompanyEmail.trim()) {
+      setError("Bus company email is required.");
+      return;
+    }
+    if (!coordinatorEmail.trim()) {
+      setError("Bus coordinator email is required.");
+      return;
+    }
+    if (!frontDeskEmail.trim()) {
+      setError("Front Desk email is required.");
+      return;
+    }
+    if (destination === "CUSTOM" && !customAddress.trim()) {
+      setError("New address is required.");
+      return;
+    }
+    if (destination === "DAYCARE" && !daycareName.trim()) {
+      setError("Daycare name is required.");
       return;
     }
     setError("");
@@ -828,6 +852,7 @@ export function ReceptionDesk({
               className="mt-6 space-y-4 rounded-2xl border border-gold bg-paper p-4"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (!event.currentTarget.reportValidity()) return;
                 removeStudent();
               }}
             >
@@ -868,51 +893,56 @@ export function ReceptionDesk({
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="block text-sm font-semibold">
-                  Primary 1 phone
+                  Primary 1 phone (required)
                   <input
                     type="tel"
                     required
                     value={parentPhone}
                     onChange={(event) => setParentPhone(event.target.value)}
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Primary 2 phone
+                  Primary 2 phone (optional)
                   <input
                     type="tel"
                     value={parentPhone2}
                     onChange={(event) => setParentPhone2(event.target.value)}
+                    placeholder="Optional"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Parent email
+                  Parent email (required)
                   <input
                     type="email"
                     required
                     value={parentEmail}
                     onChange={(event) => setParentEmail(event.target.value)}
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Teacher email
+                  Teacher email (required)
                   <input
                     type="email"
                     required
                     value={teacherEmail}
                     onChange={(event) => setTeacherEmail(event.target.value)}
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
                 <label className="block text-sm font-semibold sm:col-span-2 lg:col-span-1">
-                  Bus company email
+                  Bus company email (required)
                   <input
                     type="email"
                     required
                     value={busCompanyEmail}
                     onChange={(event) => setBusCompanyEmail(event.target.value)}
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
@@ -971,6 +1001,7 @@ export function ReceptionDesk({
               className="mt-6 space-y-4 rounded-2xl border border-gold bg-paper p-4"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (!event.currentTarget.reportValidity()) return;
                 save();
               }}
             >
@@ -1118,12 +1149,13 @@ export function ReceptionDesk({
 
               {destination === "CUSTOM" ? (
                 <label className="block text-sm font-semibold">
-                  New address
+                  New address (required)
                   <input
                     value={customAddress}
                     onChange={(event) => setCustomAddress(event.target.value)}
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                     required
+                    placeholder="Required"
                   />
                 </label>
               ) : null}
@@ -1131,10 +1163,12 @@ export function ReceptionDesk({
               {destination === "DAYCARE" ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="block text-sm font-semibold">
-                    Daycare name
+                    Daycare name (required)
                     <input
                       value={daycareName}
                       onChange={(event) => setDaycareName(event.target.value)}
+                      required
+                      placeholder="Required"
                       className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                     />
                   </label>
@@ -1159,28 +1193,28 @@ export function ReceptionDesk({
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="block text-sm font-semibold">
-                  Primary 1 phone
+                  Primary 1 phone (required)
                   <input
                     type="tel"
                     required
                     value={parentPhone}
                     onChange={(event) => setParentPhone(event.target.value)}
-                    placeholder="Gets a text"
+                    placeholder="Required"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Primary 2 phone
+                  Primary 2 phone (optional)
                   <input
                     type="tel"
                     value={parentPhone2}
                     onChange={(event) => setParentPhone2(event.target.value)}
-                    placeholder="Optional second text"
+                    placeholder="Optional"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Parent email
+                  Parent email (required)
                   <input
                     type="email"
                     required
@@ -1191,7 +1225,7 @@ export function ReceptionDesk({
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Teacher email
+                  Teacher email (required)
                   <input
                     type="email"
                     required
@@ -1202,7 +1236,7 @@ export function ReceptionDesk({
                   />
                 </label>
                 <label className="block text-sm font-semibold sm:col-span-2 lg:col-span-1">
-                  Bus company email
+                  Bus company email (required)
                   <input
                     type="email"
                     required
@@ -1213,7 +1247,7 @@ export function ReceptionDesk({
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Bus coordinator email
+                  Bus coordinator email (required)
                   <input
                     type="email"
                     required
@@ -1224,7 +1258,7 @@ export function ReceptionDesk({
                   />
                 </label>
                 <label className="block text-sm font-semibold">
-                  Front Desk email
+                  Front Desk email (required)
                   <input
                     type="email"
                     required
@@ -1236,9 +1270,9 @@ export function ReceptionDesk({
                 </label>
               </div>
               <p className="text-sm font-medium text-navy">
-                Primary 1 and Primary 2 get a text. Parent, teacher, and the bus
-                company get email now. Coordinator and Front Desk get email
-                when the bus company assigns the bus or van.
+                All of these are required except Primary 2. The change will not
+                save if an email is missing. Coordinator and Front Desk get
+                email when the bus company assigns the bus or van.
               </p>
 
               <label className="block text-sm font-semibold">

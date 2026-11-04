@@ -161,7 +161,7 @@ export function ChangeRideAssign({
             </h3>
             <p className="mt-1 text-muted">Grade {grade}</p>
             {request ? (
-              <p className="mt-2 text-sm font-semibold text-navy">{request}</p>
+              <p className="mt-2 text-sm font-extrabold text-navy">{request}</p>
             ) : null}
 
             {review && receipt ? (

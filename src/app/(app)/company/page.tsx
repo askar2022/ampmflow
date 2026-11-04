@@ -193,7 +193,10 @@ export default async function CompanyPage({
   if (!selected) {
     return (
       <div>
-        <h1 className="font-serif text-4xl text-navy">Today’s Changes</h1>
+        <h1 className="font-serif text-4xl text-navy">
+          {session.name || "Bus company"}
+        </h1>
+        <p className="mt-1 text-lg font-semibold text-navy">Today’s Changes</p>
         <p className="mt-2 text-muted">
           No school is assigned to this login yet. Ask AMPM Flow to add the
           schools you serve.
@@ -206,6 +209,7 @@ export default async function CompanyPage({
 
   return (
     <CompanyBoard
+      companyName={session.name || "Bus company"}
       schools={schools}
       schoolId={selected.id}
       desks={desks}
