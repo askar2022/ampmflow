@@ -279,6 +279,9 @@ export async function createBusCompanyForDemo(formData: FormData) {
     where: { email },
     select: { id: true, role: true },
   });
+  if (taken && taken.role !== "BUS_COMPANY") {
+    companyFail("exists");
+  }
 
   try {
     if (taken?.role === "BUS_COMPANY") {
@@ -291,8 +294,6 @@ export async function createBusCompanyForDemo(formData: FormData) {
           active: true,
         },
       });
-    } else if (taken) {
-      companyFail("exists");
     } else {
       await prisma.user.create({
         data: {

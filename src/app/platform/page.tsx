@@ -142,7 +142,8 @@ export default async function PlatformSchoolsPage({
           ) : null}
           {error === "exists" ? (
             <p className="mt-3 text-sm text-red">
-              That email is already a login. Use a different company email.
+              That email is already a school or AMPM Flow login. Use the bus
+              company’s own email.
             </p>
           ) : error === "name" ? (
             <p className="mt-3 text-sm text-red">
