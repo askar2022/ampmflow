@@ -20,13 +20,13 @@ import { APP_ORIGIN, ensureSchoolSlugs, schoolLoginUrl } from "@/lib/school-slug
 export default async function PlatformSchoolsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; saved?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; detail?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect("/");
   if (!(await isPlatformAdmin(session))) redirect("/");
 
-  const { error, saved } = await searchParams;
+  const { error, saved, detail } = await searchParams;
   await ensureSchoolSlugs().catch(() => undefined);
   await ensureCompanyColumns();
   const inquiries = await loadPendingInquiries();
@@ -156,7 +156,8 @@ export default async function PlatformSchoolsPage({
             </p>
           ) : error === "save" ? (
             <p className="mt-3 text-sm text-red">
-              Could not save the bus company. Try again.
+              Could not save the bus company.
+              {detail ? ` ${detail}` : " Try a new company email."}
             </p>
           ) : null}
           {schools.length ? (

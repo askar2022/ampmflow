@@ -8,12 +8,24 @@ import { canManageUsers, getSession, hashPassword, isPlatformAdmin } from "@/lib
 import { writeAudit } from "@/lib/audit";
 import { markInquirySetup } from "@/lib/inquiries";
 import { emailSchoolApproved } from "@/lib/school-request-email";
-import { assignCompanySchools, ensureCompanyColumns } from "@/lib/company-access";
+import { assignCompanySchools } from "@/lib/company-access";
 import { assignUniqueSlug, schoolLoginUrl } from "@/lib/school-slug";
 import { PENDING_ROLE, ROLES, type Role } from "@/lib/types";
 
-function companyFail(reason: string): never {
-  redirect(`/platform?error=${encodeURIComponent(reason)}`);
+function companyFail(reason: string, detail?: string): never {
+  const extra = detail
+    ? `&detail=${encodeURIComponent(detail.replace(/\s+/g, " ").slice(0, 160))}`
+    : "";
+  redirect(`/platform?error=${encodeURIComponent(reason)}${extra}`);
+}
+
+function prismaError(error: unknown) {
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code?: string }).code || "")
+      : "";
+  const message = error instanceof Error ? error.message : "";
+  return { code, message };
 }
 
 export async function createUser(formData: FormData): Promise<void> {
@@ -255,19 +267,20 @@ export async function createBusCompanyForDemo(formData: FormData) {
   if (!session || !canManageUsers(session.role)) return;
   if (!(await isPlatformAdmin(session))) return;
 
-  const companyName = String(formData.get("companyName") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
+  const companyName =
+    String(formData.get("companyName") || "").trim() ||
+    email.split("@")[0] ||
+    "Bus company";
   const password = String(formData.get("password") || "");
   const schoolIds = formData
     .getAll("schoolId")
     .map((value) => String(value || "").trim())
     .filter(Boolean);
 
-  if (!companyName || !email || password.length < 8) {
+  if (!email || !email.includes("@") || password.length < 8) {
     companyFail("name");
   }
-
-  await ensureCompanyColumns();
 
   const schools = await prisma.school.findMany({ select: { id: true } });
   const allowed = new Set(schools.map((row) => row.id));
@@ -275,21 +288,23 @@ export async function createBusCompanyForDemo(formData: FormData) {
   const homeId = selected[0] || schools[0]?.id;
   if (!homeId) companyFail("schools");
 
-  const taken = await prisma.user.findUnique({
-    where: { email },
+  const taken = await prisma.user.findFirst({
+    where: { email: { equals: email, mode: "insensitive" } },
     select: { id: true, role: true },
   });
-  if (taken && taken.role !== "BUS_COMPANY") {
+  if (taken && taken.role !== "BUS_COMPANY" && taken.role !== PENDING_ROLE) {
     companyFail("exists");
   }
 
   try {
-    if (taken?.role === "BUS_COMPANY") {
+    if (taken) {
       await prisma.user.update({
         where: { id: taken.id },
         data: {
           name: companyName,
+          email,
           schoolId: homeId,
+          role: "BUS_COMPANY",
           passwordHash: await hashPassword(password),
           active: true,
         },
@@ -306,12 +321,16 @@ export async function createBusCompanyForDemo(formData: FormData) {
         },
       });
     }
-  } catch {
-    companyFail("save");
+  } catch (error) {
+    const { code, message } = prismaError(error);
+    if (code === "P2002" || /unique/i.test(message)) {
+      companyFail("exists");
+    }
+    companyFail("save", code || message || "database");
   }
 
   if (selected.length) {
-    await assignCompanySchools(email, selected);
+    await assignCompanySchools(email, selected).catch(() => undefined);
   }
   revalidatePath("/platform");
   redirect("/platform?saved=company");
