@@ -318,6 +318,106 @@ export function teacherChangeEmail(args: {
   };
 }
 
+function tripHeading(trips: Trip[]) {
+  return trips.length > 1 ? "AM and PM" : trips[0] === "AM" ? "AM" : "PM";
+}
+
+function labeledNotice(args: {
+  banner: string;
+  lines: string[];
+  highlight?: string;
+}) {
+  const body = args.lines
+    .map((line) => {
+      const idx = line.indexOf(":");
+      if (idx === -1) {
+        return `<p style="margin:12px 0 0;font-size:15px;color:#0e2438;">${escapeHtml(line)}</p>`;
+      }
+      const label = line.slice(0, idx + 1);
+      const value = line.slice(idx + 1);
+      if (args.highlight && label.startsWith(args.highlight)) {
+        return `<div style="margin:14px 0;padding:12px 14px;background:#f4f1ea;border:1px solid #e6e0d4;">
+          <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#5c6570;">${escapeHtml(label.replace(":", ""))}</div>
+          <div style="margin-top:4px;font-size:20px;font-weight:700;color:#0e2438;">${escapeHtml(value.trim())}</div>
+        </div>`;
+      }
+      return `<div style="margin:0 0 10px;"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`;
+    })
+    .join("");
+  return `<!DOCTYPE html>
+<html>
+<body style="margin:0;background:#f4f1ea;font-family:Georgia,serif;color:#0e2438;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e6e0d4;">
+          <tr>
+            <td style="background:#0e2438;color:#ffffff;padding:16px 20px;">
+              <div style="font-size:18px;font-weight:700;">AMPM Flow</div>
+              <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#c9d6c4;">${escapeHtml(args.banner)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px;font-size:16px;line-height:1.5;">${body}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function parentChangeEmail(args: {
+  student: EffectiveStudent;
+  trips: Trip[];
+  previous: string;
+  next: string;
+  when: string;
+  note: string;
+  kind: ParentSmsKind;
+  amPickup?: string;
+  pmPickup?: string;
+}) {
+  const tripLabel = tripHeading(args.trips);
+  const subject = `${tripLabel} Transportation Change — ${args.student.fullName}`;
+  const from = teacherRideLabel(args.previous);
+  const to = teacherRideLabel(`${args.next} ${args.note}`);
+  const assigned = from && to && from !== to ? `${from} → ${to}` : to || from;
+  const waitingNote =
+    args.kind === "daycare-request"
+      ? "We asked the bus company for a daycare route. We will text you when a bus or van is assigned."
+      : args.kind === "address-request"
+        ? "We sent the new address to the bus company. We will text you when a bus or van is assigned."
+        : args.kind === "ride-request"
+          ? "We asked the bus company for a bus or van. We will text you when it is assigned."
+          : "";
+  const lines = waitingNote
+    ? [
+        `Student: ${args.student.fullName}`,
+        `Trip: ${tripLabel}`,
+        `Change: Waiting for a bus or van`,
+        waitingNote,
+      ]
+    : [
+        `Student: ${args.student.fullName}`,
+        `Trip: ${tripLabel}`,
+        `Change: ${assigned}`,
+        `Effective: ${args.when}`,
+        args.amPickup?.trim() ? `AM pickup: ${args.amPickup.trim()}` : "",
+        args.pmPickup?.trim() ? `PM pickup: ${args.pmPickup.trim()}` : "",
+      ].filter(Boolean);
+  return {
+    subject,
+    text: lines.join("\n"),
+    html: labeledNotice({
+      banner: `${tripLabel} Transportation Change`,
+      lines,
+      highlight: "Change",
+    }),
+  };
+}
+
 export function changeNoticeText(args: {
   student: EffectiveStudent;
   trips: Trip[];
@@ -424,7 +524,6 @@ export async function notifyTransportationChange(args: {
     pmPickup: args.pmPickup,
   });
   const html = changeNoticeHtml(text);
-  const subject = `Transportation change — ${args.student.fullName}`;
   const kind = companyRequestKind({
     destination:
       args.destination || destinationFromStudent(args.student),
@@ -487,6 +586,17 @@ export async function notifyTransportationChange(args: {
     amPickup: args.amPickup,
     pmPickup: args.pmPickup,
   });
+  const parentMail = parentChangeEmail({
+    student: args.student,
+    trips: args.trips,
+    previous: args.previous,
+    next: args.next,
+    when: args.when,
+    note: args.note,
+    kind: smsKind,
+    amPickup: args.amPickup,
+    pmPickup: args.pmPickup,
+  });
   const parentPhones = parentSmsNumbers(
     args.student.parentPhone,
     args.student.parentPhone2,
@@ -497,7 +607,13 @@ export async function notifyTransportationChange(args: {
     skipped.push("email is not configured");
   } else {
     const groups = [
-      { label: "parent", to: parent, subject, text, html },
+      {
+        label: "parent",
+        to: parent,
+        subject: parentMail.subject,
+        text: parentMail.text,
+        html: parentMail.html,
+      },
       {
         label: "teacher",
         to: teachers,
@@ -707,17 +823,6 @@ export async function notifyRouteRequest(args: {
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
-  const details = [
-    `Student: ${args.studentName}${args.studentId ? ` (${args.studentId})` : ""}`,
-    args.grade ? `Grade ${args.grade}` : "",
-    args.teacherName ? `Teacher: ${args.teacherName}` : "",
-    `Primary 1 phone: ${args.parentPhone || "—"}`,
-    `Parent email: ${args.parentEmail || "—"}`,
-    `Address: ${args.address || "—"}`,
-    args.emergency ? `Emergency contact: ${args.emergency}` : "",
-    `Requested by: ${args.user.name}`,
-  ].filter(Boolean);
-
   const companyMail = companyChangeEmail({
     studentName: args.studentName,
     grade: args.grade,
@@ -728,14 +833,21 @@ export async function notifyRouteRequest(args: {
     address: args.address,
   });
 
-  const parentText = [
-    "AMPM Flow",
-    "",
-    `We requested a bus or van for ${args.studentName}.`,
-    "The bus company will assign a route and the school will update you when the number is on file.",
-    "",
-    ...details,
-  ].join("\n");
+  const parentLines = [
+    `Student: ${args.studentName}`,
+    `Trip: AM and PM`,
+    `Change: Waiting for a bus or van`,
+    "We asked the bus company for a bus or van. We will text you when it is assigned.",
+  ];
+  const parentMail = {
+    subject: `AM and PM Transportation Change — ${args.studentName}`,
+    text: parentLines.join("\n"),
+    html: labeledNotice({
+      banner: "AM and PM Transportation Change",
+      lines: parentLines,
+      highlight: "Change",
+    }),
+  };
 
   const parent = uniqueEmails([args.parentEmail]);
   const company = uniqueEmails([args.busCompanyEmail]);
@@ -748,8 +860,9 @@ export async function notifyRouteRequest(args: {
       {
         label: "parent",
         to: parent,
-        subject: `Bus request for ${args.studentName}`,
-        text: parentText,
+        subject: parentMail.subject,
+        text: parentMail.text,
+        html: parentMail.html,
       },
       {
         label: "bus company",
