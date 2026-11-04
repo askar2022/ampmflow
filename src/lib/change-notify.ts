@@ -236,6 +236,88 @@ export function companyChangeEmail(args: {
   };
 }
 
+function teacherRideLabel(line: string) {
+  const text = stripTripPrefix(line);
+  const van = text.match(/Van\s+[A-Za-z0-9-]+/i)?.[0];
+  if (van) return van.replace(/^van/i, "Van");
+  if (/pending|waiting/i.test(text)) return "Bus pending";
+  const bus = text.match(/Bus\s+\d+/i)?.[0];
+  if (bus) return bus;
+  if (/parent/i.test(text)) return /AM/i.test(line) ? "Parent drop-off" : "Parent pickup";
+  return text || "Updated";
+}
+
+export function teacherChangeEmail(args: {
+  student: EffectiveStudent;
+  trips: Trip[];
+  previous: string;
+  next: string;
+  when: string;
+}) {
+  const tripLabel =
+    args.trips.length > 1 ? "AM and PM" : args.trips[0] === "AM" ? "AM" : "PM";
+  const subject = `${tripLabel} Transportation Change — ${args.student.fullName}`;
+  const grade = `Grade ${gradeOnly(args.student.grade)}`;
+  const classroom = args.student.classroomName?.trim();
+  const gradeClass =
+    classroom &&
+    classroom !== "—" &&
+    classroom.toLowerCase() !== args.student.teacherName.toLowerCase()
+      ? `${grade} · ${classroom}`
+      : grade;
+  const from = teacherRideLabel(args.previous);
+  const to = teacherRideLabel(args.next);
+  const change = from && to && from !== to ? `${from} → ${to}` : to || from;
+  const lines = [
+    `Student: ${args.student.fullName}`,
+    `Grade/Class: ${gradeClass}`,
+    `Trip: ${tripLabel}`,
+    `Change: ${change}`,
+    `Effective: ${args.when}`,
+  ];
+  const banner = `${tripLabel} Transportation Change`;
+  const body = lines
+    .map((line) => {
+      const idx = line.indexOf(":");
+      const label = line.slice(0, idx + 1);
+      const value = line.slice(idx + 1);
+      if (label.startsWith("Change")) {
+        return `<div style="margin:14px 0;padding:12px 14px;background:#f4f1ea;border:1px solid #e6e0d4;">
+          <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#5c6570;">${escapeHtml(label.replace(":", ""))}</div>
+          <div style="margin-top:4px;font-size:20px;font-weight:700;color:#0e2438;">${escapeHtml(value.trim())}</div>
+        </div>`;
+      }
+      return `<div style="margin:0 0 10px;"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`;
+    })
+    .join("");
+  return {
+    subject,
+    text: lines.join("\n"),
+    html: `<!DOCTYPE html>
+<html>
+<body style="margin:0;background:#f4f1ea;font-family:Georgia,serif;color:#0e2438;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e6e0d4;">
+          <tr>
+            <td style="background:#0e2438;color:#ffffff;padding:16px 20px;">
+              <div style="font-size:18px;font-weight:700;">AMPM Flow</div>
+              <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#c9d6c4;">${escapeHtml(banner)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px;font-size:16px;line-height:1.5;">${body}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+  };
+}
+
 export function changeNoticeText(args: {
   student: EffectiveStudent;
   trips: Trip[];
@@ -361,6 +443,13 @@ export async function notifyTransportationChange(args: {
     amPickup: args.amPickup,
     pmPickup: args.pmPickup,
   });
+  const teacherMail = teacherChangeEmail({
+    student: args.student,
+    trips: args.trips,
+    previous: args.previous,
+    next: args.next,
+    when: args.when,
+  });
 
   const parent = uniqueEmails([args.student.parentEmail]);
   const company = uniqueEmails([args.busCompanyEmail]);
@@ -409,7 +498,13 @@ export async function notifyTransportationChange(args: {
   } else {
     const groups = [
       { label: "parent", to: parent, subject, text, html },
-      { label: "teacher", to: teachers, subject, text, html },
+      {
+        label: "teacher",
+        to: teachers,
+        subject: teacherMail.subject,
+        text: teacherMail.text,
+        html: teacherMail.html,
+      },
       {
         label: "bus company",
         to: company,

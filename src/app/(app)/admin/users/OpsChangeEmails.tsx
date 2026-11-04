@@ -133,12 +133,12 @@ export function OpsChangeEmails({
     <div className="space-y-4">
       <EmailBox
         title="2:30 reminder"
-        help={`If anyone changed today, this reminder goes at ${sendAt} to the parent, teacher, bus company, and bus coordinator on the student form. Add extra reminder emails here. Daily Front Desk changes still go out right away from the student form.`}
+        help={`If anyone changed today, this reminder goes at ${sendAt}. The bus company, coordinator, and Front Desk get the school list. Teachers get only their class. Parents get only their child. The list shows student, grade, teacher, and bus or van — no addresses. Add extra reminder emails here. Daily Front Desk changes still go out right away.`}
         emails={reminderEmails}
         lastSent={lastSent}
         add={addChangeListEmail}
         remove={removeChangeListEmail}
-        empty="No extra reminder emails yet. Parents, teachers, the bus company, and coordinators still get the 2:30 list from the student form."
+        empty="No extra reminder emails yet. Parents, teachers, the bus company, and coordinators still get the 2:30 reminder from the student form."
         sendNowLabel="Send 2:30 reminder now"
         onSendNow={async () => {
           const result = await emailOpsChangeListNow();

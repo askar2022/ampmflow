@@ -11,7 +11,6 @@ import {
   todayKey,
 } from "./dates";
 import { sendMail, smtpConfigured } from "./email";
-import { planSummary } from "./format";
 import {
   opsChangesClockLabel,
   opsChangesTimeForToday,
@@ -204,13 +203,23 @@ function changedTrips(student: EffectiveStudent) {
   return trips;
 }
 
-function windowLabel(student: EffectiveStudent) {
-  const start = student.pm.startDate || student.am.startDate;
-  const end = student.pm.endDate || student.am.endDate;
-  if (!start && !end) return "Today only";
-  if (start && end && start === end) return `Today only · ${start}`;
-  if (start && end) return `${start} – ${end}`;
-  return start || end || "Today only";
+function gradeOnly(grade: string) {
+  return String(grade).replace(/^grade\s+/i, "") || "—";
+}
+
+function reminderRide(student: EffectiveStudent) {
+  return changedTrips(student)
+    .map((trip) => {
+      const plan = trip === "AM" ? student.am : student.pm;
+      const van = plan.notes.match(/Van\s+[A-Za-z0-9-]+/i)?.[0];
+      if (van) return `${trip} · ${van}`;
+      if (plan.type === "PARENT") {
+        return trip === "AM" ? `${trip} · Parent drop-off` : `${trip} · Parent pickup`;
+      }
+      if (plan.busNumber) return `${trip} · Bus ${plan.busNumber}`;
+      return `${trip} · Waiting for bus or van`;
+    })
+    .join(" · ");
 }
 
 function escapeHtml(value: string) {
@@ -227,103 +236,67 @@ function classroomGroups(students: EffectiveStudent[]) {
 
 export function opsChangesText(args: {
   generated: string;
-  version: string;
-  groups: [string, EffectiveStudent[]][];
+  students: EffectiveStudent[];
+  intro?: string;
 }) {
   const when = opsChangesClockLabel();
-  if (!args.groups.length) {
+  const intro =
+    args.intro ||
+    "These students changed transportation today. This list shows only the student, grade, teacher, and bus or van.";
+  if (!args.students.length) {
     return [
       "AMPM Flow",
       `${when} — today’s dismissal changes`,
       args.generated,
-      args.version,
       "",
-      "No dismissal changes today. Permanent plans stand.",
+      "No dismissal changes today.",
     ].join("\n");
   }
 
-  const lines = [
+  return [
     "AMPM Flow",
     `${when} — today’s dismissal changes`,
     args.generated,
-    args.version,
     "",
-    "Only students who changed today are listed, by class. Check these rooms first.",
+    intro,
     "",
-    "Classes to check:",
-    ...args.groups.map(
-      ([name, rows]) =>
-        `• ${name} — ${rows.length} student${rows.length === 1 ? "" : "s"}`,
+    ...args.students.map(
+      (student) =>
+        `${student.fullName} · Grade ${gradeOnly(student.grade)} · ${student.teacherName} · ${reminderRide(student)}`,
     ),
-    "",
-  ];
-
-  for (const [name, rows] of args.groups) {
-    lines.push(name);
-    for (const student of rows) {
-      const trips = changedTrips(student);
-      lines.push(`  ${student.fullName}`);
-      for (const trip of trips) {
-        const plan = trip === "AM" ? student.am : student.pm;
-        lines.push(`    ${trip}: ${planSummary(plan, trip)}  ·  ${plan.location}`);
-      }
-      lines.push(`    Window: ${windowLabel(student)}`);
-    }
-    lines.push("");
-  }
-
-  return lines.join("\n");
+  ].join("\n");
 }
 
 export function opsChangesHtml(args: {
   generated: string;
-  version: string;
-  groups: [string, EffectiveStudent[]][];
+  students: EffectiveStudent[];
+  intro?: string;
 }) {
   const when = opsChangesClockLabel();
-  const total = args.groups.reduce((sum, [, rows]) => sum + rows.length, 0);
-  const summary = args.groups.length
-    ? args.groups
-        .map(
-          ([name, rows]) =>
-            `<li style="margin:0 0 6px;"><strong>${escapeHtml(name)}</strong> — ${rows.length} student${rows.length === 1 ? "" : "s"}</li>`,
-        )
-        .join("")
-    : "<li>No classes have changes today.</li>";
-
-  const sections = args.groups.length
-    ? args.groups
-        .map(([name, rows]) => {
-          const body = rows
-            .map((student) => {
-              const trips = changedTrips(student)
-                .map((trip) => {
-                  const plan = trip === "AM" ? student.am : student.pm;
-                  return `${trip}: ${planSummary(plan, trip)} · ${plan.location}`;
-                })
-                .join("<br>");
-              return `<tr>
-                <td style="padding:10px 12px;border-top:1px solid #f0c7b8;background:#fff4f0;color:#8a1f11;">
-                  <div style="font-weight:700;">${escapeHtml(student.fullName)}</div>
-                  <div style="font-size:12px;margin-top:4px;">Changed today</div>
-                </td>
-                <td style="padding:10px 12px;border-top:1px solid #f0c7b8;background:#fff4f0;color:#8a1f11;">${trips}</td>
-                <td style="padding:10px 12px;border-top:1px solid #f0c7b8;background:#fff4f0;color:#8a1f11;">${escapeHtml(windowLabel(student))}</td>
-              </tr>`;
-            })
-            .join("");
-          return `<h2 style="margin:22px 0 8px;font-size:20px;">${escapeHtml(name)}</h2>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
-              <tr>
-                <th align="left" style="padding:8px 12px;background:#f4f1ea;color:#5c6570;font-size:12px;">Student</th>
-                <th align="left" style="padding:8px 12px;background:#f4f1ea;color:#5c6570;font-size:12px;">Today’s plan</th>
-                <th align="left" style="padding:8px 12px;background:#f4f1ea;color:#5c6570;font-size:12px;">Window</th>
-              </tr>
-              ${body}
-            </table>`;
-        })
-        .join("")
-    : `<p style="margin:16px 0 0;font-size:15px;">No dismissal changes today. Permanent plans stand.</p>`;
+  const intro =
+    args.intro ||
+    "These students changed transportation today. This list shows only the student, grade, teacher, and bus or van.";
+  const rows = args.students
+    .map(
+      (student) => `<tr>
+        <td style="padding:10px 12px;border-top:1px solid #e6e0d4;">${escapeHtml(student.fullName)}</td>
+        <td style="padding:10px 12px;border-top:1px solid #e6e0d4;">${escapeHtml(gradeOnly(student.grade))}</td>
+        <td style="padding:10px 12px;border-top:1px solid #e6e0d4;">${escapeHtml(student.teacherName)}</td>
+        <td style="padding:10px 12px;border-top:1px solid #e6e0d4;font-weight:700;">${escapeHtml(reminderRide(student))}</td>
+      </tr>`,
+    )
+    .join("");
+  const table = args.students.length
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
+        <tr>
+          <th align="left" style="padding:8px 12px;background:#f4f1ea;color:#5c6570;font-size:12px;">Student</th>
+          <th align="left" style="padding:8px 12px;background:#f4f1ea;color:#5c6570;font-size:12px;">Grade</th>
+          <th align="left" style="padding:8px 12px;background:#f4f1ea;color:#5c6570;font-size:12px;">Teacher</th>
+          <th align="left" style="padding:8px 12px;background:#f4f1ea;color:#5c6570;font-size:12px;">Bus or van</th>
+        </tr>
+        ${rows}
+      </table>`
+    : `<p style="margin:16px 0 0;font-size:15px;">No dismissal changes today.</p>`;
 
   return `<!DOCTYPE html>
 <html>
@@ -335,24 +308,15 @@ export function opsChangesHtml(args: {
           <tr>
             <td style="background:#0e2438;color:#ffffff;padding:18px 22px;">
               <div style="font-size:20px;font-weight:700;">AMPM Flow</div>
-              <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#c9d6c4;margin-top:4px;">Student Transportation &amp; Dismissal</div>
+              <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#c9d6c4;margin-top:4px;">Dismissal reminder</div>
             </td>
           </tr>
           <tr>
             <td style="padding:22px;">
-              <h1 style="margin:0 0 8px;font-size:26px;">${escapeHtml(when)} — today’s changes</h1>
-              <p style="margin:0 0 16px;font-size:13px;color:#5c6570;">${escapeHtml(args.generated)} · ${escapeHtml(args.version)}</p>
-              <p style="margin:0 0 12px;font-size:15px;line-height:1.5;">
-                ${
-                  total
-                    ? `${total} student${total === 1 ? "" : "s"} changed today, in ${args.groups.length} class${args.groups.length === 1 ? "" : "es"}. Only those students are listed. Check these rooms first.`
-                    : "No same-day changes are on the board."
-                }
-                ${isFriday() ? " Friday school closes at 12." : ""}
-              </p>
-              <p style="margin:0 0 6px;font-size:13px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#5c6570;">Classes to check</p>
-              <ul style="margin:0 0 8px;padding-left:18px;font-size:15px;">${summary}</ul>
-              ${sections}
+              <h1 style="margin:0 0 8px;font-size:24px;">${escapeHtml(when)} — today’s changes</h1>
+              <p style="margin:0 0 16px;font-size:13px;color:#5c6570;">${escapeHtml(args.generated)}</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.5;">${escapeHtml(intro)}${isFriday() ? " Friday school closes at 12." : ""}</p>
+              ${table}
             </td>
           </tr>
         </table>
@@ -384,26 +348,55 @@ export async function digestRecipients(
   schoolId: string,
   changed: EffectiveStudent[],
 ) {
-  const [saved, users, company] = await Promise.all([
+  const [saved, users, company, desk] = await Promise.all([
     loadSavedOpsEmails(schoolId),
     prisma.user.findMany({
       where: {
         schoolId,
         active: true,
-        role: { in: ["BUS_COMPANY", "COORDINATOR"] },
+        role: { in: ["BUS_COMPANY", "COORDINATOR", "FRONT_DESK"] },
       },
       select: { email: true },
     }),
     defaultBusCompanyEmail(schoolId),
+    loadSchoolDeskNotifyEmails(schoolId),
   ]);
   return parseEmailList(
     [
       ...saved,
       company,
       process.env.BUS_COMPANY_EMAIL || "",
+      desk.coordinatorEmail,
+      desk.frontDeskEmail,
       ...users.map((user) => user.email),
       ...changed.map((student) => usableTeacherEmail(student.teacherEmail)),
       ...changed.map((student) => usableOpsEmail(student.parentEmail)),
+    ].join("\n"),
+  );
+}
+
+async function staffDigestRecipients(schoolId: string) {
+  const [saved, users, company, desk] = await Promise.all([
+    loadSavedOpsEmails(schoolId),
+    prisma.user.findMany({
+      where: {
+        schoolId,
+        active: true,
+        role: { in: ["BUS_COMPANY", "COORDINATOR", "FRONT_DESK"] },
+      },
+      select: { email: true },
+    }),
+    defaultBusCompanyEmail(schoolId),
+    loadSchoolDeskNotifyEmails(schoolId),
+  ]);
+  return parseEmailList(
+    [
+      ...saved,
+      company,
+      process.env.BUS_COMPANY_EMAIL || "",
+      desk.coordinatorEmail,
+      desk.frontDeskEmail,
+      ...users.map((user) => user.email),
     ].join("\n"),
   );
 }
@@ -538,12 +531,17 @@ export async function sendOpsChangeDigest(args: {
   if (!changed.length) {
     return { ok: true, sent: 0, recipients: [], skippedEmpty: true };
   }
-  const recipients = await digestRecipients(args.schoolId, changed);
-  if (!recipients.length) {
+  const staffPreview = await staffDigestRecipients(args.schoolId);
+  const hasParentOrTeacher = changed.some(
+    (student) =>
+      Boolean(usableTeacherEmail(student.teacherEmail)) ||
+      Boolean(usableOpsEmail(student.parentEmail)),
+  );
+  if (!staffPreview.length && !hasParentOrTeacher) {
     return {
       ok: false,
       sent: 0,
-      recipients,
+      recipients: [],
       error: "No parent, teacher, bus company, or coordinator email on today’s changes.",
     };
   }
@@ -552,36 +550,89 @@ export async function sendOpsChangeDigest(args: {
     return {
       ok: false,
       sent: 0,
-      recipients,
+      recipients: staffPreview,
       error: "Email is not configured yet. Add RESEND_API_KEY.",
     };
   }
 
   const header = stamp();
   const when = opsChangesClockLabel();
-  const text = opsChangesText({
-    generated: header.generated,
-    version: header.version,
-    groups,
+  const subject = `${when} dismissal changes — ${formatLongDate(schoolNow())}`;
+  const sorted = [...changed].sort((a, b) => {
+    const teacher = a.teacherName.localeCompare(b.teacherName);
+    return teacher || a.fullName.localeCompare(b.fullName);
   });
-  const html = opsChangesHtml({
-    generated: header.generated,
-    version: header.version,
-    groups,
-  });
-  const result = await sendMail({
-    to: recipients,
-    subject: `${when} dismissal changes — ${formatLongDate(schoolNow())}`,
-    text,
-    html,
-  });
+  const staff = await staffDigestRecipients(args.schoolId);
+  const sentTo = new Set<string>();
+  const recipients: string[] = [];
+  let sentCount = 0;
+  let lastError = "";
 
-  if (!result.sent) {
+  async function sendList(
+    to: string[],
+    students: EffectiveStudent[],
+    intro: string,
+  ) {
+    const emails = to.filter((email) => email && !sentTo.has(email));
+    if (!emails.length || !students.length) return;
+    const result = await sendMail({
+      to: emails,
+      subject,
+      text: opsChangesText({
+        generated: header.generated,
+        students,
+        intro,
+      }),
+      html: opsChangesHtml({
+        generated: header.generated,
+        students,
+        intro,
+      }),
+    });
+    if (result.sent) {
+      sentCount += emails.length;
+      for (const email of emails) {
+        sentTo.add(email);
+        recipients.push(email);
+      }
+    } else {
+      lastError = result.reason || "Could not send the email.";
+    }
+  }
+
+  await sendList(
+    staff,
+    sorted,
+    "These students changed transportation today. This list shows only the student, grade, teacher, and bus or van.",
+  );
+
+  for (const [, rows] of groups) {
+    const teacherEmails = [
+      ...new Set(rows.map((student) => usableTeacherEmail(student.teacherEmail)).filter(Boolean)),
+    ];
+    await sendList(
+      teacherEmails,
+      rows,
+      "These students in your class changed transportation today. This list shows only the student, grade, teacher, and bus or van.",
+    );
+  }
+
+  for (const student of sorted) {
+    const parent = usableOpsEmail(student.parentEmail);
+    if (!parent) continue;
+    await sendList(
+      [parent],
+      [student],
+      `This is the ${when} reminder for ${student.fullName}. It shows only the student, grade, teacher, and bus or van.`,
+    );
+  }
+
+  if (!recipients.length) {
     return {
       ok: false,
       sent: 0,
       recipients,
-      error: result.reason || "Could not send the email.",
+      error: lastError || "Could not send the email.",
     };
   }
 
@@ -610,7 +661,7 @@ export async function sendOpsChangeDigest(args: {
     );
   }
 
-  return { ok: true, sent: recipients.length, recipients };
+  return { ok: true, sent: sentCount, recipients };
 }
 
 export function isOpsChangesWindow() {
