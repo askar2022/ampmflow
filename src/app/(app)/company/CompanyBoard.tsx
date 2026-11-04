@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { ChangeRideAssign } from "@/app/(app)/changes/ChangeRideAssign";
 import type { CompanySchool } from "@/lib/company-access";
 import type { Trip } from "@/lib/types";
@@ -15,22 +15,32 @@ export type CompanyRequest = {
   changed: boolean;
 };
 
-export function CompanyBoard({
-  schools,
-  schoolId,
-  schoolName,
-  buses,
-  vans,
-  rows,
-}: {
-  schools: CompanySchool[];
+export type CompanyDesk = {
   schoolId: string;
   schoolName: string;
   buses: string[];
   vans: { id: string; name: string }[];
   rows: CompanyRequest[];
+};
+
+export function CompanyBoard({
+  schools,
+  schoolId,
+  desks,
+}: {
+  schools: CompanySchool[];
+  schoolId: string;
+  desks: CompanyDesk[];
 }) {
-  const router = useRouter();
+  const [selectedId, setSelectedId] = useState(schoolId);
+  const desk =
+    desks.find((item) => item.schoolId === selectedId) || desks[0];
+  if (!desk) return null;
+
+  function chooseSchool(id: string) {
+    setSelectedId(id);
+    window.history.replaceState(null, "", `/company?school=${id}`);
+  }
 
   return (
     <div className="space-y-6">
@@ -42,10 +52,8 @@ export function CompanyBoard({
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
           <select
-            value={schoolId}
-            onChange={(event) =>
-              router.push(`/company?school=${event.target.value}`)
-            }
+            value={desk.schoolId}
+            onChange={(event) => chooseSchool(event.target.value)}
             className="mt-2 block min-h-[44px] w-full rounded-[12px] border border-line bg-white px-3"
           >
             {schools.map((school) => (
@@ -56,13 +64,13 @@ export function CompanyBoard({
           </select>
         </label>
         <p className="mt-3 text-sm font-semibold text-navy">
-          {rows.length
-            ? `${rows.length} student${rows.length === 1 ? "" : "s"} changed today at ${schoolName}`
-            : `No students changed today at ${schoolName}`}
+          {desk.rows.length
+            ? `${desk.rows.length} student${desk.rows.length === 1 ? "" : "s"} changed today at ${desk.schoolName}`
+            : `No students changed today at ${desk.schoolName}`}
         </p>
       </div>
 
-      {rows.length ? (
+      {desk.rows.length ? (
         <div className="overflow-hidden rounded-2xl border border-line bg-card">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -76,7 +84,7 @@ export function CompanyBoard({
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {desk.rows.map((row) => (
                   <tr key={row.studentId} className="row-yellow border-t border-line">
                     <td className="px-4 py-3 font-semibold">{row.name}</td>
                     <td>{row.grade}</td>
@@ -87,8 +95,8 @@ export function CompanyBoard({
                         studentId={row.studentId}
                         studentName={row.name}
                         grade={row.grade}
-                        buses={buses}
-                        vans={vans}
+                        buses={desk.buses}
+                        vans={desk.vans}
                         companyAssigned={row.changed}
                         defaultTrips={row.trips}
                       />
@@ -101,8 +109,8 @@ export function CompanyBoard({
         </div>
       ) : (
         <div className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-          When {schoolName} saves a daycare or address change, the student will
-          show here.
+          When {desk.schoolName} saves a daycare or address change, the student
+          will show here.
         </div>
       )}
     </div>
