@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import {
+  loadSchoolDeskNotifyEmails,
   saveSchoolBusCompanyEmail,
   usableOpsEmail,
 } from "@/lib/ops-change-emails";
@@ -78,6 +79,7 @@ export async function canCompanyAccessSchool(
 }
 
 export async function schoolStaffEmails(schoolId: string) {
+  const saved = await loadSchoolDeskNotifyEmails(schoolId);
   const users = await prisma.user.findMany({
     where: {
       schoolId,
@@ -87,6 +89,12 @@ export async function schoolStaffEmails(schoolId: string) {
     select: { email: true },
   });
   return [
-    ...new Set(users.map((user) => usableOpsEmail(user.email)).filter(Boolean)),
+    ...new Set(
+      [
+        saved.coordinatorEmail,
+        saved.frontDeskEmail,
+        ...users.map((user) => usableOpsEmail(user.email)),
+      ].filter(Boolean),
+    ),
   ];
 }

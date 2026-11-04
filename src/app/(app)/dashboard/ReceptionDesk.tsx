@@ -190,6 +190,8 @@ export function ReceptionDesk({
   canSeeEmergency,
   initialStudentId = "",
   busCompanyEmail: startingBusCompanyEmail = "",
+  coordinatorEmail: startingCoordinatorEmail = "",
+  frontDeskEmail: startingFrontDeskEmail = "",
 }: {
   students: DeskStudent[];
   buses: string[];
@@ -199,6 +201,8 @@ export function ReceptionDesk({
   canSeeEmergency: boolean;
   initialStudentId?: string;
   busCompanyEmail?: string;
+  coordinatorEmail?: string;
+  frontDeskEmail?: string;
 }) {
   const router = useRouter();
   const startingStudent = students.find((row) => row.id === initialStudentId);
@@ -234,6 +238,8 @@ export function ReceptionDesk({
   const [parentEmail, setParentEmail] = useState(initial.parentEmail);
   const [teacherEmail, setTeacherEmail] = useState(initial.teacherEmail);
   const [busCompanyEmail, setBusCompanyEmail] = useState(startingBusCompanyEmail);
+  const [coordinatorEmail, setCoordinatorEmail] = useState(startingCoordinatorEmail);
+  const [frontDeskEmail, setFrontDeskEmail] = useState(startingFrontDeskEmail);
   const [note, setNote] = useState("");
   const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [message, setMessage] = useState("");
@@ -348,8 +354,16 @@ export function ReceptionDesk({
       setError("Primary 1 phone is required so we can text the change.");
       return;
     }
-    if (!parentEmail.trim() || !teacherEmail.trim() || !busCompanyEmail.trim()) {
-      setError("Parent, teacher, and bus company emails are required.");
+    if (
+      !parentEmail.trim() ||
+      !teacherEmail.trim() ||
+      !busCompanyEmail.trim() ||
+      !coordinatorEmail.trim() ||
+      !frontDeskEmail.trim()
+    ) {
+      setError(
+        "Parent, teacher, bus company, coordinator, and Front Desk emails are required.",
+      );
       return;
     }
     setError("");
@@ -372,6 +386,8 @@ export function ReceptionDesk({
         parentEmail,
         teacherEmail,
         busCompanyEmail,
+        coordinatorEmail,
+        frontDeskEmail,
         note,
         confirmPermanent,
         confirmReplaceChange: replaceChange || !hasDeskChange(selected),
@@ -1196,10 +1212,33 @@ export function ReceptionDesk({
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>
+                <label className="block text-sm font-semibold">
+                  Bus coordinator email
+                  <input
+                    type="email"
+                    required
+                    value={coordinatorEmail}
+                    onChange={(event) => setCoordinatorEmail(event.target.value)}
+                    placeholder="Required"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Front Desk email
+                  <input
+                    type="email"
+                    required
+                    value={frontDeskEmail}
+                    onChange={(event) => setFrontDeskEmail(event.target.value)}
+                    placeholder="Required"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
               </div>
               <p className="text-sm font-medium text-navy">
                 Primary 1 and Primary 2 get a text. Parent, teacher, and the bus
-                company get email.
+                company get email now. Coordinator and Front Desk get email
+                when the bus company assigns the bus or van.
               </p>
 
               <label className="block text-sm font-semibold">

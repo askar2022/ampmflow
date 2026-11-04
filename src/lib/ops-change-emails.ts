@@ -62,6 +62,12 @@ async function ensureOpsEmailColumn() {
       prisma.$executeRawUnsafe(
         `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
       ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "coordinatorEmail" TEXT NOT NULL DEFAULT ''`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "frontDeskEmail" TEXT NOT NULL DEFAULT ''`,
+      ),
     ])
       .then(() => undefined)
       .catch(() => undefined);
@@ -422,6 +428,68 @@ export async function saveSchoolBusCompanyEmail(schoolId: string, email: string)
     UPDATE "SchoolSettings" SET "busCompanyEmail" = ${clean} WHERE "schoolId" = ${schoolId}
   `;
   return clean;
+}
+
+export async function loadSchoolDeskNotifyEmails(schoolId: string) {
+  try {
+    await ensureSettingsRow(schoolId);
+    const rows = await prisma.$queryRaw<
+      Array<{ coordinatorEmail: string; frontDeskEmail: string }>
+    >`
+      SELECT "coordinatorEmail", "frontDeskEmail"
+      FROM "SchoolSettings"
+      WHERE "schoolId" = ${schoolId}
+    `;
+    let coordinatorEmail = usableOpsEmail(rows[0]?.coordinatorEmail || "");
+    let frontDeskEmail = usableOpsEmail(rows[0]?.frontDeskEmail || "");
+    if (!coordinatorEmail || !frontDeskEmail) {
+      const users = await prisma.user.findMany({
+        where: {
+          schoolId,
+          active: true,
+          role: { in: ["COORDINATOR", "FRONT_DESK"] },
+        },
+        select: { role: true, email: true },
+      });
+      if (!coordinatorEmail) {
+        coordinatorEmail = usableOpsEmail(
+          users.find((user) => user.role === "COORDINATOR")?.email || "",
+        );
+      }
+      if (!frontDeskEmail) {
+        frontDeskEmail = usableOpsEmail(
+          users.find((user) => user.role === "FRONT_DESK")?.email || "",
+        );
+      }
+    }
+    return { coordinatorEmail, frontDeskEmail };
+  } catch {
+    return { coordinatorEmail: "", frontDeskEmail: "" };
+  }
+}
+
+export async function saveSchoolDeskNotifyEmails(
+  schoolId: string,
+  emails: { coordinatorEmail?: string; frontDeskEmail?: string },
+) {
+  const coordinatorEmail = usableOpsEmail(emails.coordinatorEmail || "");
+  const frontDeskEmail = usableOpsEmail(emails.frontDeskEmail || "");
+  if (!coordinatorEmail && !frontDeskEmail) return;
+  await ensureSettingsRow(schoolId);
+  if (coordinatorEmail) {
+    await prisma.$executeRaw`
+      UPDATE "SchoolSettings"
+      SET "coordinatorEmail" = ${coordinatorEmail}
+      WHERE "schoolId" = ${schoolId}
+    `;
+  }
+  if (frontDeskEmail) {
+    await prisma.$executeRaw`
+      UPDATE "SchoolSettings"
+      SET "frontDeskEmail" = ${frontDeskEmail}
+      WHERE "schoolId" = ${schoolId}
+    `;
+  }
 }
 
 export async function defaultBusCompanyEmail(schoolId: string) {

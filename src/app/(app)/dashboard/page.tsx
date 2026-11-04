@@ -1,7 +1,10 @@
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
-import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
+import {
+  defaultBusCompanyEmail,
+  loadSchoolDeskNotifyEmails,
+} from "@/lib/ops-change-emails";
 import { loadStudents } from "@/lib/transportation";
 import { ReceptionDesk } from "./ReceptionDesk";
 
@@ -15,7 +18,8 @@ export default async function DashboardPage({
   const { student: selectedId = "" } = await searchParams;
 
   const students = await loadStudents(session.schoolId);
-  const [routes, vehicles, vanRows, busCompanyEmail] = await Promise.all([
+  const [routes, vehicles, vanRows, busCompanyEmail, deskEmails] =
+    await Promise.all([
     prisma.busRoute.findMany({
       where: { schoolId: session.schoolId },
       select: { number: true },
@@ -27,6 +31,7 @@ export default async function DashboardPage({
       select: { id: true, vehicleId: true },
     }),
     defaultBusCompanyEmail(session.schoolId),
+    loadSchoolDeskNotifyEmails(session.schoolId),
   ]);
   const buses = [...new Set(routes.map((route) => route.number))];
   const vans = vehicles
@@ -49,6 +54,8 @@ export default async function DashboardPage({
         vans={vans}
         studentVanId={studentVanId}
         busCompanyEmail={busCompanyEmail}
+        coordinatorEmail={deskEmails.coordinatorEmail}
+        frontDeskEmail={deskEmails.frontDeskEmail}
         initialStudentId={selectedId}
         canPermanent={session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"}
         canSeeEmergency={

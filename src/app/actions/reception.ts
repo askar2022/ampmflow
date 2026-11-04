@@ -18,6 +18,7 @@ import {
 import {
   defaultBusCompanyEmail,
   saveSchoolBusCompanyEmail,
+  saveSchoolDeskNotifyEmails,
   usableOpsEmail,
 } from "@/lib/ops-change-emails";
 import { canCompanyAccessSchool } from "@/lib/company-access";
@@ -42,6 +43,8 @@ export type ReceptionChangeInput = {
   parentEmail?: string;
   teacherEmail?: string;
   busCompanyEmail?: string;
+  coordinatorEmail?: string;
+  frontDeskEmail?: string;
   note?: string;
   confirmPermanent?: boolean;
   confirmReplaceChange?: boolean;
@@ -171,6 +174,8 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   const parentEmail = usableOpsEmail(input.parentEmail || "");
   const teacherEmail = usableTeacherEmail(input.teacherEmail || "");
   const busCompanyEmail = usableOpsEmail(input.busCompanyEmail || "");
+  const coordinatorEmail = usableOpsEmail(input.coordinatorEmail || "");
+  const frontDeskEmail = usableOpsEmail(input.frontDeskEmail || "");
   const parentPhone = input.parentPhone?.trim() || "";
   const parentPhone2 = input.parentPhone2?.trim() || "";
   const previous = planLine(loaded.effective, input.trips);
@@ -187,9 +192,19 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   if (!busCompanyEmail) {
     return { ok: false as const, error: "Bus company email is required." };
   }
+  if (!coordinatorEmail) {
+    return { ok: false as const, error: "Bus coordinator email is required." };
+  }
+  if (!frontDeskEmail) {
+    return { ok: false as const, error: "Front Desk email is required." };
+  }
   await saveSchoolBusCompanyEmail(user.schoolId, busCompanyEmail).catch(
     () => undefined,
   );
+  await saveSchoolDeskNotifyEmails(user.schoolId, {
+    coordinatorEmail,
+    frontDeskEmail,
+  }).catch(() => undefined);
 
   await prisma.$executeRaw`
     UPDATE "Student"
