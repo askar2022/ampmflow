@@ -14,20 +14,27 @@ export default async function ResetPasswordPage({
     token?: string;
     school?: string;
     error?: string;
+    company?: string;
   }>;
 }) {
-  const { token = "", school: slug, error } = await searchParams;
+  const { token = "", school: slug, error, company } = await searchParams;
+  const fromCompany = company === "1";
   const payload = token ? await readPasswordResetToken(token) : null;
   const platform = Boolean(payload && isPlatformAdminEmail(payload.email));
-  const school = !platform && slug ? await findSchoolBySlug(slug) : null;
+  const school =
+    !platform && !fromCompany && slug ? await findSchoolBySlug(slug) : null;
   const identity = school ? await getSchoolIdentityById(school.id) : null;
-  const signIn = school ? schoolLoginPath(school.slug || slug || "") : "/login";
+  const signIn = fromCompany
+    ? "/buscompany"
+    : school
+      ? schoolLoginPath(school.slug || slug || "")
+      : "/login";
   const expired = !payload || error === "expired";
 
   return (
     <LoginFrame
-      schoolName={platform ? null : identity?.name || school?.name}
-      logoUrl={platform ? null : identity?.logoUrl}
+      schoolName={platform || fromCompany ? null : identity?.name || school?.name}
+      logoUrl={platform || fromCompany ? null : identity?.logoUrl}
       homeHref={platform ? "/" : signIn}
     >
       <div className="text-left">
@@ -41,9 +48,11 @@ export default async function ResetPasswordPage({
             </p>
             <Link
               href={
-                platform || !slug
-                  ? "/login/forgot"
-                  : `/login/forgot?school=${encodeURIComponent(slug)}`
+                fromCompany
+                  ? "/login/forgot?company=1"
+                  : platform || !slug
+                    ? "/login/forgot"
+                    : `/login/forgot?school=${encodeURIComponent(slug)}`
               }
               className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] bg-navy px-4 py-2.5 text-[16px] font-semibold text-white"
             >
@@ -56,6 +65,7 @@ export default async function ResetPasswordPage({
             {platform || !slug ? null : (
               <input type="hidden" name="schoolSlug" value={slug} />
             )}
+            {fromCompany ? <input type="hidden" name="company" value="1" /> : null}
             <label
               className="block text-left text-sm font-semibold text-navy"
               htmlFor="new-password"

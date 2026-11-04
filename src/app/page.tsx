@@ -52,6 +52,20 @@ export default async function Home({
           </section>
 
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
+            <h2 className="text-lg font-semibold text-navy">Bus company</h2>
+            <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+              See today’s changes for the schools you drive. Assign a bus or
+              van.
+            </p>
+            <Link
+              href="/buscompany"
+              className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] bg-navy px-4 py-2.5 text-[16px] font-semibold text-white hover:bg-navy-deep"
+            >
+              Bus company sign in
+            </Link>
+          </section>
+
+          <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)] sm:col-span-2">
             <h2 className="text-lg font-semibold text-navy">Talk to AMPM Flow</h2>
             <p className="mt-2 text-sm leading-6 text-[#4b5563]">
               Send a message to the AMPM Flow administrator. Schools cannot
@@ -59,7 +73,7 @@ export default async function Home({
             </p>
             <Link
               href="/contact"
-              className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] border border-navy px-4 py-2.5 text-[16px] font-semibold text-navy hover:bg-navy hover:text-white"
+              className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] border border-navy px-4 py-2.5 text-[16px] font-semibold text-navy hover:bg-navy hover:text-white sm:w-auto sm:min-w-48"
             >
               Contact us
             </Link>

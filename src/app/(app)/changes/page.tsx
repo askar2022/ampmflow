@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
@@ -16,6 +17,7 @@ function parentOnly(name: string | null | undefined) {
 export default async function ChangesPage() {
   const session = await getSession();
   if (!session) return null;
+  if (session.role === "BUS_COMPANY") redirect("/company");
   const [changes, vehicles, routes] = await Promise.all([
     loadFrontDeskChangesToday(session.schoolId),
     loadVehicles(session.schoolId).catch(() => []),
@@ -44,27 +46,45 @@ export default async function ChangesPage() {
   const assignedToday = await prisma.changeRequest.findMany({
     where: {
       schoolId: session.schoolId,
-      status: "COMPLETED",
       studentId: { in: rows.map((student) => student.id) },
-      busNumber: { not: null },
     },
-    select: { studentId: true, reviewedAt: true, updatedAt: true },
+    select: {
+      studentId: true,
+      status: true,
+      busNumber: true,
+      companyNote: true,
+      reviewedAt: true,
+      updatedAt: true,
+    },
+    orderBy: { updatedAt: "desc" },
   });
   const assignedIds = new Set(
     assignedToday
-      .filter((row) =>
-        schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey === day,
+      .filter(
+        (row) =>
+          row.status === "COMPLETED" &&
+          row.busNumber &&
+          schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey === day,
       )
       .map((row) => row.studentId)
       .filter(Boolean),
   );
+  const companyNotes = new Map<string, string>();
+  for (const row of assignedToday) {
+    if (!row.studentId || companyNotes.has(row.studentId)) continue;
+    if (row.status === "NEEDS_CLARIFICATION" && row.companyNote) {
+      companyNotes.set(row.studentId, row.companyNote);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-serif text-4xl">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Tap Need Update when the company sends the bus or van.
+          The bus company updates the request in its portal. Tap Need Update
+          here if you enter the number they sent. Gold means they asked the
+          school to check something.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <p className="text-sm font-semibold text-navy">
@@ -104,6 +124,11 @@ export default async function ChangesPage() {
                   >
                     <td className="px-4 py-3 font-semibold">
                       {student.fullName}
+                      {companyNotes.get(student.id) ? (
+                        <span className="mt-1 block text-sm font-normal text-yellow">
+                          Company: {companyNotes.get(student.id)}
+                        </span>
+                      ) : null}
                     </td>
                     <td>{gradeOnly(student.grade)}</td>
                     <td>{student.teacherName || "—"}</td>

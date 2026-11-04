@@ -1,4 +1,5 @@
 import { writeAudit } from "./audit";
+import { schoolStaffEmails } from "./company-access";
 import { sendMail, smtpConfigured } from "./email";
 import { planSummary } from "./format";
 import { usableOpsEmail } from "./ops-change-emails";
@@ -143,6 +144,8 @@ export async function notifyTransportationChange(args: {
   parentSms?: ParentSmsKind;
   teacherEmail?: string;
   busCompanyEmail?: string;
+  notifySchool?: boolean;
+  schoolId?: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
@@ -165,10 +168,17 @@ export async function notifyTransportationChange(args: {
     args.student.classroomId,
     args.teacherEmail,
   );
+  const schoolDesk =
+    args.notifySchool && args.schoolId
+      ? await schoolStaffEmails(args.schoolId)
+      : [];
 
   if (!parent.length) skipped.push("parent (required)");
   if (!teachers.length) skipped.push("teacher (required)");
   if (!company.length) skipped.push("bus company (required)");
+  if (args.notifySchool && !schoolDesk.length) {
+    skipped.push("school (coordinator or front desk email needed)");
+  }
 
   const smsKind =
     args.parentSms ||
@@ -196,16 +206,21 @@ export async function notifyTransportationChange(args: {
     skipped.push("email is not configured");
   } else {
     const groups = [
-      { label: "parent", to: parent },
-      { label: "teacher", to: teachers },
-      { label: "bus company", to: company },
+      { label: "parent", to: parent, subject },
+      { label: "teacher", to: teachers, subject },
+      { label: "bus company", to: company, subject },
+      {
+        label: "school",
+        to: schoolDesk,
+        subject: `Bus update — ${args.student.fullName}`,
+      },
     ];
     for (const group of groups) {
       if (!group.to.length) continue;
       jobs.push(
         sendMail({
           to: group.to,
-          subject,
+          subject: group.subject,
           text,
           html,
         }).then((result) => {

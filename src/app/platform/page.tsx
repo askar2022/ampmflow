@@ -3,13 +3,16 @@ import { getSession, isPlatformAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logoutAction } from "@/app/actions/auth";
 import {
+  createBusCompanyForDemo,
   createSchoolForDemo,
   resetSchoolLoginPassword,
+  updateBusCompanySchools,
 } from "@/app/actions/users";
+import { loadSchoolsByCompanyEmail } from "@/lib/company-access";
 import { loadPendingInquiries } from "@/lib/inquiries";
 import { roleLabel } from "@/lib/format";
 import { APP_NAME, APP_SUBTITLE } from "@/lib/school";
-import { ensureSchoolSlugs, schoolLoginUrl } from "@/lib/school-slug";
+import { APP_ORIGIN, ensureSchoolSlugs, schoolLoginUrl } from "@/lib/school-slug";
 
 export default async function PlatformSchoolsPage() {
   const session = await getSession();
@@ -39,6 +42,18 @@ export default async function PlatformSchoolsPage() {
     select: { id: true, schoolId: true, name: true, email: true, role: true },
     orderBy: [{ role: "asc" }, { name: "asc" }],
   });
+  const companies = await prisma.user.findMany({
+    where: { role: "BUS_COMPANY", active: true },
+    select: { id: true, name: true, email: true, schoolId: true },
+    orderBy: { name: "asc" },
+  });
+  const companySchools = await Promise.all(
+    companies.map(async (row) => ({
+      id: row.id,
+      schools: await loadSchoolsByCompanyEmail(row.email),
+    })),
+  );
+  const companyLogin = `${APP_ORIGIN.replace(/\/$/, "")}/buscompany`;
 
   return (
     <div className="min-h-dvh bg-[#f3f4f6] px-3 py-4 sm:px-4 sm:py-8">
@@ -104,6 +119,75 @@ export default async function PlatformSchoolsPage() {
           </form>
         </section>
 
+        <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-navy">Add a bus company</h2>
+          <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+            Add the company, then check the schools under it. They all sign
+            in at the same page and only see those schools.
+          </p>
+          <p className="mt-2 break-all text-sm text-[#4b5563]">{companyLogin}</p>
+          {schools.length ? (
+            <form
+              action={createBusCompanyForDemo}
+              className="mt-5 grid gap-3 sm:grid-cols-2"
+            >
+              <input
+                name="companyName"
+                required
+                placeholder="Company name"
+                className="w-full rounded-xl border border-line px-3 py-2"
+              />
+              <input
+                name="email"
+                type="email"
+                required
+                placeholder="Company email"
+                className="w-full rounded-xl border border-line px-3 py-2"
+              />
+              <input
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                placeholder="Temporary password (8+ characters)"
+                className="w-full rounded-xl border border-line px-3 py-2 sm:col-span-2"
+              />
+              <fieldset className="sm:col-span-2">
+                <legend className="text-sm font-semibold text-navy">
+                  Schools under this company
+                </legend>
+                <p className="mt-1 text-sm text-[#4b5563]">
+                  Check every school this company drives. They will see this
+                  list after they sign in.
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {schools.map((row) => (
+                    <label
+                      key={row.id}
+                      className="inline-flex items-center gap-2 text-sm text-navy"
+                    >
+                      <input
+                        type="checkbox"
+                        name="schoolId"
+                        value={row.id}
+                        className="size-4 rounded border-[#d8dce2] text-navy focus:ring-2 focus:ring-navy"
+                      />
+                      {row.name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <button className="rounded-xl bg-navy px-4 py-2.5 font-semibold text-white sm:col-span-2">
+                Create bus company
+              </button>
+            </form>
+          ) : (
+            <p className="mt-4 text-sm text-red">
+              Add a school first, then add the bus company.
+            </p>
+          )}
+        </section>
+
         {inquiries.length ? (
           <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
             <h2 className="text-lg font-semibold text-navy">School requests</h2>
@@ -124,6 +208,87 @@ export default async function PlatformSchoolsPage() {
             </ul>
           </section>
         ) : null}
+
+        <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
+          <h2 className="text-lg font-semibold text-navy">
+            Bus companies on AMPM Flow
+          </h2>
+          <p className="mt-2 text-sm text-[#4b5563]">
+            They sign in at {companyLogin} and see only the schools under
+            them. You can change those schools or set a new password here.
+          </p>
+          {companies.length ? (
+            <ul className="mt-4 divide-y divide-line">
+              {companies.map((row) => {
+                const assigned =
+                  companySchools.find((item) => item.id === row.id)?.schools ||
+                  [];
+                const assignedIds = new Set(assigned.map((school) => school.id));
+                return (
+                  <li key={row.id} className="py-4">
+                    <div className="font-medium text-navy">{row.name}</div>
+                    <div className="mt-0.5 break-all text-sm text-[#4b5563]">
+                      {row.email}
+                    </div>
+                    {assigned.length ? (
+                      <div className="mt-2 text-sm text-[#4b5563]">
+                        Schools · {assigned.map((school) => school.name).join(", ")}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-red">
+                        No schools under this company yet.
+                      </p>
+                    )}
+                    <form action={updateBusCompanySchools} className="mt-3">
+                      <input type="hidden" name="userId" value={row.id} />
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {schools.map((school) => (
+                          <label
+                            key={school.id}
+                            className="inline-flex items-center gap-2 text-sm text-navy"
+                          >
+                            <input
+                              type="checkbox"
+                              name="schoolId"
+                              value={school.id}
+                              defaultChecked={assignedIds.has(school.id)}
+                              className="size-4 rounded border-[#d8dce2] text-navy focus:ring-2 focus:ring-navy"
+                            />
+                            {school.name}
+                          </label>
+                        ))}
+                      </div>
+                      <button className="mt-3 rounded-xl bg-navy px-3 py-2 text-sm font-semibold text-white">
+                        Save schools
+                      </button>
+                    </form>
+                    <form
+                      action={resetSchoolLoginPassword}
+                      className="mt-2 flex flex-wrap gap-2"
+                    >
+                      <input type="hidden" name="userId" value={row.id} />
+                      <input
+                        name="password"
+                        type="password"
+                        required
+                        minLength={8}
+                        placeholder="New password (8+ characters)"
+                        className="min-w-[180px] flex-1 rounded-xl border border-line px-3 py-2 text-sm"
+                      />
+                      <button className="rounded-xl bg-navy px-3 py-2 text-sm font-semibold text-white">
+                        Set new password
+                      </button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mt-4 text-sm text-[#4b5563]">
+              No bus company login yet.
+            </p>
+          )}
+        </section>
 
         <section className="rounded-[20px] border border-[#e8e8ea] bg-white p-6 shadow-[0_16px_48px_rgba(15,23,42,0.08)]">
           <h2 className="text-lg font-semibold text-navy">Schools on AMPM Flow</h2>

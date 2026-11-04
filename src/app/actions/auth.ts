@@ -22,8 +22,16 @@ import { findSchoolBySlug, schoolLoginPath } from "@/lib/school-slug";
 export async function loginAction(formData: FormData) {
   const slug = String(formData.get("schoolSlug") || "").trim();
   const next = String(formData.get("next") || "").trim();
+  const intent = String(formData.get("intent") || "").trim();
   const goToSchools = next === "schools";
-  const fail = slug ? schoolLoginPath(slug) : goToSchools ? "/" : "/login";
+  const companyLogin = intent === "company";
+  const fail = slug
+    ? schoolLoginPath(slug)
+    : goToSchools
+      ? "/"
+      : companyLogin
+        ? "/buscompany"
+        : "/login";
 
   if (!isDatabaseConfigured()) {
     redirect(`${fail}?error=db`);
@@ -53,6 +61,10 @@ export async function loginAction(formData: FormData) {
     }
   }
 
+  if (companyLogin && result.user.role !== "BUS_COMPANY") {
+    redirect(`${fail}?error=staff`);
+  }
+
   if (goToSchools || isPlatformAdminEmail(result.user.email)) {
     if (!(await isPlatformAdmin(result.user))) {
       redirect(goToSchools ? "/?error=admin" : `${fail}?error=1`);
@@ -71,14 +83,20 @@ export async function loginAction(formData: FormData) {
 
 export async function logoutAction(formData: FormData) {
   await clearSession();
-  redirect(String(formData.get("next") || "") === "landing" ? "/" : "/login");
+  const next = String(formData.get("next") || "");
+  if (next === "landing") redirect("/");
+  if (next === "company") redirect("/buscompany");
+  redirect("/login");
 }
 
 export async function requestPasswordReset(formData: FormData) {
   const slug = String(formData.get("schoolSlug") || "").trim();
+  const company = String(formData.get("company") || "") === "1";
   const back = slug
     ? `/login/forgot?school=${encodeURIComponent(slug)}`
-    : "/login/forgot";
+    : company
+      ? "/login/forgot?company=1"
+      : "/login/forgot";
   const result = await sendPasswordResetEmail(
     String(formData.get("email") || ""),
     slug,
@@ -97,10 +115,13 @@ export async function completePasswordReset(formData: FormData) {
   const platform = Boolean(
     payloadEarly && isPlatformAdminEmail(payloadEarly.email),
   );
+  const company = !platform && String(formData.get("company") || "") === "1";
   const slug = platform ? "" : String(formData.get("schoolSlug") || "").trim();
   const fail = slug
     ? `/login/reset?school=${encodeURIComponent(slug)}&token=${encodeURIComponent(token)}`
-    : `/login/reset?token=${encodeURIComponent(token)}`;
+    : company
+      ? `/login/reset?token=${encodeURIComponent(token)}&company=1`
+      : `/login/reset?token=${encodeURIComponent(token)}`;
 
   if (password.length < 8) {
     redirect(`${fail}&error=short`);
@@ -116,7 +137,7 @@ export async function completePasswordReset(formData: FormData) {
 
   const user = await prisma.user.findUnique({
     where: { id: payload.id },
-    select: { id: true, email: true, active: true },
+    select: { id: true, email: true, active: true, role: true },
   });
   if (!user || user.email !== payload.email || !user.active) {
     redirect(`${fail}&error=expired`);
@@ -127,6 +148,10 @@ export async function completePasswordReset(formData: FormData) {
     data: { passwordHash: await hashPassword(password) },
   });
 
-  const signIn = platform ? "/login" : schoolSignInPath(slug);
+  const signIn = platform
+    ? "/login"
+    : user.role === "BUS_COMPANY" || company
+      ? "/buscompany"
+      : schoolSignInPath(slug);
   redirect(`${signIn}${signIn.includes("?") ? "&" : "?"}reset=1`);
 }

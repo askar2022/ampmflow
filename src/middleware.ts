@@ -7,7 +7,14 @@ const secret = new TextEncoder().encode(
 );
 
 const PUBLIC_EXACT = ["/"];
-const PUBLIC_PREFIX = ["/login", "/schools", "/contact", "/s"];
+const PUBLIC_PREFIX = [
+  "/login",
+  "/schools",
+  "/contact",
+  "/s",
+  "/buscompany",
+  "/buscampny",
+];
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_EXACT.includes(pathname)) return true;
@@ -56,7 +63,11 @@ export async function middleware(request: NextRequest) {
 
   if (!role) {
     const url = request.nextUrl.clone();
-    url.pathname = pathname.startsWith("/platform") ? "/" : "/login";
+    url.pathname = pathname.startsWith("/platform")
+      ? "/"
+      : pathname.startsWith("/company")
+        ? "/buscompany"
+        : "/login";
     return NextResponse.redirect(url);
   }
 

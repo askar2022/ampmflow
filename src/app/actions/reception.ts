@@ -20,6 +20,7 @@ import {
   saveSchoolBusCompanyEmail,
   usableOpsEmail,
 } from "@/lib/ops-change-emails";
+import { canCompanyAccessSchool } from "@/lib/company-access";
 import { parentSmsNumbers } from "@/lib/sms";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
@@ -704,7 +705,11 @@ export async function assignRequestedBus(input: {
 }) {
   const user = await getSession();
   if (!user) return { ok: false as const, error: "Please sign in." };
-  if (!["FRONT_DESK", "COORDINATOR", "ADMINISTRATOR"].includes(user.role)) {
+  const schoolStaff =
+    user.role === "FRONT_DESK" ||
+    user.role === "COORDINATOR" ||
+    user.role === "ADMINISTRATOR";
+  if (!schoolStaff && user.role !== "BUS_COMPANY") {
     return { ok: false as const, error: "You cannot assign a bus or van." };
   }
 
@@ -722,7 +727,7 @@ export async function assignRequestedBus(input: {
 
   const request = input.requestId
     ? await prisma.changeRequest.findFirst({
-        where: { id: input.requestId, schoolId: user.schoolId },
+        where: { id: input.requestId },
       })
     : null;
   const studentId = input.studentId || request?.studentId || "";
@@ -734,8 +739,18 @@ export async function assignRequestedBus(input: {
   }
 
   const loaded = await loadStudent(studentId);
-  if (!loaded || loaded.record.schoolId !== user.schoolId) {
+  if (!loaded) {
     return { ok: false as const, error: "Student not found." };
+  }
+  const schoolId = loaded.record.schoolId;
+  if (schoolStaff && schoolId !== user.schoolId) {
+    return { ok: false as const, error: "Student not found." };
+  }
+  if (
+    user.role === "BUS_COMPANY" &&
+    !(await canCompanyAccessSchool(user, schoolId))
+  ) {
+    return { ok: false as const, error: "That school is not on your list." };
   }
 
   const requestedTrips = (input.trips || []).filter(
@@ -755,7 +770,7 @@ export async function assignRequestedBus(input: {
 
   let assignedLabel = "";
   if (vehicle === "van") {
-    const van = await ensureVan(user.schoolId, rideName);
+    const van = await ensureVan(schoolId, rideName);
     assignedLabel = van.name;
     await prisma.$executeRaw`
       UPDATE "Student"
@@ -787,7 +802,7 @@ export async function assignRequestedBus(input: {
     const busNumber = rideName.replace(/^Bus\s+/i, "").trim();
     assignedLabel = `Bus ${busNumber}`;
     for (const trip of trips) {
-      const busRouteId = await routeId(user.schoolId, busNumber, trip);
+      const busRouteId = await routeId(schoolId, busNumber, trip);
       const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;
       await prisma.transportationAssignment.upsert({
         where: { studentId_trip: { studentId, trip } },
@@ -815,8 +830,8 @@ export async function assignRequestedBus(input: {
 
   await prisma.changeRequest.updateMany({
     where: {
-      schoolId: user.schoolId,
-      status: "PENDING",
+      schoolId,
+      status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
       OR: [{ id: request?.id || "" }, { studentId }],
     },
     data: {
@@ -829,7 +844,7 @@ export async function assignRequestedBus(input: {
 
   const after = await loadStudent(studentId);
   const student = after?.effective ?? loaded.effective;
-  const busCompanyEmail = await defaultBusCompanyEmail(user.schoolId);
+  const busCompanyEmail = await defaultBusCompanyEmail(schoolId);
   const notice = await notifyTransportationChange({
     user,
     student,
@@ -845,12 +860,15 @@ export async function assignRequestedBus(input: {
     parentSms: "assigned",
     teacherEmail: student.teacherEmail,
     busCompanyEmail,
+    notifySchool: user.role === "BUS_COMPANY",
+    schoolId,
   });
 
   revalidatePath("/waiting");
   revalidatePath("/dashboard");
   revalidatePath("/changes");
   revalidatePath("/buses");
+  revalidatePath("/company");
 
   return {
     ok: true as const,

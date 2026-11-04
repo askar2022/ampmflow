@@ -8,12 +8,22 @@ import { findSchoolBySlug, schoolLoginPath } from "@/lib/school-slug";
 export default async function ForgotPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ school?: string; sent?: string; error?: string }>;
+  searchParams: Promise<{
+    school?: string;
+    sent?: string;
+    error?: string;
+    company?: string;
+  }>;
 }) {
-  const { school: slug, sent, error } = await searchParams;
-  const school = slug ? await findSchoolBySlug(slug) : null;
+  const { school: slug, sent, error, company } = await searchParams;
+  const fromCompany = company === "1";
+  const school = !fromCompany && slug ? await findSchoolBySlug(slug) : null;
   const identity = school ? await getSchoolIdentityById(school.id) : null;
-  const signIn = school ? schoolLoginPath(school.slug || slug || "") : "/login";
+  const signIn = fromCompany
+    ? "/buscompany"
+    : school
+      ? schoolLoginPath(school.slug || slug || "")
+      : "/login";
 
   return (
     <LoginFrame
@@ -45,6 +55,7 @@ export default async function ForgotPasswordPage({
                   value={school.slug || slug}
                 />
               ) : null}
+              {fromCompany ? <input type="hidden" name="company" value="1" /> : null}
               <label
                 className="block text-left text-sm font-semibold text-navy"
                 htmlFor="reset-email"
@@ -65,10 +76,12 @@ export default async function ForgotPasswordPage({
             </form>
           </>
         )}
-        <p className="mt-4 text-sm leading-6 text-[#4b5563]">
-          Forgot which email Metro or another school uses? Sign in on the main
-          AMPM Flow page as the administrator and look under Schools.
-        </p>
+        {fromCompany ? null : (
+          <p className="mt-4 text-sm leading-6 text-[#4b5563]">
+            Forgot which email Metro or another school uses? Sign in on the main
+            AMPM Flow page as the administrator and look under Schools.
+          </p>
+        )}
         <Link
           href={signIn}
           className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-[8px] border border-line px-4 py-2.5 text-[16px] font-semibold text-navy"

@@ -17,7 +17,7 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
   { href: "/analytics", label: "Analytics", roles: ["COORDINATOR", "ADMINISTRATOR"] },
   { href: "/buses", label: "Roster", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK", "TEACHER"] },
-  { href: "/company", label: "Bus Company", roles: ["BUS_COMPANY"] },
+  { href: "/company", label: "Today’s Changes", roles: ["BUS_COMPANY"] },
   { href: "/admin/users", label: "Users", roles: ["ADMINISTRATOR"] },
   { href: "/teacher", label: "My Classroom", roles: ["TEACHER"] },
   { href: "/checkin", label: "Bus Check-In", roles: ["BUS_ASSISTANT"] },
@@ -47,7 +47,9 @@ export function AppShell({
       ? "/teacher"
       : user.role === "BUS_ASSISTANT"
         ? "/checkin"
-        : "/dashboard";
+        : user.role === "BUS_COMPANY"
+          ? "/company"
+          : "/dashboard";
 
   return (
     <div
@@ -81,6 +83,9 @@ export function AppShell({
               </Link>
             ) : null}
             <form action={logoutAction}>
+              {user.role === "BUS_COMPANY" ? (
+                <input type="hidden" name="next" value="company" />
+              ) : null}
               <button className="min-h-[44px] rounded-[12px] border border-navy/25 bg-white px-4 text-[14px] font-semibold text-navy sm:min-h-8 sm:rounded-full sm:px-3 sm:text-[13px]">
                 Sign Out
               </button>

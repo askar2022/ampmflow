@@ -7,6 +7,7 @@ import { canManageUsers, getSession, hashPassword, isPlatformAdmin } from "@/lib
 import { writeAudit } from "@/lib/audit";
 import { markInquirySetup } from "@/lib/inquiries";
 import { emailSchoolApproved } from "@/lib/school-request-email";
+import { assignCompanySchools } from "@/lib/company-access";
 import { assignUniqueSlug, schoolLoginUrl } from "@/lib/school-slug";
 import { PENDING_ROLE, ROLES, type Role } from "@/lib/types";
 
@@ -241,6 +242,77 @@ export async function createSchoolForDemo(formData: FormData) {
     email,
     loginUrl: schoolLoginUrl(slug),
   }).catch(() => undefined);
+  revalidatePath("/platform");
+}
+
+export async function createBusCompanyForDemo(formData: FormData) {
+  const session = await getSession();
+  if (!session || !canManageUsers(session.role)) return;
+  if (!(await isPlatformAdmin(session))) return;
+
+  const companyName = String(formData.get("companyName") || "").trim();
+  const email = String(formData.get("email") || "").trim().toLowerCase();
+  const password = String(formData.get("password") || "");
+  const schoolIds = formData
+    .getAll("schoolId")
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  if (!companyName || !email || password.length < 8) return;
+
+  const taken = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (taken) return;
+
+  const schools = await prisma.school.findMany({ select: { id: true } });
+  const allowed = new Set(schools.map((row) => row.id));
+  const selected = schoolIds.filter((id) => allowed.has(id));
+  if (!selected.length) return;
+
+  await prisma.user.create({
+    data: {
+      schoolId: selected[0],
+      name: companyName,
+      email,
+      role: "BUS_COMPANY",
+      passwordHash: await hashPassword(password),
+      active: true,
+    },
+  });
+
+  await assignCompanySchools(email, selected);
+  revalidatePath("/platform");
+}
+
+export async function updateBusCompanySchools(formData: FormData) {
+  const session = await getSession();
+  if (!session || !(await isPlatformAdmin(session))) return;
+
+  const userId = String(formData.get("userId") || "").trim();
+  const schoolIds = formData
+    .getAll("schoolId")
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  if (!userId || !schoolIds.length) return;
+
+  const company = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, role: true },
+  });
+  if (!company || company.role !== "BUS_COMPANY") return;
+
+  const schools = await prisma.school.findMany({ select: { id: true } });
+  const allowed = new Set(schools.map((row) => row.id));
+  const selected = schoolIds.filter((id) => allowed.has(id));
+  if (!selected.length) return;
+
+  await prisma.user.update({
+    where: { id: company.id },
+    data: { schoolId: selected[0] },
+  });
+  await assignCompanySchools(company.email, selected);
   revalidatePath("/platform");
 }
 

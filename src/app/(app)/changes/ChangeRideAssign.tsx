@@ -193,6 +193,12 @@ export function ChangeRideAssign({
                         {statusFor(receipt, "bus company")}
                       </span>
                     </li>
+                    <li className="flex flex-wrap justify-between gap-2 rounded-xl border border-line bg-paper px-3 py-2">
+                      <span>Coordinator and Front Desk</span>
+                      <span className="font-semibold">
+                        {statusFor(receipt, "school")}
+                      </span>
+                    </li>
                   </ul>
                 </div>
                 <p className="text-sm text-muted">

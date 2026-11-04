@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { checkDatabase, prisma } from "@/lib/prisma";
 import { LoginFrame } from "@/components/login/LoginFrame";
 import { SignInForm } from "@/components/login/SignInForm";
@@ -99,6 +100,14 @@ export default async function LoginPage({
                     : undefined
               }
             />
+            <p className="mt-3 text-center text-sm">
+              <Link
+                href="/buscompany"
+                className="font-medium text-teal hover:text-teal-deep"
+              >
+                Bus company sign in
+              </Link>
+            </p>
           </div>
         </div>
       )}

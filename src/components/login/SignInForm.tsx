@@ -13,17 +13,31 @@ export function SignInForm({
   authError,
   notice,
   schoolSlug,
+  intent,
+  forgotHref,
+  helpText,
 }: {
   authError?: string;
   notice?: string;
   schoolSlug?: string;
+  intent?: "company";
+  forgotHref?: string;
+  helpText?: string;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const invalid = Boolean(authError);
+  const forgot =
+    forgotHref ||
+    (schoolSlug
+      ? `/login/forgot?school=${encodeURIComponent(schoolSlug)}`
+      : intent === "company"
+        ? "/login/forgot?company=1"
+        : "/login/forgot");
 
   return (
     <form action={loginAction} className="space-y-3 short-h:space-y-2.5" aria-labelledby="login-heading">
       {schoolSlug ? <input type="hidden" name="schoolSlug" value={schoolSlug} /> : null}
+      {intent ? <input type="hidden" name="intent" value={intent} /> : null}
       <label className="block text-left text-sm font-semibold text-navy" htmlFor="login-email">
         Email
         <input
@@ -77,11 +91,7 @@ export function SignInForm({
           Remember me
         </label>
         <Link
-          href={
-            schoolSlug
-              ? `/login/forgot?school=${encodeURIComponent(schoolSlug)}`
-              : "/login/forgot"
-          }
+          href={forgot}
           className="font-medium text-teal hover:text-teal-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
         >
           Forgot password?
@@ -98,7 +108,7 @@ export function SignInForm({
       </p>
       <SubmitButton>Sign in</SubmitButton>
       <p className="text-center text-sm text-navy">
-        Need an account? Ask your school administrator.
+        {helpText || "Need an account? Ask your school administrator."}
       </p>
     </form>
   );

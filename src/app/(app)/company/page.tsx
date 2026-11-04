@@ -1,174 +1,98 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { loadStudents } from "@/lib/transportation";
-import { companyReportText, missingList } from "@/lib/reports";
-import { planSummary } from "@/lib/format";
-import {
-  assignBusFromCompany,
-  collapseDuplicateRequests,
-  reviewRequest,
-} from "@/app/actions/requests";
-import { uniqueChangeRequests } from "@/lib/request-dedupe";
-import { CompanyActions } from "./CompanyActions";
-import { TodayChangeForm } from "@/components/TodayChangeForm";
+import { loadVehicles } from "@/lib/gate";
+import { schoolLocalTime, todayKey } from "@/lib/dates";
+import { loadCompanySchools } from "@/lib/company-access";
+import { loadFrontDeskChangesToday } from "@/lib/transportation";
+import { CompanyBoard, CompanySchoolList, type CompanyRequest } from "./CompanyBoard";
 
-export default async function CompanyPage() {
+function gradeOnly(grade: string) {
+  return String(grade).replace(/^grade\s+/i, "") || "—";
+}
+
+export default async function CompanyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ school?: string }>;
+}) {
   const session = await getSession();
   if (!session) return null;
-  if (session.role !== "BUS_COMPANY") redirect("/dashboard");
-  await collapseDuplicateRequests(session.schoolId);
-  const students = await loadStudents(session.schoolId);
-  const waiting = missingList(students).filter(
-    (s) =>
-      s.am.waitingForAssignment ||
-      s.pm.waitingForAssignment ||
-      (s.am.type === "BUS" && !s.am.busNumber) ||
-      (s.pm.type === "BUS" && !s.pm.busNumber),
+  if (session.role !== "BUS_COMPANY") redirect("/changes");
+
+  const { school: wanted } = await searchParams;
+  const schools = await loadCompanySchools(session);
+  const selected = schools.find(
+    (school) => school.id === wanted || school.slug === wanted,
   );
-  const requests = uniqueChangeRequests(
-    await prisma.changeRequest.findMany({
-      where: {
-        schoolId: session.schoolId,
-        source: { in: ["BUS_COMPANY", "COORDINATOR", "FRONT_DESK"] },
-        status: { not: "REJECTED" },
-      },
-      include: { student: true, createdBy: true },
-      orderBy: { createdAt: "desc" },
-      take: 80,
+  if (!selected) {
+    return <CompanySchoolList schools={schools} />;
+  }
+
+  const [changes, vehicles, routes] = await Promise.all([
+    loadFrontDeskChangesToday(selected.id),
+    loadVehicles(selected.id).catch(() => []),
+    prisma.busRoute.findMany({
+      where: { schoolId: selected.id },
+      select: { number: true },
+      orderBy: { number: "asc" },
     }),
-  ).slice(0, 30);
-  const report = companyReportText(students);
-  const limited = session.role === "BUS_COMPANY";
-  const routes = await prisma.busRoute.findMany({
-    where: { schoolId: session.schoolId },
-    orderBy: { number: "asc" },
-    select: { number: true },
+  ]);
+
+  const completed = await prisma.changeRequest.findMany({
+    where: {
+      schoolId: selected.id,
+      status: "COMPLETED",
+      studentId: { in: changes.map((student) => student.id) },
+      busNumber: { not: null },
+    },
+    select: { studentId: true, reviewedAt: true, updatedAt: true },
   });
-  const busNumbers = [...new Set(routes.map((route) => route.number))];
+  const day = todayKey();
+  const assignedIds = new Set(
+    completed
+      .filter((row) =>
+        schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey === day,
+      )
+      .map((row) => row.studentId)
+      .filter(Boolean),
+  );
+
+  const vans = vehicles
+    .filter(
+      (vehicle) =>
+        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
+    )
+    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+
+  const rows: CompanyRequest[] = changes.map((student) => ({
+    studentId: student.id,
+    name: student.fullName,
+    grade: gradeOnly(student.grade),
+    teacher: student.teacherName || "—",
+    parent:
+      student.parentName && student.parentName !== "—"
+        ? student.parentName
+        : "—",
+    trips: [
+      ...(student.am.waitingForAssignment || !student.am.busNumber
+        ? (["AM"] as const)
+        : []),
+      ...(student.pm.waitingForAssignment || !student.pm.busNumber
+        ? (["PM"] as const)
+        : []),
+    ],
+    changed: assignedIds.has(student.id),
+  }));
 
   return (
-    <div className="space-y-6">
-      <div className="no-print">
-      <div>
-        <h1 className="font-serif text-4xl">
-          {limited ? "Transportation queue" : "Bus Company Updates"}
-        </h1>
-        <p className="mt-2 max-w-2xl text-muted">
-          {limited
-            ? "Parents call the school, not the bus company. The school asks you for a route. Propose a bus number here. It is not final until Admin or the Bus Coordinator approves it."
-            : "Parents call the school only. Use this page when the school needs to ask the bus company for a route. That save does not send email."}
-        </p>
-      </div>
-
-      {!limited ? (
-        <section className="rounded-2xl border border-line bg-card p-5">
-          <h2 className="font-serif text-2xl">Ask the bus company</h2>
-          <p className="mt-1 text-sm text-muted">
-            Only the school can start this. Moving / new address, daycare
-            change, and parent pickup to bus wait for the company to assign a
-            bus.
-          </p>
-          <TodayChangeForm
-            defaultCaller="SCHOOL_TO_COMPANY"
-            busNumbers={busNumbers}
-            canApplyToday
-            students={students.map((student) => ({
-              id: student.id,
-              firstName: student.firstName,
-              lastName: student.lastName,
-              studentId: student.studentId,
-              grade: student.grade,
-            }))}
-          />
-        </section>
-      ) : null}
-
-      <section className="rounded-2xl border border-line bg-card p-5">
-        <h2 className="font-serif text-2xl">Students waiting for a bus</h2>
-        <table className="mt-3 w-full text-left text-sm">
-          <thead className="text-muted">
-            <tr>
-              <th className="py-2">Student</th>
-              <th>Grade</th>
-              <th>AM</th>
-              <th>PM</th>
-              <th>Address</th>
-            </tr>
-          </thead>
-          <tbody>
-            {waiting.map((student) => (
-              <tr key={student.id} className="border-t border-line">
-                <td className="py-2 font-medium">{student.fullName}</td>
-                <td>{student.grade}</td>
-                <td>{planSummary(student.am, "AM")}</td>
-                <td>{planSummary(student.pm, "PM")}</td>
-                <td>{student.homeAddress}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="rounded-2xl border border-line bg-card p-5">
-        <h2 className="font-serif text-2xl">Requests</h2>
-        <p className="mt-1 text-sm text-muted">
-          The same student is listed once, even if the move was saved more than
-          once.
-        </p>
-        <ul className="mt-3 space-y-3">
-          {requests.map((request) => (
-            <li key={request.id} className="rounded-xl border border-line p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <strong>{request.title}</strong>
-                <span className="text-xs uppercase tracking-wider text-muted">
-                  {request.status}
-                </span>
-              </div>
-              <p className="mt-1 text-sm text-muted">{request.details}</p>
-              {request.student ? (
-                <p className="text-sm">
-                  {request.student.firstName} {request.student.lastName}
-                </p>
-              ) : null}
-              {limited && request.status !== "COMPLETED" ? (
-                <form action={assignBusFromCompany} className="mt-3 flex flex-wrap gap-2">
-                  <input type="hidden" name="requestId" value={request.id} />
-                  <input
-                    name="busNumber"
-                    placeholder="Bus number"
-                    className="rounded-xl border border-line px-3 py-2"
-                  />
-                  <input
-                    name="companyNote"
-                    placeholder="Short note"
-                    className="min-w-60 flex-1 rounded-xl border border-line px-3 py-2"
-                  />
-                  <button className="rounded-xl bg-navy px-3 py-2 text-sm font-semibold text-white">
-                    Propose assignment
-                  </button>
-                </form>
-              ) : null}
-              {!limited && request.status === "PENDING" && request.busNumber ? (
-                <form
-                  action={async () => {
-                    "use server";
-                    await reviewRequest(request.id, "APPROVED");
-                  }}
-                  className="mt-3"
-                >
-                  <button className="rounded-xl bg-green px-3 py-2 text-sm font-semibold text-white">
-                    Approve Bus {request.busNumber}
-                  </button>
-                </form>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </section>
-      </div>
-
-      {!limited ? <CompanyActions preview={report} /> : null}
-    </div>
+    <CompanyBoard
+      schools={schools}
+      schoolId={selected.id}
+      schoolName={selected.name}
+      buses={[...new Set(routes.map((route) => route.number))]}
+      vans={vans}
+      rows={rows}
+    />
   );
 }

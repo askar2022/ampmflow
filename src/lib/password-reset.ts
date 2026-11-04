@@ -15,11 +15,12 @@ type ResetPayload = {
   email: string;
 };
 
-function resetUrl(token: string, slug?: string) {
+function resetUrl(token: string, slug?: string, company?: boolean) {
   const origin = APP_ORIGIN.replace(/\/$/, "");
   const path = `/login/reset?token=${encodeURIComponent(token)}`;
   const school = slug ? `&school=${encodeURIComponent(slug)}` : "";
-  return `${origin}${path}${school}`;
+  const companyQ = company ? "&company=1" : "";
+  return `${origin}${path}${school}${companyQ}`;
 }
 
 export async function createPasswordResetToken(userId: string, email: string) {
@@ -80,11 +81,13 @@ export async function sendPasswordResetEmail(email: string, schoolSlug?: string)
     };
   }
 
-  const slug = isPlatformAdminEmail(user.email)
-    ? undefined
-    : schoolSlug || (await schoolSlugForId(user.schoolId));
+  const company = user.role === "BUS_COMPANY";
+  const slug =
+    isPlatformAdminEmail(user.email) || company
+      ? undefined
+      : schoolSlug || (await schoolSlugForId(user.schoolId));
   const token = await createPasswordResetToken(user.id, user.email);
-  const link = resetUrl(token, slug);
+  const link = resetUrl(token, slug, company);
   const result = await sendMail({
     to: user.email,
     subject: "Reset your AMPM Flow password",
