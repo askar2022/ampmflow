@@ -7,7 +7,7 @@ import { getSession } from "@/lib/auth";
 import { updateTransportation } from "@/app/actions/transportation";
 import { canRecordChange } from "@/lib/policy";
 import { durationLabel, planSummary } from "@/lib/format";
-import { loadStudent } from "@/lib/transportation";
+import { ensureStudentContactColumns, loadStudent } from "@/lib/transportation";
 import {
   noticeSummary,
   notifyRouteRequest,
@@ -718,6 +718,8 @@ export async function assignRequestedBus(input: {
   busNumber?: string;
   vehicle?: "bus" | "van";
   trips?: Trip[];
+  amPickupTime?: string;
+  pmPickupTime?: string;
 }) {
   const user = await getSession();
   if (!user) return { ok: false as const, error: "Please sign in." };
@@ -782,6 +784,17 @@ export async function assignRequestedBus(input: {
     }
   }
   if (!trips.length) trips.push("AM", "PM");
+  const amPickup = (input.amPickupTime || "").trim();
+  const pmPickup = (input.pmPickupTime || "").trim();
+  if (user.role === "BUS_COMPANY") {
+    if (trips.includes("AM") && !amPickup) {
+      return { ok: false as const, error: "Type the AM pickup time." };
+    }
+    if (trips.includes("PM") && !pmPickup) {
+      return { ok: false as const, error: "Type the PM pickup time." };
+    }
+  }
+  await ensureStudentContactColumns().catch(() => undefined);
   const previous = planLine(loaded.effective, trips);
 
   let assignedLabel = "";
@@ -844,6 +857,16 @@ export async function assignRequestedBus(input: {
     }
   }
 
+  for (const trip of trips) {
+    const time = trip === "AM" ? amPickup : pmPickup;
+    if (!time) continue;
+    await prisma.$executeRaw`
+      UPDATE "TransportationAssignment"
+      SET "pickupTime" = ${time}
+      WHERE "studentId" = ${studentId} AND "trip" = ${trip}
+    `.catch(() => undefined);
+  }
+
   await prisma.changeRequest.updateMany({
     where: {
       schoolId,
@@ -871,8 +894,16 @@ export async function assignRequestedBus(input: {
         ? `${assignedLabel} · ${planLine(student, trips)}`
         : planLine(student, trips),
     when: vehicle === "van" ? "Assigned van" : "Assigned bus",
-    note: `Bus company assigned ${assignedLabel}.`,
+    note: [
+      `Bus company assigned ${assignedLabel}.`,
+      trips.includes("AM") && amPickup ? `AM pickup ${amPickup}.` : "",
+      trips.includes("PM") && pmPickup ? `PM pickup ${pmPickup}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
     waiting: false,
+    amPickup: trips.includes("AM") ? amPickup : "",
+    pmPickup: trips.includes("PM") ? pmPickup : "",
     parentSms: "assigned",
     teacherEmail: student.teacherEmail,
     busCompanyEmail,

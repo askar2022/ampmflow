@@ -712,6 +712,11 @@ export function ReceptionDesk({
                 </StatusBadge>
               </div>
               <p className="mt-2 text-sm">{selected.am.location}</p>
+              {selected.am.pickupTime ? (
+                <p className="mt-1 text-sm font-semibold text-navy">
+                  Pickup {selected.am.pickupTime}
+                </p>
+              ) : null}
             </div>
             <div className="rounded-xl border border-line bg-paper p-4">
               <div className="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -723,6 +728,11 @@ export function ReceptionDesk({
                 </StatusBadge>
               </div>
               <p className="mt-2 text-sm">{selected.pm.location}</p>
+              {selected.pm.pickupTime ? (
+                <p className="mt-1 text-sm font-semibold text-navy">
+                  Pickup {selected.pm.pickupTime}
+                </p>
+              ) : null}
             </div>
           </div>
 

@@ -53,6 +53,9 @@ export async function ensureStudentContactColumns() {
       prisma.$executeRawUnsafe(
         `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentPhone2" TEXT NOT NULL DEFAULT ''`,
       ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "TransportationAssignment" ADD COLUMN IF NOT EXISTS "pickupTime" TEXT NOT NULL DEFAULT ''`,
+      ),
     ])
       .then(() => undefined)
       .catch(() => undefined);
@@ -118,6 +121,7 @@ function fromAssignment(
       : null,
     waitingForAssignment: assignment.waitingForAssignment,
     notes: assignment.notes,
+    pickupTime: extraText(assignment, "pickupTime"),
     source: "PERMANENT",
     location:
       type === "PARENT"

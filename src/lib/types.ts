@@ -50,6 +50,7 @@ export type PlanSnapshot = {
   customAddress: string | null;
   waitingForAssignment: boolean;
   notes: string;
+  pickupTime?: string;
   source: "TODAY" | "DATE_RANGE" | "PERMANENT" | "MISSING";
   location: string;
   startDate?: string | null;

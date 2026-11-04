@@ -72,6 +72,8 @@ export function ChangeRideAssign({
   const [trip, setTrip] = useState<TripChoice>(startingTrip(defaultTrips));
   const [busNumber, setBusNumber] = useState("");
   const [vanNumber, setVanNumber] = useState("");
+  const [amPickup, setAmPickup] = useState("");
+  const [pmPickup, setPmPickup] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
 
@@ -93,13 +95,24 @@ export function ChangeRideAssign({
       setError("Type the bus number or the van number.");
       return;
     }
+    const trips: Trip[] = trip === "BOTH" ? ["AM", "PM"] : [trip];
+    if ((trip === "AM" || trip === "BOTH") && !amPickup.trim()) {
+      setError("Type the AM pickup time.");
+      return;
+    }
+    if ((trip === "PM" || trip === "BOTH") && !pmPickup.trim()) {
+      setError("Type the PM pickup time.");
+      return;
+    }
     setError("");
     start(async () => {
       const result = await assignRequestedBus({
         studentId,
         busNumber: bus || van,
         vehicle: van && !bus ? "van" : "bus",
-        trips: trip === "BOTH" ? ["AM", "PM"] : [trip],
+        trips,
+        amPickupTime: amPickup.trim(),
+        pmPickupTime: pmPickup.trim(),
       });
       if (!result.ok) {
         setError(result.error);
@@ -117,6 +130,8 @@ export function ChangeRideAssign({
       });
       setBusNumber("");
       setVanNumber("");
+      setAmPickup("");
+      setPmPickup("");
       setDone(true);
       setReview(true);
       router.refresh();
@@ -316,6 +331,38 @@ export function ChangeRideAssign({
                     ))}
                   </div>
                 </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {trip === "PM" ? null : (
+                    <label className="block text-sm font-semibold">
+                      AM pickup time
+                      <input
+                        type="text"
+                        required
+                        value={amPickup}
+                        onChange={(event) => setAmPickup(event.target.value)}
+                        placeholder="7:15 AM"
+                        className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                      />
+                    </label>
+                  )}
+                  {trip === "AM" ? null : (
+                    <label className="block text-sm font-semibold">
+                      PM pickup time
+                      <input
+                        type="text"
+                        required
+                        value={pmPickup}
+                        onChange={(event) => setPmPickup(event.target.value)}
+                        placeholder="2:40 PM"
+                        className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                      />
+                    </label>
+                  )}
+                </div>
+                <p className="mt-2 text-sm text-muted">
+                  The parent gets this pickup time in the text and email.
+                </p>
 
                 {error ? <p className="mt-4 text-sm text-red">{error}</p> : null}
 

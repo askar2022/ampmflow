@@ -195,6 +195,7 @@ model TransportationAssignment {
   customAddressId      String?
   waitingForAssignment Boolean   @default(false)
   notes                String    @default("")
+  pickupTime           String    @default("")
   effectiveStart       DateTime?
   effectiveEnd         DateTime?
   updatedById          String

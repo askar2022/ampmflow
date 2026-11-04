@@ -58,7 +58,9 @@ function ReadEmailButton({
                 <div
                   key={`${index}-${line}`}
                   className={
-                    line.startsWith("Request:")
+                    /^(Requested change:|Address:|Daycare address:|AM pickup:|PM pickup:)/.test(
+                      line,
+                    )
                       ? "font-extrabold text-navy"
                       : "font-normal"
                   }

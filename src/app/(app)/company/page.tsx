@@ -4,7 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
 import { schoolLocalTime, todayKey } from "@/lib/dates";
 import { loadCompanySchools, type CompanySchool } from "@/lib/company-access";
-import { planLine } from "@/lib/change-notify";
+import {
+  companyAddressFor,
+  companyChangeEmail,
+  companyEffectiveDate,
+  companyRequestKind,
+  destinationFromStudent,
+  planLine,
+} from "@/lib/change-notify";
 import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import { CompanyBoard, type CompanyDesk, type CompanyRequest } from "./CompanyBoard";
@@ -45,37 +52,25 @@ function requestFor(student: EffectiveStudent) {
   return "Bus or van";
 }
 
-function companyEmail(student: EffectiveStudent, trips: Trip[], request: string) {
+function companyEmail(student: EffectiveStudent, trips: Trip[]) {
   const used = trips.length ? trips : (["PM"] as Trip[]);
-  const subject = request.startsWith("New student")
-    ? `Request for route — ${student.fullName}`
-    : `Transportation change — ${student.fullName}`;
-  const body = [
-    request.startsWith("New student")
-      ? "AMPM Flow — request for route"
-      : "AMPM Flow — transportation change",
-    "",
-    `Student: ${student.fullName}`,
-    `Parent: ${
-      student.parentName && student.parentName !== "—"
-        ? student.parentName
-        : "—"
-    }`,
-    `Primary 1 phone: ${student.parentPhone || "—"}`,
-    student.parentPhone2 ? `Primary 2 phone: ${student.parentPhone2}` : "",
-    `Parent email: ${student.parentEmail || "—"}`,
-    `Grade ${gradeOnly(student.grade)} · ${student.teacherName}`,
-    `Trip: ${used.join(" and ")}`,
-    `Request: ${request}`,
-    `Now: ${planLine(student, used)}`,
-    student.lastUpdatedBy ? `Entered by: ${student.lastUpdatedBy}` : "",
-    isWaiting(student)
-      ? "Status: Waiting for a bus or van from the company."
-      : "Status: Bus or van assigned.",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
-  return { subject, body };
+  const kind = companyRequestKind({
+    destination: destinationFromStudent(student),
+    waiting: isWaiting(student),
+    enrollmentSource: student.enrollmentSource,
+  });
+  const mail = companyChangeEmail({
+    studentName: student.fullName,
+    grade: student.grade,
+    trips: used,
+    next: planLine(student, used),
+    when: companyEffectiveDate(student, used),
+    kind,
+    address: companyAddressFor({ kind, student }),
+    amPickup: used.includes("AM") ? student.am.pickupTime : "",
+    pmPickup: used.includes("PM") ? student.pm.pickupTime : "",
+  });
+  return { subject: mail.subject, body: mail.text };
 }
 
 async function loadCompanyNeedUpdate(schoolId: string) {
@@ -161,7 +156,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
           ? student.parentName
           : "—",
       request,
-      email: companyEmail(student, trips, request),
+      email: companyEmail(student, trips),
       trips,
       changed: assignedIds.has(student.id),
     };

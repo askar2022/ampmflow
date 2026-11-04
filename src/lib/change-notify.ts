@@ -14,12 +14,23 @@ export type ParentSmsKind =
   | "ride-request"
   | "assigned";
 
+function pickupTimeLine(amPickup?: string, pmPickup?: string) {
+  return [
+    amPickup?.trim() ? `AM pickup ${amPickup.trim()}` : "",
+    pmPickup?.trim() ? `PM pickup ${pmPickup.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(". ");
+}
+
 function parentChangeSms(args: {
   student: EffectiveStudent;
   next: string;
   note: string;
   when: string;
   kind: ParentSmsKind;
+  amPickup?: string;
+  pmPickup?: string;
 }) {
   const name = args.student.fullName;
   if (args.kind === "daycare-request") {
@@ -31,17 +42,16 @@ function parentChangeSms(args: {
   if (args.kind === "ride-request") {
     return `AMPM Flow: we asked the bus company for a bus or van for ${name}. We will text you when it is assigned.`;
   }
-  const van = `${args.next} ${args.note} ${args.when}`.match(
-    /Van\s+[A-Za-z0-9-]+/i,
-  )?.[0];
-  if (van) return `AMPM Flow: ${name} is assigned ${van}.`;
+  const times = pickupTimeLine(args.amPickup, args.pmPickup);
+  const blob = `${args.next} ${args.note} ${args.when}`;
+  const van =
+    blob.match(/Van\s+[A-Za-z0-9-]+/i)?.[0] ||
+    args.note.match(/Van\s+[A-Za-z0-9-]+/i)?.[0];
   const bus =
-    args.next.match(/Bus\s+\d+/i)?.[0] ||
-    args.note.match(/Bus\s+\d+/i)?.[0];
-  if (bus) return `AMPM Flow: ${name} is assigned ${bus}.`;
-  const vanName = args.note.match(/Van\s+[A-Za-z0-9-]+/i)?.[0];
-  if (vanName) return `AMPM Flow: ${name} is assigned ${vanName}.`;
-  return `AMPM Flow: ${name} is assigned a bus or van.`;
+    args.next.match(/Bus\s+\d+/i)?.[0] || args.note.match(/Bus\s+\d+/i)?.[0];
+  const ride = van || bus || "a bus or van";
+  const assigned = `AMPM Flow: ${name} is assigned ${ride}`;
+  return times ? `${assigned}. ${times}.` : `${assigned}.`;
 }
 
 export type ChangeNotice = {
@@ -62,6 +72,170 @@ function uniqueEmails(values: Array<string | null | undefined>) {
   return [...new Set(values.map((email) => usableOpsEmail(email || "")).filter(Boolean))];
 }
 
+export type CompanyRequestKind = "DAYCARE" | "ADDRESS" | "NEW_ROUTE" | "ROUTE";
+
+const COMPANY_REQUEST_TITLES: Record<CompanyRequestKind, string> = {
+  DAYCARE: "Daycare Change Request",
+  ADDRESS: "New Address Request",
+  NEW_ROUTE: "New Route Request",
+  ROUTE: "Route Change Request",
+};
+
+function gradeOnly(grade: string) {
+  return String(grade).replace(/^grade\s+/i, "") || "—";
+}
+
+function stripTripPrefix(line: string) {
+  return line.replace(/^(AM|PM):\s*/gi, "").replace(/\s+/g, " ").trim();
+}
+
+export function companyRequestKind(args: {
+  destination?: Destination | null;
+  waiting?: boolean;
+  enrollmentSource?: string;
+}): CompanyRequestKind {
+  if (args.destination === "DAYCARE") return "DAYCARE";
+  if (args.destination === "CUSTOM") return "ADDRESS";
+  if (
+    args.waiting &&
+    (args.enrollmentSource === "ROUTE_REQUEST" ||
+      args.enrollmentSource === "NEW_APPLICATION" ||
+      !args.destination ||
+      args.destination === "HOME")
+  ) {
+    return "NEW_ROUTE";
+  }
+  return "ROUTE";
+}
+
+export function destinationFromStudent(student: EffectiveStudent): Destination | null {
+  for (const plan of [student.pm, student.am]) {
+    if (plan.destination === "DAYCARE" || plan.destination === "CUSTOM") {
+      return plan.destination;
+    }
+  }
+  return student.pm.destination || student.am.destination;
+}
+
+export function companyAddressFor(args: {
+  kind: CompanyRequestKind;
+  student?: EffectiveStudent;
+  address?: string;
+}) {
+  if (args.address?.trim()) return args.address.trim();
+  const student = args.student;
+  if (!student) return "";
+  if (args.kind === "ADDRESS") {
+    const value =
+      student.pm.customAddress ||
+      student.am.customAddress ||
+      student.homeAddress;
+    return value && value !== "—" ? value : "";
+  }
+  if (args.kind === "DAYCARE") {
+    return student.daycareAddress || "";
+  }
+  if (args.kind === "NEW_ROUTE") {
+    return student.homeAddress && student.homeAddress !== "—"
+      ? student.homeAddress
+      : "";
+  }
+  return "";
+}
+
+export function companyEffectiveDate(student: EffectiveStudent, trips: Trip[]) {
+  const plan = trips.includes("AM") && !trips.includes("PM") ? student.am : student.pm;
+  if (plan.source === "TODAY") return "Today only";
+  if (plan.source === "DATE_RANGE") {
+    if (plan.startDate && plan.endDate) return `${plan.startDate} – ${plan.endDate}`;
+    return "Date range";
+  }
+  if (plan.source === "PERMANENT") return "Permanent";
+  return "Until a bus or van is assigned";
+}
+
+function requestedChangeLine(trips: Trip[], previous: string, next: string) {
+  const trip =
+    trips.length > 1
+      ? "AM and PM transportation"
+      : trips[0] === "AM"
+        ? "AM transportation"
+        : "PM transportation";
+  const from = stripTripPrefix(previous);
+  const to = stripTripPrefix(next);
+  if (from && to && from !== to) return `${trip} from ${from} to ${to}`;
+  if (to) return `${trip} to ${to}`;
+  if (from) return `${trip} from ${from}`;
+  return trip;
+}
+
+function companyNoticeHtml(lines: string[], banner: string) {
+  const body = lines
+    .map((line) => {
+      const idx = line.indexOf(":");
+      if (idx === -1) {
+        return `<div style="margin:0 0 10px;">${escapeHtml(line)}</div>`;
+      }
+      const label = line.slice(0, idx + 1);
+      const value = line.slice(idx + 1);
+      return `<div style="margin:0 0 10px;"><strong>${escapeHtml(label)}</strong>${escapeHtml(value)}</div>`;
+    })
+    .join("");
+  return `<!DOCTYPE html>
+<html>
+<body style="margin:0;background:#f4f1ea;font-family:Georgia,serif;color:#0e2438;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #e6e0d4;">
+          <tr>
+            <td style="background:#0e2438;color:#ffffff;padding:16px 20px;">
+              <div style="font-size:18px;font-weight:700;">AMPM Flow</div>
+              <div style="font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:#c9d6c4;">${escapeHtml(banner)}</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px;font-size:16px;line-height:1.5;">${body}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function companyChangeEmail(args: {
+  studentName: string;
+  grade: string;
+  trips: Trip[];
+  previous?: string;
+  next: string;
+  when: string;
+  kind: CompanyRequestKind;
+  address?: string;
+  amPickup?: string;
+  pmPickup?: string;
+}) {
+  const title = COMPANY_REQUEST_TITLES[args.kind];
+  const subject = `${title} — ${args.studentName}`;
+  const addressLabel = args.kind === "DAYCARE" ? "Daycare address" : "Address";
+  const lines = [
+    `Student: ${args.studentName}`,
+    `Grade: ${gradeOnly(args.grade)}`,
+    `Requested change: ${requestedChangeLine(args.trips, args.previous || "", args.next)}`,
+    `Effective date: ${args.when}`,
+    args.amPickup ? `AM pickup: ${args.amPickup}` : "",
+    args.pmPickup ? `PM pickup: ${args.pmPickup}` : "",
+    args.address ? `${addressLabel}: ${args.address}` : "",
+  ].filter(Boolean);
+  return {
+    subject,
+    text: lines.join("\n"),
+    html: companyNoticeHtml(lines, title),
+  };
+}
+
 export function changeNoticeText(args: {
   student: EffectiveStudent;
   trips: Trip[];
@@ -71,6 +245,8 @@ export function changeNoticeText(args: {
   note: string;
   actorName: string;
   waiting: boolean;
+  amPickup?: string;
+  pmPickup?: string;
 }) {
   const trips = args.trips.join(" and ");
   return [
@@ -86,6 +262,8 @@ export function changeNoticeText(args: {
     `Now: ${args.next}`,
     `When: ${args.when}`,
     args.waiting ? "Status: Waiting for a bus route until the company confirms it." : "",
+    args.amPickup ? `AM pickup: ${args.amPickup}` : "",
+    args.pmPickup ? `PM pickup: ${args.pmPickup}` : "",
     args.note ? `Note: ${args.note}` : "",
     `Entered by: ${args.actorName}`,
     "",
@@ -146,6 +324,8 @@ export async function notifyTransportationChange(args: {
   busCompanyEmail?: string;
   notifySchool?: boolean;
   schoolId?: string;
+  amPickup?: string;
+  pmPickup?: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
@@ -158,9 +338,29 @@ export async function notifyTransportationChange(args: {
     note: args.note,
     actorName: args.user.name,
     waiting: args.waiting,
+    amPickup: args.amPickup,
+    pmPickup: args.pmPickup,
   });
   const html = changeNoticeHtml(text);
   const subject = `Transportation change — ${args.student.fullName}`;
+  const kind = companyRequestKind({
+    destination:
+      args.destination || destinationFromStudent(args.student),
+    waiting: args.waiting,
+    enrollmentSource: args.student.enrollmentSource,
+  });
+  const companyMail = companyChangeEmail({
+    studentName: args.student.fullName,
+    grade: args.student.grade,
+    trips: args.trips,
+    previous: args.previous,
+    next: args.next,
+    when: args.when,
+    kind,
+    address: companyAddressFor({ kind, student: args.student }),
+    amPickup: args.amPickup,
+    pmPickup: args.pmPickup,
+  });
 
   const parent = uniqueEmails([args.student.parentEmail]);
   const company = uniqueEmails([args.busCompanyEmail]);
@@ -195,6 +395,8 @@ export async function notifyTransportationChange(args: {
     note: args.note,
     when: args.when,
     kind: smsKind,
+    amPickup: args.amPickup,
+    pmPickup: args.pmPickup,
   });
   const parentPhones = parentSmsNumbers(
     args.student.parentPhone,
@@ -206,13 +408,21 @@ export async function notifyTransportationChange(args: {
     skipped.push("email is not configured");
   } else {
     const groups = [
-      { label: "parent", to: parent, subject },
-      { label: "teacher", to: teachers, subject },
-      { label: "bus company", to: company, subject },
+      { label: "parent", to: parent, subject, text, html },
+      { label: "teacher", to: teachers, subject, text, html },
+      {
+        label: "bus company",
+        to: company,
+        subject: companyMail.subject,
+        text: companyMail.text,
+        html: companyMail.html,
+      },
       {
         label: "school",
         to: schoolDesk,
         subject: `Bus update — ${args.student.fullName}`,
+        text,
+        html,
       },
     ];
     for (const group of groups) {
@@ -221,8 +431,8 @@ export async function notifyTransportationChange(args: {
         sendMail({
           to: group.to,
           subject: group.subject,
-          text,
-          html,
+          text: group.text,
+          html: group.html,
         }).then((result) => {
           if (result.sent) {
             sent.push(...group.to.map((email) => `${group.label}: ${email}`));
@@ -413,14 +623,15 @@ export async function notifyRouteRequest(args: {
     `Requested by: ${args.user.name}`,
   ].filter(Boolean);
 
-  const companyText = [
-    "AMPM Flow — request for route",
-    "",
-    "Please assign a bus or van for this student, then email or call the school with the number.",
-    "Front Desk will update the student after you confirm.",
-    "",
-    ...details,
-  ].join("\n");
+  const companyMail = companyChangeEmail({
+    studentName: args.studentName,
+    grade: args.grade,
+    trips: ["AM", "PM"],
+    next: args.address || "new bus or van route",
+    when: "Until a bus or van is assigned",
+    kind: "NEW_ROUTE",
+    address: args.address,
+  });
 
   const parentText = [
     "AMPM Flow",
@@ -448,8 +659,9 @@ export async function notifyRouteRequest(args: {
       {
         label: "bus company",
         to: company,
-        subject: `Request for route — ${args.studentName}`,
-        text: companyText,
+        subject: companyMail.subject,
+        text: companyMail.text,
+        html: companyMail.html,
       },
     ];
 
@@ -459,7 +671,7 @@ export async function notifyRouteRequest(args: {
         to: group.to,
         subject: group.subject,
         text: group.text,
-        html: changeNoticeHtml(group.text, "Request"),
+        html: group.html || changeNoticeHtml(group.text, "Request"),
       });
       if (result.sent) {
         sent.push(...group.to.map((email) => `${group.label}: ${email}`));
