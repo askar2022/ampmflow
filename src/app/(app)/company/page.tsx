@@ -5,7 +5,7 @@ import { loadVehicles } from "@/lib/gate";
 import { schoolLocalTime, todayKey } from "@/lib/dates";
 import { loadCompanySchools } from "@/lib/company-access";
 import { loadFrontDeskChangesToday } from "@/lib/transportation";
-import { CompanyBoard, CompanySchoolList, type CompanyRequest } from "./CompanyBoard";
+import { CompanyBoard, type CompanyRequest } from "./CompanyBoard";
 
 function gradeOnly(grade: string) {
   return String(grade).replace(/^grade\s+/i, "") || "—";
@@ -22,11 +22,19 @@ export default async function CompanyPage({
 
   const { school: wanted } = await searchParams;
   const schools = await loadCompanySchools(session);
-  const selected = schools.find(
-    (school) => school.id === wanted || school.slug === wanted,
-  );
+  const selected =
+    schools.find((school) => school.id === wanted || school.slug === wanted) ||
+    schools[0];
   if (!selected) {
-    return <CompanySchoolList schools={schools} />;
+    return (
+      <div>
+        <h1 className="font-serif text-4xl text-navy">Today’s Changes</h1>
+        <p className="mt-2 text-muted">
+          No school is assigned to this login yet. Ask AMPM Flow to add the
+          schools you serve.
+        </p>
+      </div>
+    );
   }
 
   const [changes, vehicles, routes] = await Promise.all([
