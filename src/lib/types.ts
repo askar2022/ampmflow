@@ -78,6 +78,7 @@ export type EffectiveStudent = {
   teacherName: string;
   teacherEmail: string;
   notes: string;
+  enrollmentSource: string;
   am: PlanSnapshot;
   pm: PlanSnapshot;
   lastUpdatedBy: string | null;

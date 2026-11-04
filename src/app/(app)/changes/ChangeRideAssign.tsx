@@ -43,6 +43,7 @@ export function ChangeRideAssign({
   studentId,
   studentName,
   grade,
+  request,
   buses = [],
   vans = [],
   defaultTrips,
@@ -54,6 +55,7 @@ export function ChangeRideAssign({
   studentId: string;
   studentName: string;
   grade: string;
+  request?: string;
   buses?: string[];
   vans?: { id: string; name: string }[];
   defaultTrips?: Trip[];
@@ -158,6 +160,9 @@ export function ChangeRideAssign({
               {studentName}
             </h3>
             <p className="mt-1 text-muted">Grade {grade}</p>
+            {request ? (
+              <p className="mt-2 text-sm font-semibold text-navy">{request}</p>
+            ) : null}
 
             {review && receipt ? (
               <div className="mt-5 space-y-4">

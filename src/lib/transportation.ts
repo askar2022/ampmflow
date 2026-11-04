@@ -231,6 +231,7 @@ export function toEffective(
     teacherName: teacher?.name ?? "Unassigned",
     teacherEmail: extraText(teacher ?? {}, "email"),
     notes: student.notes,
+    enrollmentSource: student.enrollmentSource || "RETURNING",
     am: resolveTrip(student, "AM", day),
     pm: resolveTrip(student, "PM", day),
     lastUpdatedBy: latestAssignment?.updatedBy.name ?? null,

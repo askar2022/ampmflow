@@ -4,16 +4,75 @@ import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
 import { schoolLocalTime, todayKey } from "@/lib/dates";
 import { loadCompanySchools, type CompanySchool } from "@/lib/company-access";
-import { loadFrontDeskChangesToday } from "@/lib/transportation";
+import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
+import type { EffectiveStudent } from "@/lib/types";
 import { CompanyBoard, type CompanyDesk, type CompanyRequest } from "./CompanyBoard";
 
 function gradeOnly(grade: string) {
   return String(grade).replace(/^grade\s+/i, "") || "—";
 }
 
+function isWaiting(student: EffectiveStudent) {
+  return (
+    student.am.waitingForAssignment ||
+    student.pm.waitingForAssignment ||
+    (student.am.type === "BUS" && !student.am.busNumber) ||
+    (student.pm.type === "BUS" && !student.pm.busNumber)
+  );
+}
+
+function requestFor(student: EffectiveStudent) {
+  for (const plan of [student.pm, student.am]) {
+    if (plan.destination === "DAYCARE") {
+      return plan.daycareName ? `Daycare · ${plan.daycareName}` : "Daycare";
+    }
+    if (plan.destination === "CUSTOM") {
+      return plan.customAddress
+        ? `New address · ${plan.customAddress}`
+        : "New address";
+    }
+  }
+  if (
+    student.enrollmentSource === "ROUTE_REQUEST" ||
+    student.enrollmentSource === "NEW_APPLICATION"
+  ) {
+    return student.homeAddress && student.homeAddress !== "—"
+      ? `New student · ${student.homeAddress}`
+      : "New student";
+  }
+  if (isWaiting(student)) return "New request";
+  return "Bus or van";
+}
+
+async function loadCompanyNeedUpdate(schoolId: string) {
+  const [changes, waitingAll, pending] = await Promise.all([
+    loadFrontDeskChangesToday(schoolId),
+    loadStudents(schoolId),
+    prisma.changeRequest.findMany({
+      where: {
+        schoolId,
+        status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
+      },
+      select: { studentId: true },
+    }),
+  ]);
+  const byId = new Map(changes.map((student) => [student.id, student]));
+  for (const student of waitingAll) {
+    if (isWaiting(student) && !byId.has(student.id)) {
+      byId.set(student.id, student);
+    }
+  }
+  for (const row of pending) {
+    if (!row.studentId || byId.has(row.studentId)) continue;
+    const loaded = await loadStudent(row.studentId);
+    if (loaded?.effective) byId.set(loaded.effective.id, loaded.effective);
+  }
+  return [...byId.values()];
+}
+
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
   const [changes, vehicles, routes] = await Promise.all([
-    loadFrontDeskChangesToday(school.id),
+    loadCompanyNeedUpdate(school.id),
     loadVehicles(school.id).catch(() => []),
     prisma.busRoute.findMany({
       where: { schoolId: school.id },
@@ -57,6 +116,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       student.parentName && student.parentName !== "—"
         ? student.parentName
         : "—",
+    request: requestFor(student),
     trips: [
       ...(student.am.waitingForAssignment || !student.am.busNumber
         ? (["AM"] as const)

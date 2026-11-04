@@ -666,6 +666,7 @@ export async function requestRoute(input: RouteRequestInput) {
   revalidatePath("/dashboard");
   revalidatePath("/waiting");
   revalidatePath("/changes");
+  revalidatePath("/company");
 
   const notice = await notifyRouteRequest({
     user,

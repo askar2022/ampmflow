@@ -11,6 +11,7 @@ export type CompanyRequest = {
   grade: string;
   teacher: string;
   parent: string;
+  request: string;
   trips: Trip[];
   changed: boolean;
 };
@@ -47,7 +48,8 @@ export function CompanyBoard({
       <div>
         <h1 className="font-serif text-4xl text-navy">Today’s Changes</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Choose a school, then tap Need Update and enter the bus or van.
+          The school already emailed you the student — daycare, new
+          address, or a new student. Here you only assign the bus or van.
         </p>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
@@ -80,6 +82,7 @@ export function CompanyBoard({
                   <th>Grade</th>
                   <th>Teacher</th>
                   <th>Parent</th>
+                  <th>Request</th>
                   <th className="px-4"></th>
                 </tr>
               </thead>
@@ -90,11 +93,13 @@ export function CompanyBoard({
                     <td>{row.grade}</td>
                     <td>{row.teacher || "—"}</td>
                     <td>{row.parent}</td>
+                    <td className="max-w-[220px]">{row.request}</td>
                     <td className="px-4 py-2">
                       <ChangeRideAssign
                         studentId={row.studentId}
                         studentName={row.name}
                         grade={row.grade}
+                        request={row.request}
                         buses={desk.buses}
                         vans={desk.vans}
                         companyAssigned={row.changed}
@@ -109,8 +114,8 @@ export function CompanyBoard({
         </div>
       ) : (
         <div className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-          When {desk.schoolName} saves a daycare or address change, the student
-          will show here.
+          When {desk.schoolName} sends a daycare, new address, or new student
+          request, they will show here.
         </div>
       )}
     </div>

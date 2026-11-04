@@ -89,6 +89,7 @@ function asChangeStudent(row: GateStudent, plan?: EffectiveStudent): EffectiveSt
     teacherName: row.teacherName,
     teacherEmail: "",
     notes: row.transportNotes,
+    enrollmentSource: "RETURNING",
     am: missing("AM"),
     pm: missing("PM"),
     lastUpdatedBy: null,
