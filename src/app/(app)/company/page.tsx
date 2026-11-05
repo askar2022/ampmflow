@@ -180,6 +180,14 @@ export default async function CompanyPage({
   if (!session) return null;
   if (session.role !== "BUS_COMPANY") redirect("/changes");
 
+  const liveName = await prisma.user
+    .findUnique({
+      where: { id: session.id },
+      select: { name: true },
+    })
+    .then((row) => row?.name || session.name || "Bus company")
+    .catch(() => session.name || "Bus company");
+
   const { school: wanted } = await searchParams;
   const schools = await loadCompanySchools(session);
   const selected =
@@ -189,7 +197,7 @@ export default async function CompanyPage({
     return (
       <div>
         <h1 className="font-serif text-4xl text-navy">
-          {session.name || "Bus company"}
+          {liveName}
         </h1>
         <p className="mt-1 text-lg font-semibold text-navy">Today’s Changes</p>
         <p className="mt-2 text-muted">
@@ -204,7 +212,7 @@ export default async function CompanyPage({
 
   return (
     <CompanyBoard
-      companyName={session.name || "Bus company"}
+      companyName={liveName}
       schools={schools}
       schoolId={selected.id}
       desks={desks}

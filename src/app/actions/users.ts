@@ -336,6 +336,28 @@ export async function createBusCompanyForDemo(formData: FormData) {
   redirect("/platform?saved=company");
 }
 
+export async function updateBusCompanyName(formData: FormData) {
+  const session = await getSession();
+  if (!session || !(await isPlatformAdmin(session))) return;
+
+  const userId = String(formData.get("userId") || "").trim();
+  const companyName = String(formData.get("companyName") || "").trim();
+  if (!userId || !companyName) return;
+
+  const company = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true },
+  });
+  if (!company || company.role !== "BUS_COMPANY") return;
+
+  await prisma.user.update({
+    where: { id: company.id },
+    data: { name: companyName },
+  });
+  revalidatePath("/platform");
+  revalidatePath("/company");
+}
+
 export async function updateBusCompanySchools(formData: FormData) {
   const session = await getSession();
   if (!session || !(await isPlatformAdmin(session))) return;

@@ -6,6 +6,7 @@ import {
   createBusCompanyForDemo,
   createSchoolForDemo,
   resetSchoolLoginPassword,
+  updateBusCompanyName,
   updateBusCompanySchools,
 } from "@/app/actions/users";
 import {
@@ -132,7 +133,8 @@ export default async function PlatformSchoolsPage({
           <h2 className="text-lg font-semibold text-navy">Add a bus company</h2>
           <p className="mt-2 text-sm leading-6 text-[#4b5563]">
             Add the company, then check the schools under it. They all sign
-            in at the same page and only see those schools.
+            in at the same page and only see those schools. You can use a
+            temporary name now and change it later under Bus companies.
           </p>
           <p className="mt-2 break-all text-sm text-[#4b5563]">{companyLogin}</p>
           {saved === "company" ? (
@@ -168,7 +170,7 @@ export default async function PlatformSchoolsPage({
               <input
                 name="companyName"
                 required
-                placeholder="Company name"
+                placeholder="Company name — you can change this later"
                 className="w-full rounded-xl border border-line px-3 py-2"
               />
               <input
@@ -249,7 +251,8 @@ export default async function PlatformSchoolsPage({
           </h2>
           <p className="mt-2 text-sm text-[#4b5563]">
             They sign in at {companyLogin} and see only the schools under
-            them. You can change those schools or set a new password here.
+            them. You can change the company name, schools, or password
+            here anytime.
           </p>
           {companies.length ? (
             <ul className="mt-4 divide-y divide-line">
@@ -264,6 +267,22 @@ export default async function PlatformSchoolsPage({
                     <div className="mt-0.5 break-all text-sm text-[#4b5563]">
                       {row.email}
                     </div>
+                    <form
+                      action={updateBusCompanyName}
+                      className="mt-3 flex flex-wrap gap-2"
+                    >
+                      <input type="hidden" name="userId" value={row.id} />
+                      <input
+                        name="companyName"
+                        required
+                        defaultValue={row.name}
+                        placeholder="Company name"
+                        className="min-w-[180px] flex-1 rounded-xl border border-line px-3 py-2 text-sm"
+                      />
+                      <button className="rounded-xl bg-navy px-3 py-2 text-sm font-semibold text-white">
+                        Save company name
+                      </button>
+                    </form>
                     {assigned.length ? (
                       <div className="mt-2 text-sm text-[#4b5563]">
                         Schools · {assigned.map((school) => school.name).join(", ")}

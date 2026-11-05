@@ -26,11 +26,13 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
 export function AppShell({
   user,
   schoolName,
+  headerName,
   showPlatform = false,
   children,
 }: {
   user: SessionUser;
   schoolName?: string | null;
+  headerName?: string | null;
   schoolLogoUrl?: string | null;
   showPlatform?: boolean;
   children: React.ReactNode;
@@ -66,7 +68,7 @@ export function AppShell({
         <div className="mx-auto max-w-[1100px] px-4 pt-3 sm:px-6">
           <Link href={home} className="block">
             <HeaderWelcome
-              name={company ? user.name : schoolName}
+              name={company ? headerName || user.name : schoolName}
               subtitle={company ? "Bus company" : "Transportation Desk"}
             />
           </Link>
