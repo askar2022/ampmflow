@@ -45,5 +45,6 @@ export async function nearbyAssignmentSuggestion(input: {
     ride: suggestion.ride,
     vehicle: suggestion.vehicle,
     fill: suggestion.fill,
+    miles: suggestion.miles,
   };
 }

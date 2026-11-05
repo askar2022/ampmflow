@@ -121,6 +121,7 @@ export function ChangeRideAssign({
             ride: result.ride,
             vehicle: result.vehicle,
             fill: result.fill,
+            miles: result.miles,
           });
           setNearbyStatus("found");
           return;
@@ -339,13 +340,17 @@ export function ChangeRideAssign({
                     </p>
                     <p className="mt-2 text-sm font-extrabold text-navy">
                       Closest existing address: {nearby.address}
+                      {nearby.miles != null
+                        ? ` — ${nearby.miles.toFixed(1)} miles away`
+                        : ""}
                     </p>
                     <p className="mt-1 text-sm font-extrabold text-navy">
                       That student’s assignment: {nearby.ride}
                     </p>
                     <p className="mt-2 text-sm text-navy/80">
-                      This matches a similar street already on this school’s
-                      roster. Check your routing software before you assign.
+                      {nearby.miles != null
+                        ? "Straight-line distance from this school’s saved addresses. Nearby reference only — not a confirmed route. Check your routing software before you assign."
+                        : "This matches a similar street already on this school’s roster. Check your routing software before you assign."}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
@@ -367,9 +372,11 @@ export function ChangeRideAssign({
                 ) : null}
                 {nearbyEnabled && nearbyStatus === "none" ? (
                   <p className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-sm font-semibold text-navy">
-                    No nearby assignment is available from this school’s
-                    records. Assign the bus or van below using your routing
-                    software.
+                    No similar street was found on this school’s assigned
+                    roster. We match the same street name, for example 520
+                    Morgan and 540 Morgan. Different streets a few blocks away
+                    cannot be compared without a map. Assign the bus or van
+                    below using your routing software.
                   </p>
                 ) : null}
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">

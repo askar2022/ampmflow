@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { loadSchoolGeoPoints, milesBetween, type GeoPoint } from "./geocode";
 import { loadStudents } from "./transportation";
 import type { EffectiveStudent, PlanSnapshot, Trip } from "./types";
 
@@ -8,13 +9,20 @@ export type NearbyAssignment = {
   ride: string;
   vehicle: "bus" | "van";
   fill: string;
+  miles?: number;
 };
+
+const MAX_NEARBY_MILES = 2;
 
 const STREET_WORDS: Record<string, string> = {
   north: "n",
   south: "s",
   east: "e",
   west: "w",
+  northeast: "ne",
+  northwest: "nw",
+  southeast: "se",
+  southwest: "sw",
   street: "st",
   str: "st",
   avenue: "ave",
@@ -50,20 +58,33 @@ export function normalizeStreetLine(line1: string) {
   return shortenStreetWords(cleanText(line1));
 }
 
+const DIRECTION = "n|s|e|w|ne|nw|se|sw";
+
 export function streetNameOnly(line1: string) {
-  return normalizeStreetLine(line1).replace(/^\d+[a-z]?\s+/, "").trim();
+  return normalizeStreetLine(line1)
+    .replace(/^\d+[a-z]?\s+/, "")
+    .replace(/^(old|new)\s+/, "")
+    .replace(new RegExp(`^(${DIRECTION})\\s+`), "")
+    .replace(new RegExp(`\\s+(${DIRECTION})$`), "")
+    .replace(/\b(minneapolis|st paul|saint paul|mn)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function realZip(value: string) {
+  return value.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] || "";
 }
 
 function streetParts(address: string | null | undefined) {
   const raw = (address || "").trim();
   if (!raw || raw === "—" || raw.startsWith(",")) return null;
-  const chunks = raw.split(",").map((part) => part.trim()).filter(Boolean);
+  const zip = realZip(raw);
+  const withoutZip = raw.replace(/\b\d{5}(?:-\d{4})?\b/, " ");
+  const chunks = withoutZip.split(",").map((part) => part.trim()).filter(Boolean);
   const line1 = chunks[0] || raw;
-  const last = chunks[chunks.length - 1] || "";
-  const zip = last.replace(/^[a-z]{2}\s+/i, "").replace(/\s+/g, "");
   const line = normalizeStreetLine(line1);
   const street = streetNameOnly(line1);
-  if (!line) return null;
+  if (!line && !street) return null;
   return { line, street, zip, display: raw };
 }
 
@@ -71,13 +92,13 @@ function scoreAddress(
   request: NonNullable<ReturnType<typeof streetParts>>,
   other: NonNullable<ReturnType<typeof streetParts>>,
 ) {
-  if (request.line === other.line && request.zip && request.zip === other.zip) {
-    return 100;
+  if (request.line && request.line === other.line) {
+    if (request.zip && other.zip && request.zip === other.zip) return 100;
+    return 90;
   }
-  if (request.line === other.line) return 90;
   if (request.street && request.street.length > 3 && request.street === other.street) {
     if (request.zip && other.zip && request.zip === other.zip) return 70;
-    if (!request.zip || !other.zip) return 50;
+    return 55;
   }
   return 0;
 }
@@ -88,13 +109,28 @@ function rideAddress(student: EffectiveStudent, plan: PlanSnapshot) {
   return student.homeAddress;
 }
 
-function rosterAddresses(student: EffectiveStudent, plan: PlanSnapshot) {
+function uniqueAddresses(...values: Array<string | null | undefined>) {
   return [
+    ...new Set(values.map((value) => (value || "").trim()).filter(Boolean)),
+  ];
+}
+
+function requestAddresses(student: EffectiveStudent, plan: PlanSnapshot) {
+  return uniqueAddresses(
     rideAddress(student, plan),
     student.homeAddress,
     student.daycareAddress,
     plan.customAddress,
-  ].filter((value, index, list) => value && list.indexOf(value) === index);
+  );
+}
+
+function rosterAddresses(student: EffectiveStudent, plan: PlanSnapshot) {
+  return uniqueAddresses(
+    rideAddress(student, plan),
+    student.homeAddress,
+    student.daycareAddress,
+    plan.customAddress,
+  );
 }
 
 function assignedRide(plan: PlanSnapshot, vehicleName?: string | null) {
@@ -126,6 +162,92 @@ function assignedRide(plan: PlanSnapshot, vehicleName?: string | null) {
   return null;
 }
 
+type StudentAddressIds = {
+  homeId: string | null;
+  daycareId: string | null;
+  customByTrip: Partial<Record<Trip, string | null>>;
+};
+
+function pointsFor(
+  ids: StudentAddressIds | undefined,
+  plan: PlanSnapshot,
+  geo: Map<string, GeoPoint>,
+) {
+  if (!ids) return [] as GeoPoint[];
+  const wanted = [
+    plan.destination === "DAYCARE"
+      ? ids.daycareId
+      : plan.destination === "CUSTOM"
+        ? ids.customByTrip[plan.trip]
+        : ids.homeId,
+    ids.homeId,
+    ids.daycareId,
+    ids.customByTrip[plan.trip],
+  ].filter(Boolean) as string[];
+  const points: GeoPoint[] = [];
+  const seen = new Set<string>();
+  for (const id of wanted) {
+    const point = geo.get(id);
+    if (!point || seen.has(point.id)) continue;
+    seen.add(point.id);
+    points.push(point);
+  }
+  return points;
+}
+
+function pickClosest(args: {
+  roster: EffectiveStudent[];
+  studentId: string;
+  trips: Trip[];
+  vehicleName?: Map<string, string>;
+  geo: Map<string, GeoPoint>;
+  addressIds: Map<string, StudentAddressIds>;
+}): NearbyAssignment | null {
+  const trips = args.trips.filter((trip): trip is Trip => trip === "AM" || trip === "PM");
+  const request = args.roster.find((student) => student.id === args.studentId);
+  if (!request || !trips.length) return null;
+
+  const matches: Array<NearbyAssignment & { score: number }> = [];
+  for (const trip of trips) {
+    const requestPlan = trip === "AM" ? request.am : request.pm;
+    const from = pointsFor(args.addressIds.get(request.id), requestPlan, args.geo);
+    if (!from.length) continue;
+    for (const other of args.roster) {
+      if (other.id === args.studentId) continue;
+      const otherPlan = trip === "AM" ? other.am : other.pm;
+      const ride = assignedRide(otherPlan, args.vehicleName?.get(other.id));
+      if (!ride) continue;
+      const to = pointsFor(args.addressIds.get(other.id), otherPlan, args.geo);
+      for (const requestPoint of from) {
+        for (const otherPoint of to) {
+          const miles = milesBetween(requestPoint, otherPoint);
+          if (miles > MAX_NEARBY_MILES) continue;
+          matches.push({
+            address: otherPoint.address,
+            trip,
+            ride: `${trip} ${ride.ride}`,
+            vehicle: ride.vehicle,
+            fill: ride.fill,
+            miles,
+            score: 1000 - miles * 100,
+          });
+        }
+      }
+    }
+  }
+  if (!matches.length) return null;
+  matches.sort((a, b) => (a.miles ?? 99) - (b.miles ?? 99));
+  const chosen = matches[0];
+  return {
+    address: chosen.address,
+    trip: chosen.trip,
+    ride: chosen.ride,
+    vehicle: chosen.vehicle,
+    fill: chosen.fill,
+    miles: Math.round((chosen.miles || 0) * 10) / 10,
+  };
+}
+
 export function nearbyFromRoster(args: {
   roster: EffectiveStudent[];
   studentId: string;
@@ -140,8 +262,10 @@ export function nearbyFromRoster(args: {
   const matches: Array<NearbyAssignment & { score: number }> = [];
   for (const trip of trips) {
     const requestPlan = trip === "AM" ? request.am : request.pm;
-    const requestAddress = streetParts(rideAddress(request, requestPlan));
-    if (!requestAddress) continue;
+    const requestKeys = requestAddresses(request, requestPlan)
+      .map((value) => streetParts(value))
+      .filter((value): value is NonNullable<typeof value> => Boolean(value));
+    if (!requestKeys.length) continue;
 
     for (const other of args.roster) {
       if (other.id === args.studentId) continue;
@@ -151,15 +275,18 @@ export function nearbyFromRoster(args: {
       for (const raw of rosterAddresses(other, otherPlan)) {
         const otherAddress = streetParts(raw);
         if (!otherAddress) continue;
-        const score = scoreAddress(requestAddress, otherAddress);
-        if (score < 50) continue;
+        let best = 0;
+        for (const requestAddress of requestKeys) {
+          best = Math.max(best, scoreAddress(requestAddress, otherAddress));
+        }
+        if (best < 50) continue;
         matches.push({
           address: otherAddress.display,
           trip,
           ride: `${trip} ${ride.ride}`,
           vehicle: ride.vehicle,
           fill: ride.fill,
-          score,
+          score: best,
         });
       }
     }
@@ -167,14 +294,7 @@ export function nearbyFromRoster(args: {
 
   if (!matches.length) return null;
   matches.sort((a, b) => b.score - a.score);
-  const bestScore = matches[0].score;
-  const top = matches.filter((item) => item.score === bestScore);
-  const byRide = new Map<string, number>();
-  for (const item of top) {
-    byRide.set(item.ride, (byRide.get(item.ride) || 0) + 1);
-  }
-  top.sort((a, b) => (byRide.get(b.ride) || 0) - (byRide.get(a.ride) || 0));
-  const chosen = top[0];
+  const chosen = matches[0];
   return {
     address: chosen.address,
     trip: chosen.trip,
@@ -184,26 +304,90 @@ export function nearbyFromRoster(args: {
   };
 }
 
+async function loadAddressIds(schoolId: string) {
+  const rows = await prisma.student.findMany({
+    where: { schoolId, active: true },
+    select: {
+      id: true,
+      homeAddressId: true,
+      daycare: { select: { addressId: true } },
+      assignments: {
+        select: { trip: true, customAddressId: true },
+      },
+    },
+  });
+  const map = new Map<string, StudentAddressIds>();
+  const allIds: string[] = [];
+  for (const row of rows) {
+    const customByTrip: StudentAddressIds["customByTrip"] = {};
+    for (const assignment of row.assignments) {
+      if (assignment.trip === "AM" || assignment.trip === "PM") {
+        customByTrip[assignment.trip] = assignment.customAddressId;
+        if (assignment.customAddressId) allIds.push(assignment.customAddressId);
+      }
+    }
+    map.set(row.id, {
+      homeId: row.homeAddressId,
+      daycareId: row.daycare?.addressId || null,
+      customByTrip,
+    });
+    if (row.homeAddressId) allIds.push(row.homeAddressId);
+    if (row.daycare?.addressId) allIds.push(row.daycare.addressId);
+  }
+  return { map, allIds };
+}
+
+export async function nearbySuggestionsForSchool(args: {
+  schoolId: string;
+  roster: EffectiveStudent[];
+  requests: Array<{ studentId: string; trips: Trip[] }>;
+}) {
+  const { map, allIds } = await loadAddressIds(args.schoolId);
+  const geo = await loadSchoolGeoPoints(args.schoolId, allIds);
+  const vehicles = await prisma.student.findMany({
+    where: {
+      schoolId: args.schoolId,
+      active: true,
+      vehicleId: { not: null },
+    },
+    select: { id: true, vehicle: { select: { name: true } } },
+  });
+  const vehicleName = new Map(
+    vehicles.map((row) => [row.id, row.vehicle?.name || ""]),
+  );
+  const suggestions = new Map<string, NearbyAssignment | null>();
+  for (const item of args.requests) {
+    suggestions.set(
+      item.studentId,
+      pickClosest({
+        roster: args.roster,
+        studentId: item.studentId,
+        trips: item.trips,
+        vehicleName,
+        geo,
+        addressIds: map,
+      }) ||
+        nearbyFromRoster({
+          roster: args.roster,
+          studentId: item.studentId,
+          trips: item.trips,
+          vehicleName,
+        }),
+    );
+  }
+  return suggestions;
+}
+
 export async function findNearbyAssignment(args: {
   schoolId: string;
   studentId: string;
   trips: Trip[];
 }): Promise<NearbyAssignment | null> {
-  const [students, vehicles] = await Promise.all([
-    loadStudents(args.schoolId),
-    prisma.student.findMany({
-      where: {
-        schoolId: args.schoolId,
-        active: true,
-        vehicleId: { not: null },
-      },
-      select: { id: true, vehicle: { select: { name: true } } },
-    }),
-  ]);
-  return nearbyFromRoster({
+  const students = await loadStudents(args.schoolId);
+  const suggestions = await nearbySuggestionsForSchool({
+    schoolId: args.schoolId,
     roster: students,
-    studentId: args.studentId,
-    trips: args.trips,
-    vehicleName: new Map(vehicles.map((row) => [row.id, row.vehicle?.name || ""])),
+    requests: [{ studentId: args.studentId, trips: args.trips }],
   });
+  return suggestions.get(args.studentId) || null;
 }

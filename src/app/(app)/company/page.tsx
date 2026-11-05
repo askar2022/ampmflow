@@ -12,7 +12,7 @@ import {
   destinationFromStudent,
   planLine,
 } from "@/lib/change-notify";
-import { nearbyFromRoster } from "@/lib/nearby-assignment";
+import { nearbySuggestionsForSchool } from "@/lib/nearby-assignment";
 import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
 import { isPlanWaiting, isWaitingRide } from "@/lib/format";
 import type { EffectiveStudent, Trip } from "@/lib/types";
@@ -134,12 +134,27 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     )
     .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
 
-  const rows: CompanyRequest[] = changes.map((student) => {
-    const request = requestFor(student);
+  const requestRows = changes.map((student) => {
     const trips: Trip[] = [
       ...(isPlanWaiting(student.am) ? (["AM"] as const) : []),
       ...(isPlanWaiting(student.pm) ? (["PM"] as const) : []),
     ];
+    return {
+      student,
+      trips: trips.length ? trips : (["AM", "PM"] as Trip[]),
+    };
+  });
+  const nearbyByStudent = await nearbySuggestionsForSchool({
+    schoolId: school.id,
+    roster,
+    requests: requestRows.map((row) => ({
+      studentId: row.student.id,
+      trips: row.trips,
+    })),
+  });
+
+  const rows: CompanyRequest[] = requestRows.map(({ student, trips }) => {
+    const request = requestFor(student);
     return {
       studentId: student.id,
       name: student.fullName,
@@ -153,11 +168,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       email: companyEmail(student, trips),
       trips,
       changed: assignedIds.has(student.id),
-      nearby: nearbyFromRoster({
-        roster,
-        studentId: student.id,
-        trips: trips.length ? trips : ["AM", "PM"],
-      }),
+      nearby: nearbyByStudent.get(student.id) || null,
     };
   });
 

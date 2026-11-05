@@ -22,6 +22,7 @@ import {
   usableOpsEmail,
 } from "@/lib/ops-change-emails";
 import { canCompanyAccessSchool } from "@/lib/company-access";
+import { ensureAddressGeoColumns, geocodeAndSaveAddress } from "@/lib/geocode";
 import { parentSmsNumbers } from "@/lib/sms";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
@@ -58,15 +59,16 @@ async function attachDaycare(
   phone: string,
 ) {
   const daycareName = name.trim() || "Daycare";
+  const street = line1.trim();
   let daycare = await prisma.daycare.findFirst({
     where: { schoolId, name: daycareName },
-    select: { id: true },
+    select: { id: true, addressId: true },
   });
   if (!daycare) {
     const address = await prisma.address.create({
       data: {
         schoolId,
-        line1: line1.trim() || "Daycare address pending",
+        line1: street || "Daycare address pending",
         city: "Minneapolis",
         state: "MN",
         zip: "",
@@ -75,8 +77,15 @@ async function attachDaycare(
     });
     daycare = await prisma.daycare.create({
       data: { schoolId, name: daycareName, addressId: address.id },
-      select: { id: true },
+      select: { id: true, addressId: true },
     });
+  } else if (street) {
+    await prisma.address
+      .update({
+        where: { id: daycare.addressId },
+        data: { line1: street },
+      })
+      .catch(() => undefined);
   }
   if (phone.trim()) {
     await prisma.$executeRaw`
@@ -87,6 +96,13 @@ async function attachDaycare(
     where: { id: studentId },
     data: { daycareId: daycare.id },
   });
+  await ensureAddressGeoColumns();
+  await prisma.$executeRaw`
+    UPDATE "Address"
+    SET "latitude" = NULL, "longitude" = NULL
+    WHERE "id" = ${daycare.addressId}
+  `.catch(() => undefined);
+  await geocodeAndSaveAddress(daycare.addressId).catch(() => undefined);
   return daycare.id;
 }
 
@@ -500,6 +516,7 @@ async function createRequestedStudent(args: {
       label: "home",
     },
   });
+  await geocodeAndSaveAddress(home.id).catch(() => undefined);
   const student = await prisma.student.create({
     data: {
       schoolId: args.schoolId,
@@ -614,6 +631,15 @@ export async function requestRoute(input: RouteRequestInput) {
           data: { line1: address },
         })
         .catch(() => undefined);
+      await ensureAddressGeoColumns();
+      await prisma.$executeRaw`
+        UPDATE "Address"
+        SET "latitude" = NULL, "longitude" = NULL
+        WHERE "id" = ${loaded.record.homeAddressId}
+      `.catch(() => undefined);
+      await geocodeAndSaveAddress(loaded.record.homeAddressId).catch(
+        () => undefined,
+      );
     }
     if (teacherName) {
       await prisma.teacher
