@@ -153,7 +153,11 @@ export async function geocodeAndSaveAddress(addressId: string) {
   };
 }
 
-export async function loadSchoolGeoPoints(schoolId: string, addressIds: string[]) {
+export async function loadSchoolGeoPoints(
+  schoolId: string,
+  addressIds: string[],
+  options?: { geocode?: boolean; limit?: number },
+) {
   await ensureAddressGeoColumns();
   const ids = [...new Set(addressIds.filter(Boolean))];
   if (!ids.length) return new Map<string, GeoPoint>();
@@ -191,8 +195,8 @@ export async function loadSchoolGeoPoints(schoolId: string, addressIds: string[]
     }
   }
 
-  const toGeocode = missing.slice(0, 30);
-  for (let index = 0; index < toGeocode.length; index += 5) {
+  const toGeocode = options?.geocode ? missing.slice(0, options.limit ?? 8) : [];
+  for (let index = 0; index < toGeocode.length; index += 4) {
     const chunk = toGeocode.slice(index, index + 5);
     const found = await Promise.all(
       chunk.map((id) => geocodeAndSaveAddress(id).catch(() => null)),

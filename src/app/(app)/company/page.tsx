@@ -151,7 +151,8 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       studentId: row.student.id,
       trips: row.trips,
     })),
-  });
+    geocode: false,
+  }).catch(() => new Map());
 
   const rows: CompanyRequest[] = requestRows.map(({ student, trips }) => {
     const request = requestFor(student);

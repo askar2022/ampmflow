@@ -341,41 +341,49 @@ export async function nearbySuggestionsForSchool(args: {
   schoolId: string;
   roster: EffectiveStudent[];
   requests: Array<{ studentId: string; trips: Trip[] }>;
+  geocode?: boolean;
 }) {
-  const { map, allIds } = await loadAddressIds(args.schoolId);
-  const geo = await loadSchoolGeoPoints(args.schoolId, allIds);
-  const vehicles = await prisma.student.findMany({
-    where: {
-      schoolId: args.schoolId,
-      active: true,
-      vehicleId: { not: null },
-    },
-    select: { id: true, vehicle: { select: { name: true } } },
-  });
-  const vehicleName = new Map(
-    vehicles.map((row) => [row.id, row.vehicle?.name || ""]),
-  );
-  const suggestions = new Map<string, NearbyAssignment | null>();
-  for (const item of args.requests) {
-    suggestions.set(
-      item.studentId,
-      pickClosest({
-        roster: args.roster,
-        studentId: item.studentId,
-        trips: item.trips,
-        vehicleName,
-        geo,
-        addressIds: map,
-      }) ||
-        nearbyFromRoster({
+  try {
+    const { map, allIds } = await loadAddressIds(args.schoolId);
+    const geo = await loadSchoolGeoPoints(args.schoolId, allIds, {
+      geocode: args.geocode === true,
+      limit: 8,
+    });
+    const vehicles = await prisma.student.findMany({
+      where: {
+        schoolId: args.schoolId,
+        active: true,
+        vehicleId: { not: null },
+      },
+      select: { id: true, vehicle: { select: { name: true } } },
+    });
+    const vehicleName = new Map(
+      vehicles.map((row) => [row.id, row.vehicle?.name || ""]),
+    );
+    const suggestions = new Map<string, NearbyAssignment | null>();
+    for (const item of args.requests) {
+      suggestions.set(
+        item.studentId,
+        pickClosest({
           roster: args.roster,
           studentId: item.studentId,
           trips: item.trips,
           vehicleName,
-        }),
-    );
+          geo,
+          addressIds: map,
+        }) ||
+          nearbyFromRoster({
+            roster: args.roster,
+            studentId: item.studentId,
+            trips: item.trips,
+            vehicleName,
+          }),
+      );
+    }
+    return suggestions;
+  } catch {
+    return new Map<string, NearbyAssignment | null>();
   }
-  return suggestions;
 }
 
 export async function findNearbyAssignment(args: {
@@ -388,6 +396,7 @@ export async function findNearbyAssignment(args: {
     schoolId: args.schoolId,
     roster: students,
     requests: [{ studentId: args.studentId, trips: args.trips }],
+    geocode: true,
   });
   return suggestions.get(args.studentId) || null;
 }
