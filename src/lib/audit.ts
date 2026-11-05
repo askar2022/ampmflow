@@ -3,6 +3,7 @@ import type { PlanSnapshot, SessionUser } from "./types";
 
 export async function writeAudit(args: {
   user: SessionUser;
+  schoolId?: string | null;
   studentId?: string | null;
   action: string;
   trip?: string | null;
@@ -13,7 +14,7 @@ export async function writeAudit(args: {
 }) {
   return prisma.auditLog.create({
     data: {
-      schoolId: args.user.schoolId,
+      schoolId: args.schoolId || args.user.schoolId,
       studentId: args.studentId ?? null,
       actorId: args.user.id,
       approvedById: args.approvedById ?? args.user.id,

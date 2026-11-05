@@ -13,6 +13,7 @@ import {
   type LateRide,
 } from "@/lib/late-alert";
 import type { Trip } from "@/lib/types";
+import { SmsCostButton } from "./SmsCostPopup";
 
 type Preview = {
   rideLabel: string;
@@ -21,6 +22,8 @@ type Preview = {
   studentCount: number;
   preview: string;
   smsReady: boolean;
+  estimatedCents: number;
+  estimatedCostLabel: string;
 };
 
 export function LateAlertBoard({
@@ -46,6 +49,7 @@ export function LateAlertBoard({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [costRefresh, setCostRefresh] = useState(0);
   const [pending, start] = useTransition();
 
   const trips: Trip[] = useMemo(
@@ -104,6 +108,7 @@ export function LateAlertBoard({
         return;
       }
       setMessage(result.message);
+      setCostRefresh((value) => value + 1);
     });
   }
 
@@ -117,16 +122,22 @@ export function LateAlertBoard({
               Late Bus Alert
             </p>
           </div>
-          <Link
-            href={`/company?school=${selectedSchool}`}
-            className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
-          >
-            Today’s Changes
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <SmsCostButton
+              schoolId={selectedSchool}
+              refreshKey={costRefresh}
+            />
+            <Link
+              href={`/company?school=${selectedSchool}`}
+              className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+            >
+              Today’s Changes
+            </Link>
+          </div>
         </div>
         <p className="mt-2 max-w-2xl text-muted">
-          Text parents when a bus or van is running late. Uses the same Twilio
-          texts parents already get for transportation changes.
+          Text parents when a bus or van is running late. Each text is 30¢ —
+          open SMS cost for this week and month by bus or van.
         </p>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
@@ -224,7 +235,11 @@ export function LateAlertBoard({
                     preview.studentCount === 1 ? "" : "s"
                   })`
                 : ""}
-              .
+              {" · "}
+              <span className="font-extrabold">
+                {preview.estimatedCostLabel}
+              </span>{" "}
+              SMS cost.
             </div>
             <div className="rounded-xl border border-line bg-paper px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -236,7 +251,7 @@ export function LateAlertBoard({
             </div>
             {!preview.smsReady ? (
               <p className="text-sm text-red">
-                Twilio is not set, so the alert cannot send yet.
+                Texting is not set up yet, so the alert cannot send.
               </p>
             ) : null}
           </div>

@@ -1,7 +1,10 @@
 "use server";
 
 import { getSession } from "@/lib/auth";
-import { canCompanyAccessSchool } from "@/lib/company-access";
+import {
+  canCompanyAccessSchool,
+  loadCompanySchools,
+} from "@/lib/company-access";
 import { writeAudit } from "@/lib/audit";
 import {
   lateAlertSms,
@@ -11,6 +14,11 @@ import {
   uniqueFamilyPhones,
   type LateDelayMinutes,
 } from "@/lib/late-alert";
+import {
+  formatSmsMoney,
+  loadCompanySmsCostReport,
+  SMS_COST_CENTS,
+} from "@/lib/sms-cost";
 import { sendSms, smsConfigured } from "@/lib/sms";
 import type { Trip } from "@/lib/types";
 
@@ -53,6 +61,7 @@ export async function lateAlertPreview(input: {
   }
 
   const phones = uniqueFamilyPhones(recipients);
+  const estimatedCents = phones.length * SMS_COST_CENTS;
   return {
     ok: true as const,
     rideLabel: ride.label,
@@ -61,6 +70,8 @@ export async function lateAlertPreview(input: {
     studentCount: recipients.length,
     preview: lateAlertSms({ rideLabel: ride.label, minutes }),
     smsReady: smsConfigured(),
+    estimatedCents,
+    estimatedCostLabel: formatSmsMoney(estimatedCents),
   };
 }
 
@@ -80,7 +91,7 @@ export async function sendLateBusAlert(input: {
   if (!smsConfigured()) {
     return {
       ok: false as const,
-      error: "Twilio is not set. Parent texts cannot send yet.",
+      error: "Texting is not set up yet. Parent texts cannot send.",
     };
   }
 
@@ -111,8 +122,10 @@ export async function sendLateBusAlert(input: {
 
   const body = lateAlertSms({ rideLabel: ride.label, minutes });
   const texted = await sendSms({ to: phones, body });
+  const smsCount = texted.recipients.length;
   await writeAudit({
     user,
+    schoolId: input.schoolId,
     action: "LATE_BUS_ALERT",
     newPlan: {
       schoolId: input.schoolId,
@@ -120,6 +133,9 @@ export async function sendLateBusAlert(input: {
       minutes,
       trips,
       familyCount: phones.length,
+      smsCount,
+      centsEach: SMS_COST_CENTS,
+      costCents: smsCount * SMS_COST_CENTS,
       sent: texted.recipients,
       errors: texted.errors,
     },
@@ -136,11 +152,12 @@ export async function sendLateBusAlert(input: {
     ok: true as const,
     rideLabel: ride.label,
     minutes,
-    sentCount: texted.recipients.length,
+    sentCount: smsCount,
     skippedCount: texted.errors.length,
-    message: `Texted ${texted.recipients.length} famil${
-      texted.recipients.length === 1 ? "y" : "ies"
-    } on ${ride.label}.`,
+    costCents: smsCount * SMS_COST_CENTS,
+    message: `Texted ${smsCount} famil${
+      smsCount === 1 ? "y" : "ies"
+    } on ${ride.label} · ${formatSmsMoney(smsCount * SMS_COST_CENTS)}.`,
   };
 }
 
@@ -154,4 +171,22 @@ export async function listLateRides(schoolId: string) {
   }
   const rides = await loadLateRides(schoolId);
   return { ok: true as const, rides };
+}
+
+export async function loadSmsCostPopup(schoolId?: string) {
+  const user = await getSession();
+  if (!user || user.role !== "BUS_COMPANY") {
+    return { ok: false as const, error: "Only the bus company can view this." };
+  }
+  const schools = await loadCompanySchools(user);
+  const schoolIds = schools.map((school) => school.id);
+  if (schoolId && !(await canCompanyAccessSchool(user, schoolId))) {
+    return { ok: false as const, error: "That school is not on your list." };
+  }
+  const report = await loadCompanySmsCostReport({
+    actorId: user.id,
+    schoolIds,
+    schoolId: schoolId || undefined,
+  });
+  return { ok: true as const, report };
 }
