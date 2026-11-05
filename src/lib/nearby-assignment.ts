@@ -116,21 +116,11 @@ function uniqueAddresses(...values: Array<string | null | undefined>) {
 }
 
 function requestAddresses(student: EffectiveStudent, plan: PlanSnapshot) {
-  return uniqueAddresses(
-    rideAddress(student, plan),
-    student.homeAddress,
-    student.daycareAddress,
-    plan.customAddress,
-  );
+  return uniqueAddresses(rideAddress(student, plan));
 }
 
 function rosterAddresses(student: EffectiveStudent, plan: PlanSnapshot) {
-  return uniqueAddresses(
-    rideAddress(student, plan),
-    student.homeAddress,
-    student.daycareAddress,
-    plan.customAddress,
-  );
+  return uniqueAddresses(rideAddress(student, plan));
 }
 
 function assignedRide(plan: PlanSnapshot, vehicleName?: string | null) {
@@ -180,9 +170,6 @@ function pointsFor(
       : plan.destination === "CUSTOM"
         ? ids.customByTrip[plan.trip]
         : ids.homeId,
-    ids.homeId,
-    ids.daycareId,
-    ids.customByTrip[plan.trip],
   ].filter(Boolean) as string[];
   const points: GeoPoint[] = [];
   const seen = new Set<string>();
