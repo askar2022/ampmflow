@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { nearbyAssignmentSuggestion } from "@/app/actions/nearby-assignment";
 import { assignRequestedBus } from "@/app/actions/reception";
+import type { NearbyAssignment } from "@/lib/nearby-assignment";
 import type { Trip } from "@/lib/types";
 
 type TripChoice = "AM" | "PM" | "BOTH";
@@ -18,6 +20,8 @@ type Receipt = {
   teacherEmail: string;
   busCompanyEmail: string;
 };
+
+type NearbyStatus = "idle" | "loading" | "found" | "none" | "dismissed";
 
 function startingTrip(defaultTrips?: Trip[]): TripChoice {
   const am = defaultTrips?.includes("AM");
@@ -51,6 +55,8 @@ export function ChangeRideAssign({
   parentEmail = "",
   parentPhone = "",
   teacherEmail = "",
+  nearbyEnabled = false,
+  nearby: nearbyStart = null,
 }: {
   studentId: string;
   studentName: string;
@@ -63,6 +69,8 @@ export function ChangeRideAssign({
   parentEmail?: string;
   parentPhone?: string;
   teacherEmail?: string;
+  nearbyEnabled?: boolean;
+  nearby?: NearbyAssignment | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -76,12 +84,81 @@ export function ChangeRideAssign({
   const [pmPickup, setPmPickup] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
+  const [nearbyStatus, setNearbyStatus] = useState<NearbyStatus>(
+    nearbyEnabled ? (nearbyStart ? "found" : "none") : "idle",
+  );
+  const [nearby, setNearby] = useState<NearbyAssignment | null>(nearbyStart);
+  const nearbyDismissed = useRef(false);
 
   function close() {
     if (pending) return;
     setOpen(false);
     setReview(false);
     setError("");
+    setNearbyStatus("idle");
+    setNearby(null);
+    nearbyDismissed.current = false;
+  }
+
+  useEffect(() => {
+    if (!open || review || !nearbyEnabled || nearbyDismissed.current) return;
+    const start = startingTrip(defaultTrips);
+    if (trip === start) {
+      setNearby(nearbyStart);
+      setNearbyStatus(nearbyStart ? "found" : "none");
+      return;
+    }
+    let cancelled = false;
+    const trips: Trip[] = trip === "BOTH" ? ["AM", "PM"] : [trip];
+    setNearbyStatus("loading");
+    nearbyAssignmentSuggestion({ studentId, trips })
+      .then((result) => {
+        if (cancelled || nearbyDismissed.current) return;
+        if (result.ok && result.found) {
+          setNearby({
+            address: result.address,
+            trip: result.trip,
+            ride: result.ride,
+            vehicle: result.vehicle,
+            fill: result.fill,
+          });
+          setNearbyStatus("found");
+          return;
+        }
+        setNearby(null);
+        setNearbyStatus("none");
+      })
+      .catch(() => {
+        if (cancelled || nearbyDismissed.current) return;
+        setNearby(null);
+        setNearbyStatus("none");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, review, nearbyEnabled, studentId, trip, defaultTrips, nearbyStart]);
+
+  function dismissNearby() {
+    nearbyDismissed.current = true;
+    setNearbyStatus("dismissed");
+  }
+
+  function applyNearby() {
+    if (!nearby) return;
+    if (nearby.vehicle === "van") {
+      const match = vans.find(
+        (van) =>
+          van.name.toLowerCase() === nearby.fill.toLowerCase() ||
+          van.name.toLowerCase() === `van ${nearby.fill}`.toLowerCase() ||
+          nearby.fill.toLowerCase() === van.name.replace(/^van\s+/i, "").toLowerCase(),
+      );
+      setVanNumber(match?.name || nearby.fill);
+      setBusNumber("");
+    } else {
+      setBusNumber(nearby.fill);
+      setVanNumber("");
+    }
+    dismissNearby();
   }
 
   function assign() {
@@ -250,6 +327,51 @@ export function ChangeRideAssign({
               </div>
             ) : (
               <>
+                {nearbyEnabled && nearbyStatus === "loading" ? (
+                  <p className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-sm font-semibold text-navy">
+                    Checking this school’s addresses for a nearby reference…
+                  </p>
+                ) : null}
+                {nearbyEnabled && nearbyStatus === "found" && nearby ? (
+                  <div className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-4">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-navy">
+                      Nearby reference only — not a confirmed route
+                    </p>
+                    <p className="mt-2 text-sm font-extrabold text-navy">
+                      Closest existing address: {nearby.address}
+                    </p>
+                    <p className="mt-1 text-sm font-extrabold text-navy">
+                      That student’s assignment: {nearby.ride}
+                    </p>
+                    <p className="mt-2 text-sm text-navy/80">
+                      This matches a similar street already on this school’s
+                      roster. Check your routing software before you assign.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={applyNearby}
+                        className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"
+                      >
+                        Use this suggestion
+                      </button>
+                      <button
+                        type="button"
+                        onClick={dismissNearby}
+                        className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold"
+                      >
+                        Continue without suggestion
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+                {nearbyEnabled && nearbyStatus === "none" ? (
+                  <p className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-sm font-semibold text-navy">
+                    No nearby assignment is available from this school’s
+                    records. Assign the bus or van below using your routing
+                    software.
+                  </p>
+                ) : null}
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <label className="block text-sm font-semibold">
                     Bus number

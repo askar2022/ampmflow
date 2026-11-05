@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChangeRideAssign } from "@/app/(app)/changes/ChangeRideAssign";
 import type { CompanySchool } from "@/lib/company-access";
+import type { NearbyAssignment } from "@/lib/nearby-assignment";
 import type { Trip } from "@/lib/types";
 
 export type CompanyRequest = {
@@ -15,6 +16,7 @@ export type CompanyRequest = {
   email: { subject: string; body: string };
   trips: Trip[];
   changed: boolean;
+  nearby?: NearbyAssignment | null;
 };
 
 function ReadEmailButton({
@@ -184,6 +186,8 @@ export function CompanyBoard({
                           vans={desk.vans}
                           companyAssigned={row.changed}
                           defaultTrips={row.trips}
+                          nearbyEnabled
+                          nearby={row.nearby}
                         />
                       </div>
                     </td>

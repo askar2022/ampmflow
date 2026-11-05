@@ -23,6 +23,22 @@ function pickupTimeLine(amPickup?: string, pmPickup?: string) {
     .join(". ");
 }
 
+function pickupTimeLineSo(amPickup?: string, pmPickup?: string) {
+  return [
+    amPickup?.trim() ? `Qaadista AM ${amPickup.trim()}` : "",
+    pmPickup?.trim() ? `Qaadista PM ${pmPickup.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(". ");
+}
+
+function bilingualSms(english: string, somali: string) {
+  return `${english}\n${somali}`;
+}
+
+const REQUEST_SO =
+  "Waxaan u dirney codisigaagii kambaniga basaska. Waanu kuu soo diri doonaa marka bas ama van lagu qoro.";
+
 function parentChangeSms(args: {
   student: EffectiveStudent;
   next: string;
@@ -33,16 +49,21 @@ function parentChangeSms(args: {
   pmPickup?: string;
 }) {
   const name = args.student.fullName;
-  if (args.kind === "daycare-request") {
-    return `AMPM Flow: we asked the bus company to add a daycare route for ${name}. We will text you when a bus or van is assigned.`;
-  }
-  if (args.kind === "address-request") {
-    return `AMPM Flow: we sent ${name}'s new address to the bus company. We will text you when a bus or van is assigned.`;
-  }
-  if (args.kind === "ride-request") {
-    return `AMPM Flow: we asked the bus company for a bus or van for ${name}. We will text you when it is assigned.`;
+  if (
+    args.kind === "daycare-request" ||
+    args.kind === "address-request" ||
+    args.kind === "ride-request"
+  ) {
+    const english =
+      args.kind === "daycare-request"
+        ? `AMPM Flow: we asked the bus company to add a daycare route for ${name}. We will text you when a bus or van is assigned.`
+        : args.kind === "address-request"
+          ? `AMPM Flow: we sent ${name}'s new address to the bus company. We will text you when a bus or van is assigned.`
+          : `AMPM Flow: we asked the bus company for a bus or van for ${name}. We will text you when it is assigned.`;
+    return bilingualSms(english, `${name}: ${REQUEST_SO}`);
   }
   const times = pickupTimeLine(args.amPickup, args.pmPickup);
+  const timesSo = pickupTimeLineSo(args.amPickup, args.pmPickup);
   const blob = `${args.next} ${args.note} ${args.when}`;
   const van =
     blob.match(/Van\s+[A-Za-z0-9-]+/i)?.[0] ||
@@ -50,8 +71,13 @@ function parentChangeSms(args: {
   const bus =
     args.next.match(/Bus\s+\d+/i)?.[0] || args.note.match(/Bus\s+\d+/i)?.[0];
   const ride = van || bus || "a bus or van";
+  const rideSo = van || bus || "bas ama van";
   const assigned = `AMPM Flow: ${name} is assigned ${ride}`;
-  return times ? `${assigned}. ${times}.` : `${assigned}.`;
+  const assignedSo = `${name} waxaa lagu qoray ${rideSo}`;
+  return bilingualSms(
+    times ? `${assigned}. ${times}.` : `${assigned}.`,
+    timesSo ? `${assignedSo}. ${timesSo}.` : `${assignedSo}.`,
+  );
 }
 
 export type ChangeNotice = {
@@ -738,10 +764,15 @@ export async function notifyStudentLeft(args: {
   if (!teachers.length) skipped.push("teacher (required)");
   if (!company.length) skipped.push("bus company (required)");
 
-  const smsBody = [
-    `AMPM Flow: ${args.student.fullName} is no longer on the school transportation list`,
-    args.reason,
-  ].join(". ");
+  const smsBody = bilingualSms(
+    [
+      `AMPM Flow: ${args.student.fullName} is no longer on the school transportation list`,
+      args.reason,
+    ]
+      .filter(Boolean)
+      .join(". "),
+    `${args.student.fullName} kama sii jiro liiska gaadiidka dugsiga.`,
+  );
   const parentPhones = parentSmsNumbers(
     args.student.parentPhone,
     args.student.parentPhone2,
@@ -893,7 +924,10 @@ export async function notifyRouteRequest(args: {
   if (requestPhones.length && smsConfigured()) {
     const texted = await sendSms({
       to: requestPhones,
-      body: `AMPM Flow: we requested a bus or van for ${args.studentName}. The school will update you when the number is on file.`,
+      body: bilingualSms(
+        `AMPM Flow: we requested a bus or van for ${args.studentName}. The school will update you when the number is on file.`,
+        `${args.studentName}: ${REQUEST_SO}`,
+      ),
     });
     if (texted.sent) {
       sent.push(...texted.recipients.map((phone) => `parent text: ${phone}`));

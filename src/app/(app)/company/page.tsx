@@ -12,6 +12,7 @@ import {
   destinationFromStudent,
   planLine,
 } from "@/lib/change-notify";
+import { nearbyFromRoster } from "@/lib/nearby-assignment";
 import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import { CompanyBoard, type CompanyDesk, type CompanyRequest } from "./CompanyBoard";
@@ -100,8 +101,9 @@ async function loadCompanyNeedUpdate(schoolId: string) {
 }
 
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
-  const [changes, vehicles, routes] = await Promise.all([
+  const [changes, roster, vehicles, routes] = await Promise.all([
     loadCompanyNeedUpdate(school.id),
+    loadStudents(school.id),
     loadVehicles(school.id).catch(() => []),
     prisma.busRoute.findMany({
       where: { schoolId: school.id },
@@ -159,6 +161,11 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       email: companyEmail(student, trips),
       trips,
       changed: assignedIds.has(student.id),
+      nearby: nearbyFromRoster({
+        roster,
+        studentId: student.id,
+        trips: trips.length ? trips : ["AM", "PM"],
+      }),
     };
   });
 
