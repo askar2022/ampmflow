@@ -32,7 +32,7 @@ export default async function LoginPage({
           : db.reason === "unreachable"
             ? usedDirectHost
               ? `Vercel has DATABASE_URL, but it cannot reach ${db.host}:${db.port}. Use the pooler URI on port 6543.`
-              : `Vercel has DATABASE_URL (${db.host || "unknown host"}${db.port ? `:${db.port}` : ""}), but login to Postgres failed.`
+              : "The database is busy after the last page crash. Wait one minute, then refresh. DATABASE_URL is already set."
             : "";
 
   return (
@@ -40,21 +40,32 @@ export default async function LoginPage({
       {!db.ok ? (
         <div className="text-left">
           <h2 className="text-lg font-semibold text-navy short-h:text-base">
-            Connect the database
+            {db.reason === "unreachable" && !usedDirectHost
+              ? "Database is busy"
+              : "Connect the database"}
           </h2>
           <p className="mt-2 text-sm text-red">{dbMessage}</p>
-          <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
-            <li>Open Supabase → Connect at the top of the project.</li>
-            <li>
-              Copy the <strong>Transaction pooler</strong> URI (port{" "}
-              <code>6543</code>).
-            </li>
-            <li>Replace the password placeholder with your database password.</li>
-            <li>
-              In Vercel, set <strong>DATABASE_URL</strong> for Production.
-            </li>
-            <li>Redeploy, then refresh this page.</li>
-          </ol>
+          {db.reason === "unreachable" && !usedDirectHost ? (
+            <p className="mt-4 text-sm text-ink">
+              Open Supabase and confirm the project is not paused. Then refresh
+              this page. You do not need to change DATABASE_URL.
+            </p>
+          ) : (
+            <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-ink">
+              <li>Open Supabase → Connect at the top of the project.</li>
+              <li>
+                Copy the <strong>Transaction pooler</strong> URI (port{" "}
+                <code>6543</code>).
+              </li>
+              <li>
+                Replace the password placeholder with your database password.
+              </li>
+              <li>
+                In Vercel, set <strong>DATABASE_URL</strong> for Production.
+              </li>
+              <li>Redeploy, then refresh this page.</li>
+            </ol>
+          )}
         </div>
       ) : needsSetup ? (
         <div>

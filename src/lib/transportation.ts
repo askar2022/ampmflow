@@ -56,12 +56,6 @@ export async function ensureStudentContactColumns() {
       prisma.$executeRawUnsafe(
         `ALTER TABLE "TransportationAssignment" ADD COLUMN IF NOT EXISTS "pickupTime" TEXT NOT NULL DEFAULT ''`,
       ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION`,
-      ),
     ])
       .then(() => undefined)
       .catch(() => undefined);

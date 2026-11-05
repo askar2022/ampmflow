@@ -17,7 +17,22 @@ function databaseUrl() {
   if (!url || url.includes("[YOUR-PASSWORD]") || url.startsWith("http")) {
     return "";
   }
-  return url;
+  try {
+    const parsed = new URL(url);
+    const pooler =
+      parsed.port === "6543" || parsed.hostname.includes("pooler.supabase.com");
+    if (pooler) {
+      if (!parsed.searchParams.has("pgbouncer")) {
+        parsed.searchParams.set("pgbouncer", "true");
+      }
+      if (!parsed.searchParams.has("connection_limit")) {
+        parsed.searchParams.set("connection_limit", "1");
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }
 
 export function isDatabaseConfigured() {
@@ -49,16 +64,20 @@ export async function checkDatabase() {
   }
 
   const { host, port } = describeUrl(raw);
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    return { ok: true as const, reason: "ok" as const, host, port, code: "" };
-  } catch (error) {
-    const code =
-      typeof error === "object" && error && "code" in error
-        ? String((error as { code?: string }).code || "")
-        : "";
-    return { ok: false as const, reason: "unreachable" as const, host, port, code };
+  let code = "";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return { ok: true as const, reason: "ok" as const, host, port, code: "" };
+    } catch (error) {
+      code =
+        typeof error === "object" && error && "code" in error
+          ? String((error as { code?: string }).code || "")
+          : "";
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    }
   }
+  return { ok: false as const, reason: "unreachable" as const, host, port, code };
 }
 
 const FALLBACK_URL = "postgresql://unused:unused@127.0.0.1:5432/unused";
