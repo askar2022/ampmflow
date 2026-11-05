@@ -1,7 +1,7 @@
 import { prisma } from "./prisma";
 
 /** Charged to the bus company for each late-alert parent text. */
-export const SMS_COST_CENTS = 30;
+export const SMS_COST_CENTS = 8;
 
 export type SmsRideUsage = {
   rideLabel: string;

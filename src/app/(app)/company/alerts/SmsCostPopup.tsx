@@ -68,7 +68,7 @@ export function SmsCostButton({
                   SMS cost
                 </h3>
                 <p className="mt-1 text-sm text-muted">
-                  30¢ per text · late alerts for this school
+                  8¢ per text · late alerts for this school
                 </p>
               </div>
               <button

@@ -136,7 +136,7 @@ export function LateAlertBoard({
           </div>
         </div>
         <p className="mt-2 max-w-2xl text-muted">
-          Text parents when a bus or van is running late. Each text is 30¢ —
+          Text parents when a bus or van is running late. Each text is 8¢ —
           open SMS cost for this week and month by bus or van.
         </p>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
