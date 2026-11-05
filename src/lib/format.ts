@@ -66,6 +66,73 @@ export function formatAddress(parts: {
   return `${parts.line1}, ${parts.city}, ${parts.state} ${parts.zip}`;
 }
 
+function vanFromPlan(plan: PlanSnapshot) {
+  return plan.notes?.match(/Van\s+[A-Za-z0-9-]+/i)?.[0] || "";
+}
+
+export function isPlanWaiting(plan: PlanSnapshot) {
+  if (plan.type === "PARENT") return false;
+  if (plan.waitingForAssignment) return true;
+  if (plan.type === "BUS" && !plan.busNumber && !vanFromPlan(plan)) return true;
+  return false;
+}
+
+export function isWaitingRide(student: EffectiveStudent) {
+  return isPlanWaiting(student.am) || isPlanWaiting(student.pm);
+}
+
+export function changeRequestLabel(student: EffectiveStudent) {
+  for (const plan of [student.pm, student.am]) {
+    if (plan.destination === "DAYCARE") {
+      return plan.daycareName ? `Daycare · ${plan.daycareName}` : "Daycare";
+    }
+    if (plan.destination === "CUSTOM") {
+      return plan.customAddress
+        ? `New address · ${plan.customAddress}`
+        : "New address";
+    }
+  }
+  if (
+    student.enrollmentSource === "ROUTE_REQUEST" ||
+    student.enrollmentSource === "NEW_APPLICATION"
+  ) {
+    return student.homeAddress && student.homeAddress !== "—"
+      ? `New route · ${student.homeAddress}`
+      : "New route";
+  }
+  if (isWaitingRide(student)) return "New request";
+  return "Bus or van";
+}
+
+export function companyAssignmentLabel(student: EffectiveStudent) {
+  const parts: string[] = [];
+  for (const plan of [student.am, student.pm]) {
+    if (isPlanWaiting(plan)) continue;
+    const van = vanFromPlan(plan);
+    const ride = van
+      ? van.replace(/^van/i, "Van")
+      : plan.busNumber
+        ? `Bus ${plan.busNumber}`
+        : "";
+    if (!ride) continue;
+    const time = plan.pickupTime?.trim();
+    parts.push(time ? `${plan.trip} ${ride} · ${time}` : `${plan.trip} ${ride}`);
+  }
+  return parts.length ? parts.join(" · ") : "Waiting for company";
+}
+
+export function isRouteRequestStudent(student: EffectiveStudent) {
+  if (
+    student.enrollmentSource === "ROUTE_REQUEST" ||
+    student.enrollmentSource === "NEW_APPLICATION"
+  ) {
+    return true;
+  }
+  if (!isWaitingRide(student)) return false;
+  const destination = student.pm.destination || student.am.destination;
+  return destination === "HOME" || !destination;
+}
+
 export function planSummary(plan: PlanSnapshot, trip: Trip = plan.trip) {
   if (plan.source === "MISSING" || !plan.type) {
     return "Missing assignment";
@@ -83,9 +150,11 @@ export function planSummary(plan: PlanSnapshot, trip: Trip = plan.trip) {
         : plan.customAddress
           ? ` — ${plan.customAddress}`
           : "";
-  if (plan.waitingForAssignment || !plan.busNumber) {
+  if (isPlanWaiting(plan)) {
     return `Bus pending${dest}`;
   }
+  const van = vanFromPlan(plan);
+  if (van) return `${van.replace(/^van/i, "Van")}${dest}`;
   return `Bus ${plan.busNumber}${dest}`;
 }
 
@@ -99,7 +168,7 @@ export type StatusTone = "yellow" | "green" | "red" | "blue" | "gray" | "orange"
 
 export function planTone(plan: PlanSnapshot): StatusTone {
   if (plan.source === "MISSING" || !plan.type) return "red";
-  if (plan.waitingForAssignment || (plan.type === "BUS" && !plan.busNumber)) {
+  if (isPlanWaiting(plan)) {
     return "red";
   }
   if (plan.type === "PARENT") return "blue";

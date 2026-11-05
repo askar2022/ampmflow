@@ -1,9 +1,15 @@
 import { getSession } from "@/lib/auth";
-import { loadVehicles } from "@/lib/gate";
+import { schoolLocalTime, todayKey } from "@/lib/dates";
+import {
+  changeRequestLabel,
+  companyAssignmentLabel,
+  isRouteRequestStudent,
+  isWaitingRide,
+} from "@/lib/format";
 import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { prisma } from "@/lib/prisma";
-import { loadStudents } from "@/lib/transportation";
-import { AssignBusList, type WaitingStudent } from "./AssignBusList";
+import { loadStudent, loadStudents } from "@/lib/transportation";
+import { RequestRecordTable, type RequestRecordRow } from "@/components/RequestRecordTable";
 import { RouteRequestForm } from "./RouteRequestForm";
 
 function requestGrade(row: {
@@ -20,11 +26,13 @@ export default async function WaitingPage() {
   const session = await getSession();
   if (!session) return null;
   const busCompanyEmail = await defaultBusCompanyEmail(session.schoolId);
-  const [pending, students, vehicles, routes] = await Promise.all([
+  const day = todayKey();
+  const [pending, students] = await Promise.all([
     prisma.changeRequest.findMany({
       where: {
         schoolId: session.schoolId,
-        status: "PENDING",
+        title: { startsWith: "Request for route" },
+        status: { in: ["PENDING", "COMPLETED", "NEEDS_CLARIFICATION"] },
       },
       include: {
         student: {
@@ -34,59 +42,65 @@ export default async function WaitingPage() {
       orderBy: { createdAt: "desc" },
     }),
     loadStudents(session.schoolId),
-    loadVehicles(session.schoolId).catch(() => []),
-    prisma.busRoute.findMany({
-      where: { schoolId: session.schoolId },
-      select: { number: true },
-      orderBy: { number: "asc" },
-    }),
   ]);
-  const buses = [...new Set(routes.map((route) => route.number))];
-  const vans = vehicles
-    .filter(
-      (vehicle) =>
-        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
-    )
-    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
-
-  const rows: WaitingStudent[] = [];
+  const byId = new Map(students.map((student) => [student.id, student]));
+  const rows: RequestRecordRow[] = [];
   const seen = new Set<string>();
 
   for (const row of pending) {
+    const reviewedDay = schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey;
+    if (row.status === "COMPLETED" && reviewedDay !== day) continue;
     const studentId = row.studentId || row.student?.id || "";
-    const name = row.student
-      ? `${row.student.firstName} ${row.student.lastName}`
-      : row.title.replace(/^Request for route\s+[—-]\s+/i, "");
+    const loaded =
+      (studentId && byId.get(studentId)) ||
+      (studentId ? (await loadStudent(studentId))?.effective : null);
+    const name = loaded
+      ? loaded.fullName
+      : row.student
+        ? `${row.student.firstName} ${row.student.lastName}`
+        : row.title.replace(/^Request for route\s+[—-]\s+/i, "");
     const key = studentId || row.id;
     if (seen.has(key)) continue;
     seen.add(key);
+    const waiting = loaded ? isWaitingRide(loaded) : !row.busNumber;
     rows.push({
-      requestId: row.id,
-      studentId: studentId || undefined,
+      id: key,
       name,
-      grade: requestGrade(row),
+      grade: loaded?.grade || requestGrade(row),
+      request: loaded
+        ? changeRequestLabel(loaded)
+        : row.details.match(/·\s*([^·]+?)\s*·/)?.[1]?.trim() || "New route",
+      company: loaded
+        ? companyAssignmentLabel(loaded)
+        : row.busNumber || "Waiting for company",
+      waiting,
     });
   }
 
   for (const student of students) {
-    const waiting =
-      student.am.waitingForAssignment ||
-      student.pm.waitingForAssignment ||
-      (student.am.type === "BUS" && !student.am.busNumber) ||
-      (student.pm.type === "BUS" && !student.pm.busNumber);
-    if (!waiting || seen.has(student.id)) continue;
+    if (!isRouteRequestStudent(student) || seen.has(student.id)) continue;
     seen.add(student.id);
     rows.push({
-      studentId: student.id,
+      id: student.id,
       name: student.fullName,
       grade: student.grade,
+      request: changeRequestLabel(student),
+      company: companyAssignmentLabel(student),
+      waiting: isWaitingRide(student),
     });
   }
 
   return (
     <div className="space-y-6">
       <RouteRequestForm busCompanyEmail={busCompanyEmail} />
-      <AssignBusList rows={rows} buses={buses} vans={vans} />
+      <p className="max-w-2xl text-muted">
+        The school submits the request. The bus company assigns the bus or van.
+        This list is the record — your request and their update.
+      </p>
+      <RequestRecordTable
+        rows={rows}
+        empty="No route requests yet. Submit a new request and it will stay here until the company assigns a bus or van."
+      />
     </div>
   );
 }

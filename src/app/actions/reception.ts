@@ -703,7 +703,7 @@ export async function requestRoute(input: RouteRequestInput) {
       "Request sent.",
       notice.sent.length ? `Emailed ${notice.sent.join(", ")}.` : "",
       notice.skipped.length ? `Could not email ${notice.skipped.join(", ")}.` : "",
-      "The student stays here until the coordinator types the bus number the company assigned.",
+      "The student stays here until the bus company assigns a bus or van.",
     ]
       .filter(Boolean)
       .join(" "),
@@ -723,12 +723,11 @@ export async function assignRequestedBus(input: {
 }) {
   const user = await getSession();
   if (!user) return { ok: false as const, error: "Please sign in." };
-  const schoolStaff =
-    user.role === "FRONT_DESK" ||
-    user.role === "COORDINATOR" ||
-    user.role === "ADMINISTRATOR";
-  if (!schoolStaff && user.role !== "BUS_COMPANY") {
-    return { ok: false as const, error: "You cannot assign a bus or van." };
+  if (user.role !== "BUS_COMPANY") {
+    return {
+      ok: false as const,
+      error: "The bus company assigns the bus or van.",
+    };
   }
 
   const vehicle = input.vehicle === "van" ? "van" : "bus";
@@ -761,13 +760,7 @@ export async function assignRequestedBus(input: {
     return { ok: false as const, error: "Student not found." };
   }
   const schoolId = loaded.record.schoolId;
-  if (schoolStaff && schoolId !== user.schoolId) {
-    return { ok: false as const, error: "Student not found." };
-  }
-  if (
-    user.role === "BUS_COMPANY" &&
-    !(await canCompanyAccessSchool(user, schoolId))
-  ) {
+  if (!(await canCompanyAccessSchool(user, schoolId))) {
     return { ok: false as const, error: "That school is not on your list." };
   }
 

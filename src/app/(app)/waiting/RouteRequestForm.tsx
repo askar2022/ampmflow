@@ -73,7 +73,8 @@ export function RouteRequestForm({
       <h2 className="font-serif text-2xl">Submit a route request</h2>
       <p className="mt-1 text-sm text-muted">
         Fill this form. The button emails the parent and the bus company. The
-        student then stays in the list above.
+        student stays in the list below as a record until the company assigns
+        a bus or van.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">

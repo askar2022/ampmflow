@@ -14,6 +14,7 @@ import {
 } from "@/lib/change-notify";
 import { nearbyFromRoster } from "@/lib/nearby-assignment";
 import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
+import { isPlanWaiting, isWaitingRide } from "@/lib/format";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import { CompanyBoard, type CompanyDesk, type CompanyRequest } from "./CompanyBoard";
 
@@ -22,12 +23,7 @@ function gradeOnly(grade: string) {
 }
 
 function isWaiting(student: EffectiveStudent) {
-  return (
-    student.am.waitingForAssignment ||
-    student.pm.waitingForAssignment ||
-    (student.am.type === "BUS" && !student.am.busNumber) ||
-    (student.pm.type === "BUS" && !student.pm.busNumber)
-  );
+  return isWaitingRide(student);
 }
 
 function requestFor(student: EffectiveStudent) {
@@ -141,12 +137,8 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
   const rows: CompanyRequest[] = changes.map((student) => {
     const request = requestFor(student);
     const trips: Trip[] = [
-      ...(student.am.waitingForAssignment || !student.am.busNumber
-        ? (["AM"] as const)
-        : []),
-      ...(student.pm.waitingForAssignment || !student.pm.busNumber
-        ? (["PM"] as const)
-        : []),
+      ...(isPlanWaiting(student.am) ? (["AM"] as const) : []),
+      ...(isPlanWaiting(student.pm) ? (["PM"] as const) : []),
     ];
     return {
       studentId: student.id,
