@@ -67,7 +67,7 @@ async function censusGeocode(query: string) {
   url.searchParams.set("benchmark", "Public_AR_Current");
   url.searchParams.set("format", "json");
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(6000),
+    signal: AbortSignal.timeout(2500),
     headers: { Accept: "application/json" },
   });
   if (!response.ok) return null;
@@ -87,7 +87,7 @@ async function nominatimGeocode(query: string) {
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "1");
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(6000),
+    signal: AbortSignal.timeout(2500),
     headers: {
       Accept: "application/json",
       "User-Agent": "AMPMFlow/1.0 (askar@automationllc.org)",
@@ -149,9 +149,11 @@ export async function geocodeAndSaveAddress(addressId: string) {
   }
 
   const query = displayAddress(row);
-  const found =
-    (await censusGeocode(query).catch(() => null)) ||
-    (await nominatimGeocode(query).catch(() => null));
+  // Race free lookups so Need Update does not wait on a slow provider.
+  const found = await Promise.any([
+    censusGeocode(query),
+    nominatimGeocode(query),
+  ]).catch(() => null);
   if (!found) return null;
 
   await prisma.$executeRaw`
@@ -212,9 +214,10 @@ export async function loadSchoolGeoPoints(
 
   const priority = new Set(options?.priorityIds || []);
   missing.sort((a, b) => Number(priority.has(b)) - Number(priority.has(a)));
-  const toGeocode = options?.geocode ? missing.slice(0, options.limit ?? 12) : [];
-  for (let index = 0; index < toGeocode.length; index += 4) {
-    const chunk = toGeocode.slice(index, index + 5);
+  // Keep this small so Need Update stays quick. Coordinates are saved once.
+  const toGeocode = options?.geocode ? missing.slice(0, options.limit ?? 4) : [];
+  for (let index = 0; index < toGeocode.length; index += 2) {
+    const chunk = toGeocode.slice(index, index + 2);
     const found = await Promise.all(
       chunk.map((id) => geocodeAndSaveAddress(id).catch(() => null)),
     );

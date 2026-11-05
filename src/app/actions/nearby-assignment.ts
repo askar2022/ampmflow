@@ -27,11 +27,14 @@ export async function nearbyAssignmentSuggestion(input: {
     (trip): trip is Trip => trip === "AM" || trip === "PM",
   );
   const trips: Trip[] = requested.length ? requested : ["AM", "PM"];
-  const suggestion = await findNearbyAssignment({
-    schoolId,
-    studentId: input.studentId,
-    trips,
-  }).catch(() => null);
+  const suggestion = await Promise.race([
+    findNearbyAssignment({
+      schoolId,
+      studentId: input.studentId,
+      trips,
+    }).catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 9000)),
+  ]);
 
   if (!suggestion) {
     return { ok: true as const, found: false as const };

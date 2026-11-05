@@ -360,11 +360,7 @@ export async function nearbySuggestionsForSchool(args: {
         ids.customByTrip.PM,
       ].filter(Boolean) as string[];
     });
-    const geo = await loadSchoolGeoPoints(args.schoolId, allIds, {
-      geocode: args.geocode === true,
-      limit: 12,
-      priorityIds,
-    });
+    // Street match first so the popup is never blocked by geocoding.
     const vehicles = await prisma.student.findMany({
       where: {
         schoolId: args.schoolId,
@@ -380,21 +376,50 @@ export async function nearbySuggestionsForSchool(args: {
     for (const item of args.requests) {
       suggestions.set(
         item.studentId,
-        pickClosest({
+        nearbyFromRoster({
           roster: args.roster,
           studentId: item.studentId,
           trips: item.trips,
           vehicleName,
-          geo,
-          addressIds: map,
-        }) ||
-          nearbyFromRoster({
-            roster: args.roster,
-            studentId: item.studentId,
-            trips: item.trips,
-            vehicleName,
-          }),
+        }),
       );
+    }
+
+    if (!args.geocode) return suggestions;
+
+    // Only geocode when street match failed.
+    // Geocode the request address only; compare against already-saved roster coordinates.
+    const needMiles = args.requests.filter(
+      (item) => !suggestions.get(item.studentId),
+    );
+    if (!needMiles.length) return suggestions;
+
+    const requestOnly = needMiles.flatMap((item) => {
+      const ids = map.get(item.studentId);
+      if (!ids) return [] as string[];
+      return [
+        ids.customByTrip.AM,
+        ids.customByTrip.PM,
+        ids.daycareId,
+        ids.homeId,
+      ].filter(Boolean) as string[];
+    });
+    const geo = await loadSchoolGeoPoints(args.schoolId, allIds, {
+      geocode: true,
+      // Request address first, then a couple assigned stops if they have no saved coords yet.
+      limit: 3,
+      priorityIds: requestOnly.length ? requestOnly : priorityIds,
+    });
+    for (const item of needMiles) {
+      const closest = pickClosest({
+        roster: args.roster,
+        studentId: item.studentId,
+        trips: item.trips,
+        vehicleName,
+        geo,
+        addressIds: map,
+      });
+      if (closest) suggestions.set(item.studentId, closest);
     }
     return suggestions;
   } catch {

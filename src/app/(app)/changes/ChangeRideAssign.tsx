@@ -320,7 +320,8 @@ export function ChangeRideAssign({
               <>
                 {nearbyEnabled && nearbyStatus === "loading" ? (
                   <p className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-sm font-semibold text-navy">
-                    Checking this school’s addresses for a nearby reference…
+                    Checking nearby stops… usually a few seconds the first
+                    time, then faster.
                   </p>
                 ) : null}
                 {nearbyEnabled && nearbyStatus === "found" && nearby ? (
@@ -362,11 +363,9 @@ export function ChangeRideAssign({
                 ) : null}
                 {nearbyEnabled && nearbyStatus === "none" ? (
                   <p className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-sm font-semibold text-navy">
-                    No similar street was found on this school’s assigned
-                    roster. We match the same street name, for example 520
-                    Morgan and 540 Morgan. Different streets a few blocks away
-                    cannot be compared without a map. Assign the bus or van
-                    below using your routing software.
+                    No nearby assigned stop was found within about 3 miles on
+                    this school’s roster. Assign the bus or van below using
+                    your routing software.
                   </p>
                 ) : null}
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
