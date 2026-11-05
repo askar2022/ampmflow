@@ -14,7 +14,9 @@ export function AppNav({
     <>
       {links.map((item) => {
         const active =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+          item.href === "/company"
+            ? pathname === "/company"
+            : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <Link
             key={item.href}
