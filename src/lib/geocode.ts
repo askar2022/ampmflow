@@ -25,13 +25,28 @@ export async function ensureAddressGeoColumns() {
   await geoColumnsReady;
 }
 
+function cleanPart(value: string | null | undefined) {
+  const text = (value || "").replace(/[—–]/g, " ").replace(/\s+/g, " ").trim();
+  if (!text || text === "-" || text === ",") return "";
+  return text;
+}
+
 function displayAddress(row: {
   line1: string;
   city: string;
   state: string;
   zip: string;
 }) {
-  return `${row.line1}, ${row.city}, ${row.state} ${row.zip}`
+  const line1 = cleanPart(row.line1);
+  const zip = cleanPart(row.zip) || line1.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] || "";
+  const city = cleanPart(row.city);
+  const state = cleanPart(row.state);
+  if (/minneapolis/i.test(line1) && /\bMN\b/i.test(line1)) {
+    return line1;
+  }
+  return [line1, city || "Minneapolis", `${state || "MN"} ${zip}`.trim()]
+    .filter(Boolean)
+    .join(", ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -52,7 +67,7 @@ async function censusGeocode(query: string) {
   url.searchParams.set("benchmark", "Public_AR_Current");
   url.searchParams.set("format", "json");
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(4000),
+    signal: AbortSignal.timeout(6000),
     headers: { Accept: "application/json" },
   });
   if (!response.ok) return null;
@@ -72,7 +87,7 @@ async function nominatimGeocode(query: string) {
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "1");
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(4000),
+    signal: AbortSignal.timeout(6000),
     headers: {
       Accept: "application/json",
       "User-Agent": "AMPMFlow/1.0 (askar@automationllc.org)",
@@ -156,7 +171,7 @@ export async function geocodeAndSaveAddress(addressId: string) {
 export async function loadSchoolGeoPoints(
   schoolId: string,
   addressIds: string[],
-  options?: { geocode?: boolean; limit?: number },
+  options?: { geocode?: boolean; limit?: number; priorityIds?: string[] },
 ) {
   await ensureAddressGeoColumns();
   const ids = [...new Set(addressIds.filter(Boolean))];
@@ -195,7 +210,9 @@ export async function loadSchoolGeoPoints(
     }
   }
 
-  const toGeocode = options?.geocode ? missing.slice(0, options.limit ?? 8) : [];
+  const priority = new Set(options?.priorityIds || []);
+  missing.sort((a, b) => Number(priority.has(b)) - Number(priority.has(a)));
+  const toGeocode = options?.geocode ? missing.slice(0, options.limit ?? 12) : [];
   for (let index = 0; index < toGeocode.length; index += 4) {
     const chunk = toGeocode.slice(index, index + 5);
     const found = await Promise.all(

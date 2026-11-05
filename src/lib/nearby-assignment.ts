@@ -1,3 +1,4 @@
+import { dateInRange, todayKey } from "./dates";
 import { prisma } from "./prisma";
 import { loadSchoolGeoPoints, milesBetween, type GeoPoint } from "./geocode";
 import { loadStudents } from "./transportation";
@@ -12,7 +13,7 @@ export type NearbyAssignment = {
   miles?: number;
 };
 
-const MAX_NEARBY_MILES = 2;
+const MAX_NEARBY_MILES = 3;
 
 const STREET_WORDS: Record<string, string> = {
   north: "n",
@@ -292,6 +293,7 @@ export function nearbyFromRoster(args: {
 }
 
 async function loadAddressIds(schoolId: string) {
+  const day = todayKey();
   const rows = await prisma.student.findMany({
     where: { schoolId, active: true },
     select: {
@@ -300,6 +302,15 @@ async function loadAddressIds(schoolId: string) {
       daycare: { select: { addressId: true } },
       assignments: {
         select: { trip: true, customAddressId: true },
+      },
+      tempChanges: {
+        where: { undone: false, status: "APPROVED" },
+        select: {
+          trip: true,
+          customAddressId: true,
+          startDate: true,
+          endDate: true,
+        },
       },
     },
   });
@@ -312,6 +323,13 @@ async function loadAddressIds(schoolId: string) {
         customByTrip[assignment.trip] = assignment.customAddressId;
         if (assignment.customAddressId) allIds.push(assignment.customAddressId);
       }
+    }
+    for (const change of row.tempChanges) {
+      if (change.trip !== "AM" && change.trip !== "PM") continue;
+      if (!dateInRange(day, change.startDate, change.endDate)) continue;
+      if (!change.customAddressId) continue;
+      customByTrip[change.trip] = change.customAddressId;
+      allIds.push(change.customAddressId);
     }
     map.set(row.id, {
       homeId: row.homeAddressId,
@@ -332,9 +350,20 @@ export async function nearbySuggestionsForSchool(args: {
 }) {
   try {
     const { map, allIds } = await loadAddressIds(args.schoolId);
+    const priorityIds = args.requests.flatMap((item) => {
+      const ids = map.get(item.studentId);
+      if (!ids) return [];
+      return [
+        ids.homeId,
+        ids.daycareId,
+        ids.customByTrip.AM,
+        ids.customByTrip.PM,
+      ].filter(Boolean) as string[];
+    });
     const geo = await loadSchoolGeoPoints(args.schoolId, allIds, {
       geocode: args.geocode === true,
-      limit: 8,
+      limit: 12,
+      priorityIds,
     });
     const vehicles = await prisma.student.findMany({
       where: {

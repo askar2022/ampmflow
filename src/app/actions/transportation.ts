@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { notifyCoordinators, writeAudit } from "@/lib/audit";
 import { formatTime, todayKey } from "@/lib/dates";
+import { geocodeAndSaveAddress } from "@/lib/geocode";
 import { loadStudent, resolveTrip, addressHasNoRoute } from "@/lib/transportation";
 import { canRecordChange, isAfterDeadline, isAfterSnapshot } from "@/lib/policy";
 import { planSummary } from "@/lib/format";
@@ -109,17 +110,20 @@ export async function updateTransportation(
   }
 
   if (input.destination === "CUSTOM" && input.customAddress?.trim()) {
+    const raw = input.customAddress.trim();
+    const zip = raw.match(/\b(\d{5})(?:-\d{4})?\b/)?.[1] || "";
     const created = await prisma.address.create({
       data: {
         schoolId: user.schoolId,
-        line1: input.customAddress.trim(),
-        city: "—",
-        state: "—",
-        zip: "—",
+        line1: raw,
+        city: "Minneapolis",
+        state: "MN",
+        zip,
         label: "custom",
       },
     });
     customAddressId = created.id;
+    await geocodeAndSaveAddress(created.id).catch(() => undefined);
   }
 
   const startDate =
