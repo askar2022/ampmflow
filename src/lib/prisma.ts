@@ -17,22 +17,7 @@ function databaseUrl() {
   if (!url || url.includes("[YOUR-PASSWORD]") || url.startsWith("http")) {
     return "";
   }
-  try {
-    const parsed = new URL(url);
-    const pooler =
-      parsed.port === "6543" || parsed.hostname.includes("pooler.supabase.com");
-    if (pooler) {
-      if (!parsed.searchParams.has("pgbouncer")) {
-        parsed.searchParams.set("pgbouncer", "true");
-      }
-      if (!parsed.searchParams.has("connection_limit")) {
-        parsed.searchParams.set("connection_limit", "1");
-      }
-    }
-    return parsed.toString();
-  } catch {
-    return url;
-  }
+  return url;
 }
 
 export function isDatabaseConfigured() {

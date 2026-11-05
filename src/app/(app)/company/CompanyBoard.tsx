@@ -111,8 +111,8 @@ export function CompanyBoard({
   if (!desk) return null;
 
   function chooseSchool(id: string) {
-    setSelectedId(id);
-    window.history.replaceState(null, "", `/company?school=${id}`);
+    if (id === selectedId) return;
+    window.location.assign(`/company?school=${id}`);
   }
 
   return (

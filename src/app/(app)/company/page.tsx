@@ -96,6 +96,7 @@ async function loadCompanyNeedUpdate(schoolId: string) {
 }
 
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
+  try {
   const [changes, vehicles, routes] = await Promise.all([
     loadCompanyNeedUpdate(school.id),
     loadVehicles(school.id).catch(() => []),
@@ -161,6 +162,15 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     vans,
     rows,
   };
+  } catch {
+    return {
+      schoolId: school.id,
+      schoolName: school.name,
+      buses: [],
+      vans: [],
+      rows: [],
+    };
+  }
 }
 
 export default async function CompanyPage({
@@ -200,14 +210,14 @@ export default async function CompanyPage({
     );
   }
 
-  const desks = await Promise.all(schools.map(loadSchoolDesk));
+  const desk = await loadSchoolDesk(selected);
 
   return (
     <CompanyBoard
       companyName={liveName}
       schools={schools}
       schoolId={selected.id}
-      desks={desks}
+      desks={[desk]}
     />
   );
 }
