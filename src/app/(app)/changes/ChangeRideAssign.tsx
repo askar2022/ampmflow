@@ -48,6 +48,7 @@ export function ChangeRideAssign({
   studentName,
   grade,
   request,
+  effectiveDate = "",
   buses = [],
   vans = [],
   defaultTrips,
@@ -61,6 +62,7 @@ export function ChangeRideAssign({
   studentName: string;
   grade: string;
   request?: string;
+  effectiveDate?: string;
   buses?: string[];
   vans?: { id: string; name: string }[];
   defaultTrips?: Trip[];
@@ -233,18 +235,21 @@ export function ChangeRideAssign({
           onClick={close}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-card p-6 shadow-lg"
+            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-card p-5 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
             <h3
               id={`company-update-${studentId}`}
-              className="font-serif text-3xl text-navy"
+              className="font-serif text-2xl text-navy"
             >
               {studentName}
             </h3>
-            <p className="mt-1 text-muted">Grade {grade}</p>
+            <p className="mt-0.5 text-sm text-muted">Grade {grade}</p>
             {request ? (
-              <p className="mt-2 text-sm font-extrabold text-navy">{request}</p>
+              <p className="mt-1 text-sm font-extrabold text-navy">{request}</p>
+            ) : null}
+            {effectiveDate ? (
+              <p className="mt-0.5 text-sm text-muted">Effective {effectiveDate}</p>
             ) : null}
 
             {review && receipt ? (
@@ -319,42 +324,39 @@ export function ChangeRideAssign({
             ) : (
               <>
                 {nearbyEnabled && nearbyStatus === "loading" ? (
-                  <p className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-sm font-semibold text-navy">
-                    Checking nearby stops… usually a few seconds the first
-                    time, then faster.
+                  <p className="mt-3 rounded-lg border border-line bg-paper px-3 py-2 text-xs text-muted">
+                    Checking nearby stops…
                   </p>
                 ) : null}
                 {nearbyEnabled && nearbyStatus === "found" && nearby ? (
-                  <div className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-4">
-                    <p className="text-xs font-extrabold uppercase tracking-wide text-navy">
-                      Nearby reference only — not a confirmed route
+                  <div className="mt-3 rounded-lg border border-line bg-paper px-3 py-2.5">
+                    <p className="text-xs font-semibold text-navy">
+                      Nearby reference
                     </p>
-                    <p className="mt-2 text-sm font-extrabold text-navy">
-                      Closest existing address: {nearby.address}
+                    <p className="mt-1 text-sm font-semibold text-navy">
+                      {nearby.address}
                       {nearby.miles != null
-                        ? ` — ${nearby.miles.toFixed(1)} miles away`
+                        ? ` · ${nearby.miles.toFixed(1)} mi approx.`
                         : ""}
                     </p>
-                    <p className="mt-1 text-sm font-extrabold text-navy">
-                      That student’s assignment: {nearby.ride}
+                    <p className="mt-0.5 text-sm text-navy">
+                      Suggested assignment: {nearby.ride}
                     </p>
-                    <p className="mt-2 text-sm text-navy/80">
-                      {nearby.miles != null
-                        ? "Straight-line distance from this school’s saved addresses. Nearby reference only — not a confirmed route. Check your routing software before you assign."
-                        : "This matches a similar street already on this school’s roster. Check your routing software before you assign."}
+                    <p className="mt-1 text-xs text-muted">
+                      Reference only—confirm in your routing system.
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       <button
                         type="button"
                         onClick={applyNearby}
-                        className="rounded-full bg-navy px-4 py-2 text-sm font-semibold text-white"
+                        className="rounded-full bg-navy px-3 py-1 text-xs font-semibold text-white"
                       >
-                        Use this suggestion
+                        Use suggestion
                       </button>
                       <button
                         type="button"
                         onClick={dismissNearby}
-                        className="rounded-full border border-line bg-white px-4 py-2 text-sm font-semibold"
+                        className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold"
                       >
                         Continue without suggestion
                       </button>
@@ -362,13 +364,11 @@ export function ChangeRideAssign({
                   </div>
                 ) : null}
                 {nearbyEnabled && nearbyStatus === "none" ? (
-                  <p className="mt-4 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-sm font-semibold text-navy">
-                    No nearby assigned stop was found within about 3 miles on
-                    this school’s roster. Assign the bus or van below using
-                    your routing software.
+                  <p className="mt-3 rounded-lg border border-line bg-paper px-3 py-2 text-xs text-muted">
+                    No nearby assignment available. Assign below.
                   </p>
                 ) : null}
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <label className="block text-sm font-semibold">
                     Bus number
                     <input
@@ -386,7 +386,7 @@ export function ChangeRideAssign({
                         }
                       }}
                       placeholder="4"
-                      className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                      className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                     />
                   </label>
                   <label className="block text-sm font-semibold">
@@ -405,7 +405,7 @@ export function ChangeRideAssign({
                         }
                       }}
                       placeholder="2"
-                      className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                      className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                     />
                   </label>
                 </div>
@@ -424,9 +424,9 @@ export function ChangeRideAssign({
                   </datalist>
                 ) : null}
 
-                <div className="mt-5">
+                <div className="mt-3">
                   <div className="text-sm font-semibold">Trip</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {(
                       [
                         ["AM", "Morning"],
@@ -438,7 +438,7 @@ export function ChangeRideAssign({
                         key={value}
                         type="button"
                         onClick={() => setTrip(value)}
-                        className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                        className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${
                           trip === value
                             ? "bg-navy text-white"
                             : "border border-line bg-paper"
@@ -450,7 +450,7 @@ export function ChangeRideAssign({
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {trip === "PM" ? null : (
                     <label className="block text-sm font-semibold">
                       AM pickup time
@@ -460,7 +460,7 @@ export function ChangeRideAssign({
                         value={amPickup}
                         onChange={(event) => setAmPickup(event.target.value)}
                         placeholder="7:15 AM"
-                        className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                        className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                       />
                     </label>
                   )}
@@ -473,23 +473,20 @@ export function ChangeRideAssign({
                         value={pmPickup}
                         onChange={(event) => setPmPickup(event.target.value)}
                         placeholder="2:40 PM"
-                        className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-3 text-base font-medium text-navy"
+                        className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                       />
                     </label>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-muted">
-                  The parent gets this pickup time in the text and email.
-                </p>
 
-                {error ? <p className="mt-4 text-sm text-red">{error}</p> : null}
+                {error ? <p className="mt-3 text-sm text-red">{error}</p> : null}
 
-                <div className="mt-6 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     disabled={pending}
                     onClick={assign}
-                    className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    className="rounded-full bg-navy px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   >
                     {pending ? "Saving…" : "Assign"}
                   </button>
@@ -497,7 +494,7 @@ export function ChangeRideAssign({
                     type="button"
                     disabled={pending}
                     onClick={close}
-                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                    className="rounded-full border border-line px-5 py-2 text-sm font-semibold"
                   >
                     Cancel
                   </button>

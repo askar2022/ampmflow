@@ -12,6 +12,7 @@ export type CompanyRequest = {
   teacher: string;
   parent: string;
   request: string;
+  effectiveDate?: string;
   email: { subject: string; body: string };
   trips: Trip[];
   changed: boolean;
@@ -180,6 +181,7 @@ export function CompanyBoard({
                           studentName={row.name}
                           grade={row.grade}
                           request={row.request}
+                          effectiveDate={row.effectiveDate}
                           buses={desk.buses}
                           vans={desk.vans}
                           companyAssigned={row.changed}

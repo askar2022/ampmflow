@@ -139,6 +139,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       ...(isPlanWaiting(student.am) ? (["AM"] as const) : []),
       ...(isPlanWaiting(student.pm) ? (["PM"] as const) : []),
     ];
+    const used = trips.length ? trips : (["AM", "PM"] as Trip[]);
     return {
       studentId: student.id,
       name: student.fullName,
@@ -149,8 +150,9 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
           ? student.parentName
           : "—",
       request,
+      effectiveDate: companyEffectiveDate(student, used),
       email: companyEmail(student, trips),
-      trips: trips.length ? trips : (["AM", "PM"] as Trip[]),
+      trips: used,
       changed: assignedIds.has(student.id),
     };
   });
