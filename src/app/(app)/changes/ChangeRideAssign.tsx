@@ -56,7 +56,6 @@ export function ChangeRideAssign({
   parentPhone = "",
   teacherEmail = "",
   nearbyEnabled = false,
-  nearby: nearbyStart = null,
 }: {
   studentId: string;
   studentName: string;
@@ -70,7 +69,6 @@ export function ChangeRideAssign({
   parentPhone?: string;
   teacherEmail?: string;
   nearbyEnabled?: boolean;
-  nearby?: NearbyAssignment | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -84,10 +82,8 @@ export function ChangeRideAssign({
   const [pmPickup, setPmPickup] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
-  const [nearbyStatus, setNearbyStatus] = useState<NearbyStatus>(
-    nearbyEnabled ? (nearbyStart ? "found" : "none") : "idle",
-  );
-  const [nearby, setNearby] = useState<NearbyAssignment | null>(nearbyStart);
+  const [nearbyStatus, setNearbyStatus] = useState<NearbyStatus>("idle");
+  const [nearby, setNearby] = useState<NearbyAssignment | null>(null);
   const nearbyDismissed = useRef(false);
 
   function close() {
@@ -102,12 +98,6 @@ export function ChangeRideAssign({
 
   useEffect(() => {
     if (!open || review || !nearbyEnabled || nearbyDismissed.current) return;
-    const start = startingTrip(defaultTrips);
-    if (trip === start) {
-      setNearby(nearbyStart);
-      setNearbyStatus(nearbyStart ? "found" : "none");
-      return;
-    }
     let cancelled = false;
     const trips: Trip[] = trip === "BOTH" ? ["AM", "PM"] : [trip];
     setNearbyStatus("loading");
@@ -137,7 +127,7 @@ export function ChangeRideAssign({
     return () => {
       cancelled = true;
     };
-  }, [open, review, nearbyEnabled, studentId, trip, defaultTrips, nearbyStart]);
+  }, [open, review, nearbyEnabled, studentId, trip]);
 
   function dismissNearby() {
     nearbyDismissed.current = true;

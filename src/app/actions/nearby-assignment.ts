@@ -31,7 +31,7 @@ export async function nearbyAssignmentSuggestion(input: {
     schoolId,
     studentId: input.studentId,
     trips,
-  });
+  }).catch(() => null);
 
   if (!suggestion) {
     return { ok: true as const, found: false as const };

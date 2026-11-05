@@ -100,8 +100,6 @@ model Address {
   state     String
   zip       String
   label     String   @default("home")
-  latitude  Float?
-  longitude Float?
   createdAt DateTime @default(now())
 
   school              School                     @relation(fields: [schoolId], references: [id])

@@ -1,5 +1,4 @@
 import { ensureGateTables } from "./gate";
-import { ensureAddressGeoColumns } from "./geocode";
 import { prisma } from "./prisma";
 import { dateInRange, schoolLocalTime, todayKey } from "./dates";
 import { formatAddress, locationFor } from "./format";
@@ -57,7 +56,12 @@ export async function ensureStudentContactColumns() {
       prisma.$executeRawUnsafe(
         `ALTER TABLE "TransportationAssignment" ADD COLUMN IF NOT EXISTS "pickupTime" TEXT NOT NULL DEFAULT ''`,
       ),
-      ensureAddressGeoColumns(),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION`,
+      ),
+      prisma.$executeRawUnsafe(
+        `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION`,
+      ),
     ])
       .then(() => undefined)
       .catch(() => undefined);

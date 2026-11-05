@@ -52,7 +52,7 @@ async function censusGeocode(query: string) {
   url.searchParams.set("benchmark", "Public_AR_Current");
   url.searchParams.set("format", "json");
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(4000),
     headers: { Accept: "application/json" },
   });
   if (!response.ok) return null;
@@ -72,7 +72,7 @@ async function nominatimGeocode(query: string) {
   url.searchParams.set("format", "json");
   url.searchParams.set("limit", "1");
   const response = await fetch(url, {
-    signal: AbortSignal.timeout(8000),
+    signal: AbortSignal.timeout(4000),
     headers: {
       Accept: "application/json",
       "User-Agent": "AMPMFlow/1.0 (askar@automationllc.org)",

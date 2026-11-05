@@ -12,7 +12,6 @@ import {
   destinationFromStudent,
   planLine,
 } from "@/lib/change-notify";
-import { nearbySuggestionsForSchool } from "@/lib/nearby-assignment";
 import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
 import { isPlanWaiting, isWaitingRide } from "@/lib/format";
 import type { EffectiveStudent, Trip } from "@/lib/types";
@@ -97,9 +96,8 @@ async function loadCompanyNeedUpdate(schoolId: string) {
 }
 
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
-  const [changes, roster, vehicles, routes] = await Promise.all([
+  const [changes, vehicles, routes] = await Promise.all([
     loadCompanyNeedUpdate(school.id),
-    loadStudents(school.id),
     loadVehicles(school.id).catch(() => []),
     prisma.busRoute.findMany({
       where: { schoolId: school.id },
@@ -134,28 +132,12 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     )
     .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
 
-  const requestRows = changes.map((student) => {
+  const rows: CompanyRequest[] = changes.map((student) => {
+    const request = requestFor(student);
     const trips: Trip[] = [
       ...(isPlanWaiting(student.am) ? (["AM"] as const) : []),
       ...(isPlanWaiting(student.pm) ? (["PM"] as const) : []),
     ];
-    return {
-      student,
-      trips: trips.length ? trips : (["AM", "PM"] as Trip[]),
-    };
-  });
-  const nearbyByStudent = await nearbySuggestionsForSchool({
-    schoolId: school.id,
-    roster,
-    requests: requestRows.map((row) => ({
-      studentId: row.student.id,
-      trips: row.trips,
-    })),
-    geocode: false,
-  }).catch(() => new Map());
-
-  const rows: CompanyRequest[] = requestRows.map(({ student, trips }) => {
-    const request = requestFor(student);
     return {
       studentId: student.id,
       name: student.fullName,
@@ -167,9 +149,8 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
           : "—",
       request,
       email: companyEmail(student, trips),
-      trips,
+      trips: trips.length ? trips : (["AM", "PM"] as Trip[]),
       changed: assignedIds.has(student.id),
-      nearby: nearbyByStudent.get(student.id) || null,
     };
   });
 
