@@ -84,7 +84,7 @@ export function lateAlertSms(args: {
   minutes: number;
 }) {
   const english = `AMPM Flow: ${args.rideLabel} is running about ${args.minutes} minutes late. We're sorry for the delay.`;
-  const somali = `Waan ka xunahay daahintaanka ${args.rideLabel}`;
+  const somali = `${args.rideLabel} waxa uu soo daahyaa ${args.minutes} daqiiqo, waxaan ka xunahay daahitaanka.`;
   return `${english}\n${somali}`;
 }
 
