@@ -54,7 +54,7 @@ function identityFromRecord(school: {
     logoUrl: /sankofa/i.test(name)
       ? DEFAULT_SCHOOL_LOGO
       : /aim/i.test(name)
-        ? "/demo-2.jpg"
+        ? "/aim_Logo.png"
         : null,
   };
 }

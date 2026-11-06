@@ -28,6 +28,7 @@ export function AppShell({
   user,
   schoolName,
   headerName,
+  schoolLogoUrl,
   showPlatform = false,
   children,
 }: {
@@ -71,6 +72,7 @@ export function AppShell({
             <HeaderWelcome
               name={company ? headerName || user.name : schoolName}
               subtitle={company ? "Bus company" : "Transportation Desk"}
+              logoUrl={company ? null : schoolLogoUrl}
             />
           </Link>
         </div>
