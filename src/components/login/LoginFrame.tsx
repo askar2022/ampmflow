@@ -53,6 +53,23 @@ export function LoginFrame({
         <p className="login-staff-note mt-5 text-center text-xs text-[#9aa1aa] short-h:hidden">
           Authorized staff only
         </p>
+        <p className="mt-3 text-center text-xs text-[#9aa1aa]">
+          <Link
+            href="/privacy"
+            className="font-medium underline-offset-2 hover:text-navy hover:underline"
+          >
+            Data Privacy
+          </Link>
+          <span className="mx-2" aria-hidden="true">
+            ·
+          </span>
+          <Link
+            href="/terms"
+            className="font-medium underline-offset-2 hover:text-navy hover:underline"
+          >
+            Terms and Conditions
+          </Link>
+        </p>
       </div>
     </div>
   );
