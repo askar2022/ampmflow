@@ -71,6 +71,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Signed-in staff only — not public to people outside the school.
+  if (pathname.startsWith("/privacy") || pathname.startsWith("/terms")) {
+    return NextResponse.next();
+  }
+
   if (role === "TEACHER" && !["/teacher", "/print"].some((p) => pathname.startsWith(p))) {
     if (pathname.startsWith("/api")) return NextResponse.next();
     const url = request.nextUrl.clone();
