@@ -20,13 +20,11 @@ export function HeaderWelcome({
       />
       <div className="absolute inset-y-0 left-0 flex w-[70%] max-w-[18rem] flex-col justify-center px-3 sm:w-[58%] sm:max-w-[26rem] sm:px-5">
         {showLogo ? (
-          <div className="mb-1.5 inline-flex max-w-full items-center rounded-xl bg-white/92 px-2.5 py-1.5 shadow-sm ring-1 ring-black/5 sm:mb-2 sm:px-3 sm:py-2">
-            <img
-              src={logoUrl!}
-              alt=""
-              className="h-8 w-auto max-w-[9.5rem] object-contain object-left sm:h-10 sm:max-w-[12rem]"
-            />
-          </div>
+          <img
+            src={logoUrl!}
+            alt=""
+            className="mb-1.5 h-12 w-auto max-w-[15rem] self-start object-contain object-left sm:mb-2 sm:h-14 sm:max-w-[18rem] md:h-16"
+          />
         ) : null}
         <h1 className="font-serif text-lg leading-tight text-navy sm:text-2xl">
           Welcome to {name || "your school"}
