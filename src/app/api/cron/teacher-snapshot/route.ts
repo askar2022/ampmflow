@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isSchoolWeekday } from "@/lib/dates";
 import { runScheduledTeacherSnapshots } from "@/lib/teacher-snapshot";
 
 function authorized(request: Request) {
@@ -11,6 +12,15 @@ function authorized(request: Request) {
 export async function GET(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isSchoolWeekday()) {
+    return NextResponse.json({
+      ok: true,
+      ran: false,
+      reason: "weekend",
+      schools: 0,
+    });
   }
 
   const result = await runScheduledTeacherSnapshots();

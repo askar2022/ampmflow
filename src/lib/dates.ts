@@ -42,12 +42,43 @@ export function addMinutesToClock(hhmm: string, minutes: number) {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
-export function isSchoolWeekday(weekday = schoolLocalTime().weekday) {
-  return !["Sat", "Sun", "Saturday", "Sunday"].includes(weekday);
+/** 0 = Sunday … 6 = Saturday in America/Chicago. */
+export function schoolWeekdayNumber(date = new Date()) {
+  const weekday = schoolLocalTime(date).weekday.toLowerCase().slice(0, 3);
+  const map: Record<string, number> = {
+    sun: 0,
+    mon: 1,
+    tue: 2,
+    wed: 3,
+    thu: 4,
+    fri: 5,
+    sat: 6,
+  };
+  return map[weekday] ?? -1;
 }
 
-export function isFriday(weekday = schoolLocalTime().weekday) {
-  return weekday === "Fri" || weekday === "Friday";
+/** School days only — Monday through Friday (Minnesota / Chicago time). */
+export function isSchoolWeekday(
+  weekdayOrDate: string | Date = schoolNow(),
+) {
+  if (weekdayOrDate instanceof Date) {
+    const day = schoolWeekdayNumber(weekdayOrDate);
+    return day >= 1 && day <= 5;
+  }
+  const key = String(weekdayOrDate || "")
+    .toLowerCase()
+    .slice(0, 3);
+  return Boolean(key) && key !== "sat" && key !== "sun";
+}
+
+export function isFriday(weekdayOrDate: string | Date = schoolNow()) {
+  if (weekdayOrDate instanceof Date) {
+    return schoolWeekdayNumber(weekdayOrDate) === 5;
+  }
+  const key = String(weekdayOrDate || "")
+    .toLowerCase()
+    .slice(0, 3);
+  return key === "fri";
 }
 
 export function clockInWindow(hhmm: string, start: string, minutes: number) {

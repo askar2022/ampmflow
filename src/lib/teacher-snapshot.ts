@@ -261,7 +261,7 @@ export async function snapshotTimeForSchool(schoolId: string) {
 export function isTeacherSnapshotWindow(snapshotTime: string) {
   const clock = schoolLocalTime();
   return (
-    isSchoolWeekday(clock.weekday) &&
+    isSchoolWeekday() &&
     clockInWindow(clock.hhmm, snapshotTime, SNAPSHOT_WINDOW_MINUTES)
   );
 }
@@ -395,10 +395,10 @@ export async function sendTeacherClassroomLists(args: {
 }
 
 export async function runScheduledTeacherSnapshots() {
-  const clock = schoolLocalTime();
-  if (!isSchoolWeekday(clock.weekday)) {
+  if (!isSchoolWeekday()) {
     return { ran: false as const, reason: "weekend", schools: 0 };
   }
+  const clock = schoolLocalTime();
 
   const schools = await prisma.school.findMany({ select: { id: true } });
   const results: Array<{ schoolId: string; sent: number; skipped?: string }> = [];

@@ -520,6 +520,9 @@ export async function sendOpsChangeDigest(args: {
   actorId: string;
   automatic?: boolean;
 }): Promise<OpsDigestResult> {
+  if (args.automatic && !isSchoolWeekday()) {
+    return { ok: true, sent: 0, recipients: [], skippedEmpty: true };
+  }
   const dateKey = schoolLocalTime().dateKey;
   if (args.automatic && (await alreadySent(args.schoolId, dateKey))) {
     return { ok: true, sent: 0, alreadySent: true, recipients: [] };
@@ -667,16 +670,16 @@ export async function sendOpsChangeDigest(args: {
 export function isOpsChangesWindow() {
   const clock = schoolLocalTime();
   return (
-    isSchoolWeekday(clock.weekday) &&
+    isSchoolWeekday() &&
     clockInWindow(clock.hhmm, opsChangesTimeForToday(), WINDOW_MINUTES)
   );
 }
 
 export async function runScheduledOpsChangeDigests() {
-  const clock = schoolLocalTime();
-  if (!isSchoolWeekday(clock.weekday)) {
+  if (!isSchoolWeekday()) {
     return { ran: false as const, reason: "weekend", schools: 0 };
   }
+  const clock = schoolLocalTime();
   if (!isOpsChangesWindow()) {
     return { ran: false as const, reason: "outside-window", schools: 0 };
   }
