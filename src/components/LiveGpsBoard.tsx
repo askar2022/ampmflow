@@ -124,7 +124,7 @@ export function LiveGpsBoard({
                 className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
                 style={{ left: bus.map.left, top: bus.map.top }}
               >
-                <div className="rounded-xl bg-[#f5c518] px-2.5 py-1.5 text-center text-[11px] font-extrabold text-navy shadow-md ring-2 ring-white">
+                <div className="rounded-xl bg-[#f5c518] px-2.5 py-1.5 text-center text-[11px] font-extrabold text-navy shadow-[0_8px_16px_rgba(11,41,66,0.18)] ring-2 ring-white">
                   {bus.label}
                 </div>
               </div>
@@ -149,7 +149,7 @@ export function LiveGpsBoard({
               {buses.map((bus) => (
                 <li
                   key={bus.id}
-                  className="rounded-xl border border-line bg-paper px-3 py-3"
+                  className="rounded-xl border border-navy/15 bg-white px-3 py-3 shadow-[0_6px_18px_rgba(11,41,66,0.08)]"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
