@@ -79,8 +79,8 @@ export function AppShell({
           </Link>
         </div>
         <nav className="mx-auto mt-3 flex max-w-[1100px] flex-col gap-2 px-4 sm:flex-row sm:items-center sm:px-6">
-          <div className="nav-scroll min-w-0">
-            <div className="inline-flex min-h-[44px] min-w-max items-center gap-1 rounded-full bg-navy-deep px-2 text-[14px] text-white">
+          <div className="min-w-0 w-full">
+            <div className="flex min-h-[44px] w-full flex-wrap items-center gap-1 rounded-[22px] bg-navy-deep px-2 py-1 text-[14px] text-white">
               <AppNav links={links} />
             </div>
           </div>
