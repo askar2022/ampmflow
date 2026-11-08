@@ -142,7 +142,7 @@ export function LiveGpsBoard({
           </div>
 
           <div className="flex max-h-[420px] flex-col overflow-auto p-3">
-            <p className="px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+            <p className="px-1 pb-2 text-sm font-extrabold uppercase tracking-wide text-navy">
               Time to school
             </p>
             <ul className="space-y-2">
