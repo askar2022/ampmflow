@@ -37,7 +37,7 @@ export default async function CompanyLiveGpsPage({
       select: { number: true },
       orderBy: { number: "asc" },
     }),
-    fetchOneStepLiveBuses(),
+    fetchOneStepLiveBuses(selected.name),
   ]);
 
   return (

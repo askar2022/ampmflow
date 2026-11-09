@@ -3,6 +3,7 @@
 import { getSession } from "@/lib/auth";
 import { loadCompanySchools } from "@/lib/company-access";
 import { fetchOneStepLiveBuses, onestepGpsConfigured } from "@/lib/onestep-gps";
+import { prisma } from "@/lib/prisma";
 
 export async function loadLiveGpsFeed(schoolId?: string) {
   const user = await getSession();
@@ -10,12 +11,14 @@ export async function loadLiveGpsFeed(schoolId?: string) {
     return { ok: false as const, error: "Sign in required." };
   }
 
+  let resolvedSchoolId = user.schoolId;
   if (user.role === "BUS_COMPANY") {
     if (schoolId) {
       const schools = await loadCompanySchools(user);
       if (!schools.some((school) => school.id === schoolId)) {
         return { ok: false as const, error: "That school is not on your list." };
       }
+      resolvedSchoolId = schoolId;
     }
   } else if (
     !["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"].includes(user.role)
@@ -23,9 +26,15 @@ export async function loadLiveGpsFeed(schoolId?: string) {
     return { ok: false as const, error: "Not allowed." };
   } else if (schoolId && schoolId !== user.schoolId) {
     return { ok: false as const, error: "Not allowed for that school." };
+  } else if (schoolId) {
+    resolvedSchoolId = schoolId;
   }
 
-  const feed = await fetchOneStepLiveBuses();
+  const school = await prisma.school.findUnique({
+    where: { id: resolvedSchoolId },
+    select: { name: true },
+  });
+  const feed = await fetchOneStepLiveBuses(school?.name);
   return {
     ok: true as const,
     configured: onestepGpsConfigured(),

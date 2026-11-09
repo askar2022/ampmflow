@@ -38,7 +38,12 @@ export function onestepGpsConfigured() {
   return Boolean(apiKey());
 }
 
-export function schoolGpsPoint(): { lat: number; lng: number } | null {
+/** Official Aim Academy pin (2831 12th Ave S, Minneapolis) — MDE lat/lng. */
+const AIM_SCHOOL_PIN = { lat: 44.950661, lng: -93.257431 };
+
+export function schoolGpsPoint(
+  schoolName?: string | null,
+): { lat: number; lng: number } | null {
   const latRaw = (
     process.env.ONESTEP_SCHOOL_LAT ||
     process.env.SCHOOL_GPS_LAT ||
@@ -49,14 +54,22 @@ export function schoolGpsPoint(): { lat: number; lng: number } | null {
     process.env.SCHOOL_GPS_LNG ||
     ""
   ).trim();
-  if (!latRaw || !lngRaw) return null;
-  const lat = Number(latRaw);
-  const lng = Number(lngRaw);
-  // Empty env used to become 0,0 and show thousands of fake miles.
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  if (Math.abs(lat) < 0.01 && Math.abs(lng) < 0.01) return null;
-  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-  return { lat, lng };
+  if (latRaw && lngRaw) {
+    const lat = Number(latRaw);
+    const lng = Number(lngRaw);
+    // Empty env used to become 0,0 and show thousands of fake miles.
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      !(Math.abs(lat) < 0.01 && Math.abs(lng) < 0.01) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lng) <= 180
+    ) {
+      return { lat, lng };
+    }
+  }
+  if (schoolName && /aim/i.test(schoolName)) return AIM_SCHOOL_PIN;
+  return null;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -425,9 +438,11 @@ async function requestDevices(key: string) {
   throw new Error(lastError || "OneStep GPS request failed.");
 }
 
-export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
+export async function fetchOneStepLiveBuses(
+  schoolName?: string | null,
+): Promise<LiveGpsFeed> {
   const fetchedAt = new Date().toISOString();
-  const school = schoolGpsPoint();
+  const school = schoolGpsPoint(schoolName);
   const key = apiKey();
   if (!key) {
     return {

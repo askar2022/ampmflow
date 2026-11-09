@@ -17,7 +17,7 @@ export default async function LiveGpsPage() {
       select: { number: true },
       orderBy: { number: "asc" },
     }),
-    fetchOneStepLiveBuses(),
+    fetchOneStepLiveBuses(school?.name),
   ]);
 
   return (
