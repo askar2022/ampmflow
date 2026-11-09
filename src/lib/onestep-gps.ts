@@ -114,7 +114,54 @@ function extractPoint(device: Record<string, unknown>) {
   return { lat, lng, updatedAt };
 }
 
+/**
+ * Aim Academy (Minnehaha): OneStep unit numbers → school bus labels.
+ * 1038 = Bus 5, 1119 = Bus 4. Third bus will be added when the company sends it.
+ * Override/extend with ONESTEP_BUS_MAP like: 1038=Bus 5,1119=Bus 4
+ */
+function busLabelMap() {
+  const defaults: Record<string, string> = {
+    "1038": "Bus 5",
+    "1119": "Bus 4",
+  };
+  const raw = (process.env.ONESTEP_BUS_MAP || "").trim();
+  if (!raw) return defaults;
+  for (const part of raw.split(/[,;]+/)) {
+    const [id, ...rest] = part.split("=");
+    const key = (id || "").trim();
+    const label = rest.join("=").trim();
+    if (key && label) defaults[key] = label;
+  }
+  return defaults;
+}
+
+function deviceTokens(device: Record<string, unknown>) {
+  return [
+    text(device.id, device.device_id, device.deviceId, device.imei),
+    text(
+      device.display_name,
+      device.displayName,
+      device.name,
+      device.device_name,
+      device.deviceName,
+      device.label,
+      device.plate_number,
+      device.vin_name,
+    ),
+  ]
+    .filter(Boolean)
+    .flatMap((value) => {
+      const digits = value.match(/\d{3,}/g) || [];
+      return [value, value.toLowerCase(), ...digits];
+    });
+}
+
 function deviceLabel(device: Record<string, unknown>, index: number) {
+  const map = busLabelMap();
+  for (const token of deviceTokens(device)) {
+    const mapped = map[token] || map[token.replace(/\D/g, "")];
+    if (mapped) return mapped;
+  }
   const label = text(
     device.display_name,
     device.displayName,
