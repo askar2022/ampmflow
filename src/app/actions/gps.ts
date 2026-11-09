@@ -118,6 +118,20 @@ export async function loadGpsReportDay(input: {
   const access = await resolveGpsSchoolId(input.schoolId);
   if (!access.ok) return access;
 
+  // Refresh live positions first so Arrived school updates when Bus 5 is on campus.
+  const school = await prisma.school.findUnique({
+    where: { id: access.schoolId },
+    select: { name: true },
+  });
+  const feed = await fetchOneStepLiveBuses(school?.name);
+  if (feed.live) {
+    await recordLiveGpsBuses({
+      schoolId: access.schoolId,
+      company: "Minnehaha",
+      buses: feed.buses,
+    });
+  }
+
   const [rows, days] = await Promise.all([
     loadGpsTripReport({
       schoolId: access.schoolId,

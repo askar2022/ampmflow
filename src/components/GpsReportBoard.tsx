@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { loadGpsReportDay } from "@/app/actions/gps";
 import { formatGpsClock } from "@/lib/gps-log";
 
@@ -54,6 +54,15 @@ export function GpsReportBoard({
     });
   }
 
+  useEffect(() => {
+    loadDay(dayKey || initialDayKey);
+    const timer = window.setInterval(() => {
+      loadDay(dayKey || initialDayKey);
+    }, 30000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolId]);
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -63,28 +72,39 @@ export function GpsReportBoard({
             {schoolName} · Minnehaha’s 3 Aim buses only (Bus 4, Bus 5, 3rd bus)
           </p>
         </div>
-        <label className="text-sm font-semibold text-navy">
-          History day
-          <select
-            className="ml-2 min-h-[40px] rounded-lg border border-line bg-white px-3 py-2 font-medium"
-            value={dayKey}
-            onChange={(e) => loadDay(e.target.value)}
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-sm font-semibold text-navy">
+            History day
+            <select
+              className="ml-2 min-h-[40px] rounded-lg border border-line bg-white px-3 py-2 font-medium"
+              value={dayKey}
+              onChange={(e) => loadDay(e.target.value)}
+            >
+              {dayOptions.map((day) => (
+                <option key={day.dayKey} value={day.dayKey}>
+                  {day.dayKey}
+                  {day.count ? ` · ${day.count} events` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => loadDay(dayKey || initialDayKey)}
+            className="min-h-[40px] rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-navy disabled:opacity-60"
           >
-            {dayOptions.map((day) => (
-              <option key={day.dayKey} value={day.dayKey}>
-                {day.dayKey}
-                {day.count ? ` · ${day.count} events` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+            {pending ? "Updating…" : "Refresh times"}
+          </button>
+        </div>
       </div>
 
       <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-        Times save automatically from Live GPS: first stop pickup, arrive at
-        school, leave school after drop-off, and last student stop. Open a past
-        day anytime to show Minnehaha or the school.
-        {pending ? " Loading…" : ""}
+        Each bus is timed on its own. A bus parked at headquarters does not
+        count as a pickup. When a bus reaches school (like Bus 5 drop-off),
+        Arrived school fills in. First pickup and last stop only after the bus
+        really moves on the route.
+        {pending ? " Updating…" : ""}
       </p>
 
       {error ? (

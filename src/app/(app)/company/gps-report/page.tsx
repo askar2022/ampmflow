@@ -3,7 +3,12 @@ import { getSession } from "@/lib/auth";
 import { loadCompanySchools } from "@/lib/company-access";
 import { GpsReportBoard } from "@/components/GpsReportBoard";
 import { todayKey } from "@/lib/dates";
-import { loadGpsArrivalDays, loadGpsTripReport } from "@/lib/gps-log";
+import {
+  loadGpsArrivalDays,
+  loadGpsTripReport,
+  recordLiveGpsBuses,
+} from "@/lib/gps-log";
+import { fetchOneStepLiveBuses } from "@/lib/onestep-gps";
 
 export default async function CompanyGpsReportPage({
   searchParams,
@@ -32,6 +37,15 @@ export default async function CompanyGpsReportPage({
   }
 
   const day = todayKey();
+  const feed = await fetchOneStepLiveBuses(selected.name);
+  if (feed.live) {
+    await recordLiveGpsBuses({
+      schoolId: selected.id,
+      company: "Minnehaha",
+      buses: feed.buses,
+    });
+  }
+
   const [rows, days] = await Promise.all([
     loadGpsTripReport({ schoolId: selected.id, dayKey: day }),
     loadGpsArrivalDays(selected.id),

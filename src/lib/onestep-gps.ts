@@ -505,8 +505,9 @@ export async function fetchOneStepLiveBuses(
     );
 
     const liveBuses: LiveBusPoint[] = uniqueRows.map((row, index) => {
+      // Keep two decimals so "at school" is not rounded away (0.14 → 0.1).
       const miles = school
-        ? Number(milesBetween(school, row).toFixed(1))
+        ? Number(milesBetween(school, row).toFixed(2))
         : null;
       return {
         id: row.id,
