@@ -18,22 +18,21 @@ export function RequestRecordTable({
   showParent = false,
   showKind = false,
   showDate = false,
-  empty,
+  empty = "No open requests yet.",
 }: {
   rows: RequestRecordRow[];
   showTeacher?: boolean;
   showParent?: boolean;
   showKind?: boolean;
   showDate?: boolean;
-  empty: string;
+  empty?: string;
 }) {
-  if (!rows.length) {
-    return (
-      <div className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-        {empty}
-      </div>
-    );
-  }
+  const colCount =
+    4 +
+    (showTeacher ? 1 : 0) +
+    (showParent ? 1 : 0) +
+    (showDate ? 1 : 0) +
+    (showKind ? 1 : 0);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card">
@@ -52,35 +51,46 @@ export function RequestRecordTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.id}
-                className={`border-t border-line ${
-                  row.waiting ? "row-yellow" : "row-green"
-                }`}
-              >
-                <td className="px-4 py-3 font-semibold">{row.name}</td>
-                <td>{row.grade.replace(/^grade\s+/i, "") || "—"}</td>
-                {showTeacher ? <td>{row.teacher || "—"}</td> : null}
-                {showParent ? <td>{row.parent || "—"}</td> : null}
-                {showDate ? (
-                  <td className="whitespace-nowrap font-semibold text-navy">
-                    {row.requestDate || "—"}
+            {rows.length ? (
+              rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className={`border-t border-line ${
+                    row.waiting ? "row-yellow" : "row-green"
+                  }`}
+                >
+                  <td className="px-4 py-3 font-semibold">{row.name}</td>
+                  <td>{row.grade.replace(/^grade\s+/i, "") || "—"}</td>
+                  {showTeacher ? <td>{row.teacher || "—"}</td> : null}
+                  {showParent ? <td>{row.parent || "—"}</td> : null}
+                  {showDate ? (
+                    <td className="whitespace-nowrap font-semibold text-navy">
+                      {row.requestDate || "—"}
+                    </td>
+                  ) : null}
+                  {showKind ? (
+                    <td className="font-extrabold text-navy">
+                      {row.kind || row.request}
+                    </td>
+                  ) : null}
+                  <td className="max-w-[260px] font-normal">
+                    {row.detail || row.request}
                   </td>
-                ) : null}
-                {showKind ? (
-                  <td className="font-extrabold text-navy">
-                    {row.kind || row.request}
+                  <td className="px-4 py-3 font-extrabold text-navy">
+                    {row.company}
                   </td>
-                ) : null}
-                <td className="max-w-[260px] font-normal">
-                  {row.detail || row.request}
-                </td>
-                <td className="px-4 py-3 font-extrabold text-navy">
-                  {row.company}
+                </tr>
+              ))
+            ) : (
+              <tr className="border-t border-line">
+                <td
+                  colSpan={colCount}
+                  className="px-4 py-6 text-sm text-muted"
+                >
+                  {empty}
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
