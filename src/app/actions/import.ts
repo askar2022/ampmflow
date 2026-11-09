@@ -265,6 +265,8 @@ const POSITIONAL_KEYS = ["id", "student", "grade", "teacher", "room", "am", "pm"
 
 const NAME_LAST_FIRST =
   /^[A-Za-z][A-Za-z'\-.]*\s*,\s*[A-Za-z][A-Za-z'\-.]*(?:\s+[A-Za-z][A-Za-z'\-.]*)*$/;
+const NAME_FIRST_LAST =
+  /^[A-Za-z][A-Za-z'\-.]*\s+[A-Za-z][A-Za-z'\-.]+(?:\s+[A-Za-z][A-Za-z'\-.]+)?$/;
 
 function sheetMatrix(sheet: XLSX.WorkSheet) {
   const matrix = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
@@ -281,15 +283,31 @@ function nonEmptyLines(matrix: string[][]) {
   return matrix.filter((line) => line.some(Boolean));
 }
 
+function cleanSheetName(sheetName: string) {
+  return sheetName
+    .replace(/[\u00a0\u2000-\u200b]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function looksLikePersonName(value: string) {
   const clean = value.split("/")[0]?.trim() || "";
-  return NAME_LAST_FIRST.test(clean);
+  if (!clean || clean.length > 60) return false;
+  if (/\d{3,}/.test(clean)) return false;
+  if (
+    /(street|avenue|road|drive|lane|court|circle|burnsville|eden|minneapolis|minnesota|\bmn\b)/i.test(
+      clean,
+    )
+  ) {
+    return false;
+  }
+  return NAME_LAST_FIRST.test(clean) || NAME_FIRST_LAST.test(clean);
 }
 
 function parseSheetRide(sheetName: string) {
-  const name = sheetName.trim();
+  const name = cleanSheetName(sheetName);
   const trip = /\bPM\b/i.test(name) ? "PM" : /\bAM\b/i.test(name) ? "AM" : null;
-  const van = name.match(/\bvan\s*([0-9]+)\b/i);
+  const van = name.match(/\bvan\s*#?\s*([0-9]+)\b/i);
   if (van) {
     return {
       kind: "VAN" as const,
@@ -298,7 +316,7 @@ function parseSheetRide(sheetName: string) {
       trip,
     };
   }
-  const bus = name.match(/\bbus\s*([0-9]+)\b/i);
+  const bus = name.match(/\bbus\s*#?\s*([0-9]+)\b/i);
   if (bus) {
     return {
       kind: "BUS" as const,
@@ -353,6 +371,11 @@ function isDayibMetaOrStopRow(cells: string[]) {
 }
 
 function findDayibName(cells: string[]) {
+  for (const cell of cells) {
+    if (cell.includes("/")) continue;
+    const clean = cell.trim();
+    if (NAME_LAST_FIRST.test(clean)) return clean;
+  }
   for (const cell of cells) {
     if (cell.includes("/")) continue;
     if (looksLikePersonName(cell)) return cell.trim();
@@ -414,17 +437,22 @@ function rowsFromDayibRouteSheet(
       row.transportation_type = "VAN";
       row.am = ride.label;
       row.pm = ride.label;
+      row.sheet_ride = ride.label;
     } else if (ride?.kind === "BUS") {
       row.transportation_type = "BUS";
-      row["bus number"] = ride.number;
-      if (!ride.trip || ride.trip === "AM") {
+      row.sheet_ride = `${ride.label}${ride.trip ? ` ${ride.trip}` : ""}`;
+      // Keep AM and PM separate — never copy one trip onto the other.
+      if (ride.trip === "AM") {
         row.am = ride.label;
-        row.am_bus = ride.number;
         row["am bus"] = ride.number;
-      }
-      if (!ride.trip || ride.trip === "PM") {
+      } else if (ride.trip === "PM") {
         row.pm = ride.label;
-        row.pm_bus = ride.number;
+        row["pm bus"] = ride.number;
+      } else {
+        row["bus number"] = ride.number;
+        row.am = ride.label;
+        row.pm = ride.label;
+        row["am bus"] = ride.number;
         row["pm bus"] = ride.number;
       }
     }
@@ -613,7 +641,20 @@ async function applyStudentPlans(args: {
   pmDest: string;
   vanName: string;
   daycareId?: string;
+  clearMissingTrips?: boolean;
 }) {
+  if (args.clearMissingTrips) {
+    if (!args.amType) {
+      await prisma.transportationAssignment
+        .deleteMany({ where: { studentId: args.studentId, trip: "AM" } })
+        .catch(() => undefined);
+    }
+    if (!args.pmType) {
+      await prisma.transportationAssignment
+        .deleteMany({ where: { studentId: args.studentId, trip: "PM" } })
+        .catch(() => undefined);
+    }
+  }
   for (const [trip, type, busNo, dest] of [
     ["AM", args.amType, args.amBus, args.amDest],
     ["PM", args.pmType, args.pmBus, args.pmDest],
@@ -992,16 +1033,18 @@ export async function importStudents(formData: FormData) {
     );
     const amRide = cell(row, "am_type", "am bus", "am route", "morning", "am");
     const pmRide = cell(row, "pm_type", "pm bus", "pm route", "afternoon", "pm");
+    // Dayib route tabs set am and/or pm explicitly — do not copy AM onto PM.
+    const splitTrips = Boolean(amRide || pmRide);
     const rideValue = vehicleName || amRide || pmRide || sharedBus || transportType;
     const amPlan = parsePlan(
       /van/i.test(transportType) || /van/i.test(vehicleName)
         ? vehicleName || transportType
-        : amRide || (!pmRide ? rideValue : ""),
+        : amRide || (!splitTrips ? rideValue : ""),
     );
     const pmPlan = parsePlan(
       /van/i.test(transportType) || /van/i.test(vehicleName)
         ? vehicleName || transportType
-        : pmRide || (!amRide ? rideValue : ""),
+        : pmRide || (!splitTrips ? rideValue : ""),
     );
     let daycareName = cell(row, "daycare_name", "daycare");
     if (!daycareName && (amPlan.dest === "DAYCARE" || pmPlan.dest === "DAYCARE")) {
@@ -1015,15 +1058,20 @@ export async function importStudents(formData: FormData) {
         : "";
     const amType = vanName
       ? "VAN"
-      : parseType(transportType) || parseType(cell(row, "am_type")) || amPlan.type;
+      : parseType(cell(row, "am_type")) || amPlan.type || (!splitTrips ? parseType(transportType) : null);
     const pmType = vanName
       ? "VAN"
-      : parseType(transportType) || parseType(cell(row, "pm_type")) || pmPlan.type || amType;
+      : parseType(cell(row, "pm_type")) ||
+        pmPlan.type ||
+        (!splitTrips ? parseType(transportType) || amType : null);
     const amBus =
       cell(row, "am_bus", "am bus") ||
       amPlan.bus ||
       (/bus/i.test(vehicleName) ? vehicleName.replace(/^Bus\s+/i, "") : "");
-    const pmBus = cell(row, "pm_bus", "pm bus") || pmPlan.bus || amBus;
+    const pmBus =
+      cell(row, "pm_bus", "pm bus") ||
+      pmPlan.bus ||
+      (!splitTrips ? amBus : "");
     const amDest =
       cell(row, "am_destination").toUpperCase() || amPlan.dest || "HOME";
     const pmDest =
@@ -1128,6 +1176,7 @@ export async function importStudents(formData: FormData) {
         amDest,
         pmDest,
         vanName,
+        clearMissingTrips: splitTrips,
       });
       await prisma.student
         .update({
@@ -1322,6 +1371,7 @@ export async function importStudents(formData: FormData) {
       pmDest,
       vanName,
       daycareId,
+      clearMissingTrips: splitTrips,
     });
     } catch (error) {
       errors.push(

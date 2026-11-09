@@ -22,6 +22,10 @@ function teacherLabel(student: EffectiveStudent) {
   return student.teacherName || "No teacher";
 }
 
+function planVanLabel(plan: EffectiveStudent["am"]) {
+  return plan.notes?.match(/Van\s+[A-Za-z0-9-]+/i)?.[0] || "";
+}
+
 function studentBuses(student: EffectiveStudent): string[] {
   return [
     ...new Set(
@@ -30,6 +34,29 @@ function studentBuses(student: EffectiveStudent): string[] {
       ),
     ),
   ];
+}
+
+function studentRideOptions(student: EffectiveStudent) {
+  const options: { value: string; label: string }[] = [];
+  const amVan = planVanLabel(student.am);
+  const pmVan = planVanLabel(student.pm);
+  if (amVan) options.push({ value: `ride:van:${amVan.toLowerCase()}`, label: amVan });
+  if (pmVan && pmVan.toLowerCase() !== amVan.toLowerCase()) {
+    options.push({ value: `ride:van:${pmVan.toLowerCase()}`, label: pmVan });
+  }
+  if (student.am.busNumber) {
+    options.push({
+      value: `ride:am:${student.am.busNumber}`,
+      label: `Bus ${student.am.busNumber} AM`,
+    });
+  }
+  if (student.pm.busNumber) {
+    options.push({
+      value: `ride:pm:${student.pm.busNumber}`,
+      label: `Bus ${student.pm.busNumber} PM`,
+    });
+  }
+  return options;
 }
 
 function busFilterLabel(value: string) {
@@ -45,6 +72,40 @@ function sameDeskBus(stored: string, wanted: string) {
   if (a === b) return true;
   const other = /^(3rd(\s+bus)?|other(\s+bus)?)$/i;
   return other.test(a) && other.test(b);
+}
+
+function studentMatchesRide(
+  student: EffectiveStudent,
+  ride: string,
+  studentVanId: Record<string, string>,
+) {
+  if (!ride) return true;
+  if (ride === "none") {
+    return !(studentBuses(student).length || studentVanId[student.id] || planVanLabel(student.am) || planVanLabel(student.pm));
+  }
+  if (ride === "waiting") {
+    return (
+      student.am.waitingForAssignment ||
+      student.pm.waitingForAssignment ||
+      (!student.am.busNumber && !student.pm.busNumber && !studentVanId[student.id] && !planVanLabel(student.am) && !planVanLabel(student.pm))
+    );
+  }
+  if (ride.startsWith("van:")) {
+    return studentVanId[student.id] === ride.slice(4);
+  }
+  if (ride.startsWith("ride:van:")) {
+    const wanted = ride.slice("ride:van:".length);
+    return [planVanLabel(student.am), planVanLabel(student.pm)].some(
+      (label) => label.toLowerCase() === wanted,
+    );
+  }
+  if (ride.startsWith("ride:am:")) {
+    return sameDeskBus(student.am.busNumber || "", ride.slice("ride:am:".length));
+  }
+  if (ride.startsWith("ride:pm:")) {
+    return sameDeskBus(student.pm.busNumber || "", ride.slice("ride:pm:".length));
+  }
+  return studentBuses(student).some((bus) => sameDeskBus(bus, ride));
 }
 
 function uniqueSorted(values: string[]) {
@@ -67,26 +128,7 @@ function deskRows(
     .filter((student) => {
       if (grade && student.grade !== grade) return false;
       if (teacher && teacherLabel(student) !== teacher) return false;
-      if (ride === "none") {
-        if (studentBuses(student).length || studentVanId[student.id]) return false;
-      } else if (ride === "waiting") {
-        if (
-          !student.am.waitingForAssignment &&
-          !student.pm.waitingForAssignment &&
-          student.am.busNumber &&
-          student.pm.busNumber &&
-          !studentVanId[student.id]
-        ) {
-          return false;
-        }
-      } else if (ride.startsWith("van:")) {
-        if (studentVanId[student.id] !== ride.slice(4)) return false;
-      } else if (
-        ride &&
-        !studentBuses(student).some((bus) => sameDeskBus(bus, ride))
-      ) {
-        return false;
-      }
+      if (ride && !studentMatchesRide(student, ride, studentVanId)) return false;
       if (!q) return true;
       const hay = [
         student.fullName,
@@ -277,16 +319,28 @@ export function ReceptionDesk({
     () => uniqueSorted(students.map((student) => teacherLabel(student))),
     [students],
   );
-  // Bus / van filter options come from the loaded roster only — not a hard-coded fleet.
-  const busChoices = useMemo(
-    () => uniqueSorted(students.flatMap((student) => studentBuses(student))),
-    [students],
-  );
-  const deskVans = useMemo(() => {
-    if (aimSchool) return [];
-    const used = new Set(Object.values(studentVanId).filter(Boolean));
-    return vans.filter((van) => used.has(van.id));
-  }, [aimSchool, vans, studentVanId]);
+  // Ride filter options come from the loaded roster only — Bus 1 AM / Bus 1 PM stay separate.
+  const rideChoices = useMemo(() => {
+    const byValue = new Map<string, string>();
+    for (const student of students) {
+      for (const option of studentRideOptions(student)) {
+        byValue.set(option.value, option.label);
+      }
+      const vanId = studentVanId[student.id];
+      if (vanId && !aimSchool) {
+        const van = vans.find((row) => row.id === vanId);
+        if (van) byValue.set(`van:${van.id}`, van.name);
+      }
+    }
+    return [...byValue.entries()]
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, {
+          numeric: true,
+          sensitivity: "base",
+        }),
+      );
+  }, [aimSchool, studentVanId, students, vans]);
   const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(
     () => deskRows(students, deferredQuery, grade, teacher, ride, studentVanId),
@@ -545,14 +599,9 @@ export function ReceptionDesk({
                 {aimSchool ? "No bus" : "No bus or van"}
               </option>
               <option value="waiting">Request for route</option>
-              {busChoices.map((item) => (
-                <option key={`bus-${item}`} value={item}>
-                  {busFilterLabel(item)}
-                </option>
-              ))}
-              {deskVans.map((van) => (
-                <option key={van.id} value={`van:${van.id}`}>
-                  {van.name}
+              {rideChoices.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
                 </option>
               ))}
             </select>
