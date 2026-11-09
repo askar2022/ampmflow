@@ -618,7 +618,32 @@ async function applyStudentPlans(args: {
     ["AM", args.amType, args.amBus, args.amDest],
     ["PM", args.pmType, args.pmBus, args.pmDest],
   ] as const) {
-    if (!type || type === "VAN") continue;
+    if (!type) continue;
+    if (type === "VAN") {
+      const vanLabel = args.vanName || "Van";
+      await prisma.transportationAssignment.upsert({
+        where: { studentId_trip: { studentId: args.studentId, trip } },
+        create: {
+          studentId: args.studentId,
+          trip,
+          type: "BUS",
+          destination: "HOME",
+          busRouteId: null,
+          waitingForAssignment: false,
+          notes: vanLabel,
+          updatedById: args.userId,
+        },
+        update: {
+          type: "BUS",
+          destination: "HOME",
+          busRouteId: null,
+          waitingForAssignment: false,
+          notes: vanLabel,
+          updatedById: args.userId,
+        },
+      });
+      continue;
+    }
     const route = busNo
       ? await prisma.busRoute.upsert({
           where: {

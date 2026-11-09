@@ -57,13 +57,22 @@ export function roleLabel(role: string) {
   }
 }
 
-export function formatAddress(parts: {
-  line1: string;
-  city: string;
-  state: string;
-  zip: string;
-}) {
-  return `${parts.line1}, ${parts.city}, ${parts.state} ${parts.zip}`;
+export function formatAddress(
+  parts?: {
+    line1?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+  } | null,
+) {
+  if (!parts) return "—";
+  const line1 = String(parts.line1 || "").trim();
+  const city = String(parts.city || "").trim();
+  const state = String(parts.state || "").trim();
+  const zip = String(parts.zip || "").trim();
+  if (!line1 && !city && !state && !zip) return "—";
+  if (!city && !state && !zip) return line1 || "—";
+  return `${line1 || "—"}, ${city || "—"}, ${state || "—"} ${zip}`.trim();
 }
 
 function vanFromPlan(plan: PlanSnapshot) {
@@ -155,6 +164,7 @@ export function planSummary(plan: PlanSnapshot, trip: Trip = plan.trip) {
   }
   const van = vanFromPlan(plan);
   if (van) return `${van.replace(/^van/i, "Van")}${dest}`;
+  if (!plan.busNumber) return `Bus pending${dest}`;
   return `Bus ${plan.busNumber}${dest}`;
 }
 

@@ -14,9 +14,7 @@ import {
   ENROLL_LABEL,
   FOLLOW_LABEL,
   PM_LABEL,
-  familyGroupKey,
   loadGateHistory,
-  loadGateRoster,
 } from "@/lib/gate";
 
 export default async function StudentPage({
@@ -38,17 +36,57 @@ export default async function StudentPage({
     take: 20,
   });
 
-  const [gateHistory, roster, listed] = await Promise.all([
+  const [gateHistory, listed] = await Promise.all([
     loadGateHistory(session.schoolId, id),
-    loadGateRoster(session.schoolId),
     listBusNumbers(session.schoolId),
   ]);
-  const gateStudent = roster.find((row) => row.id === id);
-  const siblings = roster.filter(
-    (row) =>
-      Boolean(gateStudent) &&
-      familyGroupKey(row) === familyGroupKey(gateStudent!),
-  );
+  // Avoid loading the full school roster just to show siblings — that can
+  // crash Front Desk / student pages after a large Dayib import.
+  const phone = student.parentPhone && student.parentPhone !== "—"
+    ? student.parentPhone
+    : "";
+  const siblingRows = phone
+    ? await prisma.student.findMany({
+        where: {
+          schoolId: session.schoolId,
+          active: true,
+          parentPhone: phone,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          grade: true,
+          studentId: true,
+        },
+        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        take: 20,
+      })
+    : [
+        {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+          grade: student.grade,
+          studentId: student.studentId,
+        },
+      ];
+  const siblings = siblingRows.map((row) => ({
+    id: row.id,
+    studentId: row.studentId,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    fullName: `${row.firstName} ${row.lastName}`,
+    grade: row.grade,
+  }));
+  const vehicle = record.vehicleId
+    ? await prisma.transportVehicle
+        .findUnique({
+          where: { id: record.vehicleId },
+          select: { name: true, driverName: true, driverPhone: true },
+        })
+        .catch(() => null)
+    : null;
 
   const canUndo = audits.some(
     (log) => log.action === "UPDATE_PERMANENT" || log.action === "CREATE_TEMPORARY",
@@ -138,13 +176,14 @@ export default async function StudentPage({
         <div className="rounded-2xl border border-line bg-card p-5">
           <h2 className="font-serif text-2xl">Family & destinations</h2>
           <dl className="mt-4 space-y-2 text-sm">
-            <Row label="Family ID" value={gateStudent?.familyKey || "—"} />
+            <Row label="Family ID" value={record.familyId || "—"} />
             <Row
               label="Enrollment"
               value={
-                gateStudent
-                  ? ENROLL_LABEL[gateStudent.enrollmentSource]
-                  : "—"
+                ENROLL_LABEL[
+                  (student.enrollmentSource as keyof typeof ENROLL_LABEL) ||
+                    "RETURNING"
+                ] || student.enrollmentSource || "—"
               }
             />
             <Row
@@ -158,10 +197,10 @@ export default async function StudentPage({
             <Row
               label="Assigned Vehicle/Route"
               value={
-                gateStudent
-                  ? `${gateStudent.vehicleName}${
-                      gateStudent.driverName
-                        ? ` · ${gateStudent.driverName} ${gateStudent.driverPhone}`
+                vehicle
+                  ? `${vehicle.name}${
+                      vehicle.driverName
+                        ? ` · ${vehicle.driverName} ${vehicle.driverPhone}`
                         : ""
                     }`
                   : "Not Assigned"

@@ -74,7 +74,6 @@ const studentInclude = {
       busRoute: { select: { number: true, loadingLocation: true } },
       daycare: { select: { name: true } },
       customAddress: true,
-      updatedBy: { select: { name: true } },
     },
   },
   tempChanges: {
@@ -195,7 +194,7 @@ export function toEffective(
   student: NonNullable<StudentRecord>,
   day = todayKey(),
 ): EffectiveStudent {
-  const teacher = student.classroom.teachers[0];
+  const teacher = student.classroom?.teachers?.[0];
   const amUpdated = student.assignments.find((item) => item.trip === "AM");
   const pmUpdated = student.assignments.find((item) => item.trip === "PM");
   const latestAssignment = [amUpdated, pmUpdated]
@@ -212,34 +211,34 @@ export function toEffective(
     firstName: student.firstName,
     lastName: student.lastName,
     fullName: `${student.firstName} ${student.lastName}`,
-    grade: student.grade,
+    grade: student.grade || "—",
     parentName: displayParentName(
       student.parentName,
       extraText(student, "parentEmail"),
     ),
-    parentPhone: student.parentPhone,
+    parentPhone: student.parentPhone || "—",
     parentPhone2: extraText(student, "parentPhone2"),
     parentEmail: extraText(student, "parentEmail"),
     emergencyName: extraText(student, "emergencyName"),
     emergencyPhone: extraText(student, "emergencyPhone"),
     homeAddress: formatAddress(student.homeAddress),
     daycareName: student.daycare?.name ?? null,
-    daycareAddress: student.daycare
+    daycareAddress: student.daycare?.address
       ? formatAddress(student.daycare.address)
       : null,
     daycarePhone: student.daycare
       ? extraText(student.daycare, "phone") || null
       : null,
     classroomId: student.classroomId,
-    classroomName: student.classroom.name,
+    classroomName: student.classroom?.name || "Unassigned",
     teacherName: teacher?.name ?? "Unassigned",
     teacherEmail: extraText(teacher ?? {}, "email"),
-    notes: student.notes,
+    notes: student.notes || "",
     enrollmentSource: student.enrollmentSource || "RETURNING",
     am: resolveTrip(student, "AM", day),
     pm: resolveTrip(student, "PM", day),
-    lastUpdatedBy: latestAssignment?.updatedBy.name ?? null,
-    lastUpdatedAt: latestAssignment?.updatedAt.toISOString() ?? null,
+    lastUpdatedBy: null,
+    lastUpdatedAt: latestAssignment?.updatedAt?.toISOString() ?? null,
   };
 }
 
@@ -314,7 +313,15 @@ export async function loadStudents(schoolId: string, day = todayKey()) {
     include: studentInclude,
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
-  return rows.map((row) => toEffective(row, day));
+  const students: EffectiveStudent[] = [];
+  for (const row of rows) {
+    try {
+      students.push(toEffective(row, day));
+    } catch {
+      // Skip a bad roster row so one broken import cannot crash Front Desk.
+    }
+  }
+  return students;
 }
 
 export async function loadStudent(id: string, day = todayKey()) {
