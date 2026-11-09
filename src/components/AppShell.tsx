@@ -13,7 +13,7 @@ function deskNavLabel(schoolName?: string | null) {
 const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
   { href: "/dashboard", label: "Front Desk", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/waiting", label: "Submit new request", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/changes", label: "Today’s Changes", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
+  { href: "/changes", label: "Open requests", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/gps", label: "Live GPS", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/analytics", label: "Analytics", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/buses", label: "Roster", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
