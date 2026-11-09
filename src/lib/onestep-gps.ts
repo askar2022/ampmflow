@@ -39,13 +39,23 @@ export function onestepGpsConfigured() {
 }
 
 export function schoolGpsPoint(): { lat: number; lng: number } | null {
-  const lat = Number(
-    process.env.ONESTEP_SCHOOL_LAT || process.env.SCHOOL_GPS_LAT || "",
-  );
-  const lng = Number(
-    process.env.ONESTEP_SCHOOL_LNG || process.env.SCHOOL_GPS_LNG || "",
-  );
+  const latRaw = (
+    process.env.ONESTEP_SCHOOL_LAT ||
+    process.env.SCHOOL_GPS_LAT ||
+    ""
+  ).trim();
+  const lngRaw = (
+    process.env.ONESTEP_SCHOOL_LNG ||
+    process.env.SCHOOL_GPS_LNG ||
+    ""
+  ).trim();
+  if (!latRaw || !lngRaw) return null;
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
+  // Empty env used to become 0,0 and show thousands of fake miles.
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (Math.abs(lat) < 0.01 && Math.abs(lng) < 0.01) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
   return { lat, lng };
 }
 
