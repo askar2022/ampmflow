@@ -4,17 +4,18 @@ import { useEffect, useState, useTransition } from "react";
 import { loadLiveGpsFeed } from "@/app/actions/gps";
 import type { LiveBusPoint, LiveGpsFeed } from "@/lib/onestep-gps";
 
-type PreviewBus = {
+type BoardBus = {
   id: string;
   label: string;
-  etaMinutes: number;
-  miles: number;
-  status: "On route" | "Arriving" | "At school";
+  etaMinutes: number | null;
+  miles: number | null;
+  status: string;
+  pending?: boolean;
   map: { left: string; top: string };
 };
 
-/** Aim preview until live GPS: only the buses Minnehaha has shared so far. */
-const SAMPLE: PreviewBus[] = [
+/** Minnehaha: 3 Aim buses. GPS for Bus 4 + Bus 5 now; 3rd unit # later. */
+const SAMPLE: BoardBus[] = [
   {
     id: "4",
     label: "Bus 4",
@@ -31,17 +32,29 @@ const SAMPLE: PreviewBus[] = [
     status: "Arriving",
     map: { left: "48%", top: "42%" },
   },
+  {
+    id: "pending-third",
+    label: "3rd bus",
+    etaMinutes: null,
+    miles: null,
+    status: "GPS soon",
+    pending: true,
+    map: { left: "62%", top: "48%" },
+  },
 ];
 
-function buildSample(_labels: string[]): PreviewBus[] {
-  return SAMPLE;
-}
-
 function schoolPin(feed: LiveGpsFeed | null) {
-  if (!feed?.school || !feed.buses.length) {
+  const livePoints =
+    feed?.buses.filter(
+      (bus) => !bus.pending && bus.lat != null && bus.lng != null,
+    ) || [];
+  if (!feed?.school || !livePoints.length) {
     return { left: "40%", top: "28%" };
   }
-  const points = feed.buses.map((bus) => ({ lat: bus.lat, lng: bus.lng }));
+  const points = livePoints.map((bus) => ({
+    lat: bus.lat as number,
+    lng: bus.lng as number,
+  }));
   const lats = [...points.map((p) => p.lat), feed.school.lat];
   const lngs = [...points.map((p) => p.lng), feed.school.lng];
   let minLat = Math.min(...lats);
@@ -73,7 +86,6 @@ function schoolPin(feed: LiveGpsFeed | null) {
 export function LiveGpsBoard({
   schoolName,
   schoolId,
-  busLabels = [],
   audience = "school",
   initialFeed = null,
 }: {
@@ -86,9 +98,10 @@ export function LiveGpsBoard({
   const [feed, setFeed] = useState<LiveGpsFeed | null>(initialFeed);
   const [error, setError] = useState(initialFeed?.error || "");
   const [pending, start] = useTransition();
-  const sample = buildSample(busLabels);
-  const live = Boolean(feed?.live && feed.buses.length);
-  const buses: Array<PreviewBus | LiveBusPoint> = live ? feed!.buses : sample;
+  const liveBuses =
+    feed?.buses.filter((bus) => !bus.pending && bus.lat != null) || [];
+  const live = Boolean(feed?.live && liveBuses.length);
+  const buses: Array<BoardBus | LiveBusPoint> = live ? feed!.buses : SAMPLE;
   const school = schoolPin(feed);
 
   function refresh() {
@@ -116,7 +129,7 @@ export function LiveGpsBoard({
         <div>
           <h1 className="font-serif text-4xl text-navy">Live GPS</h1>
           <p className="mt-1 text-muted">
-            {schoolName} · morning and afternoon bus locations
+            {schoolName} · Minnehaha’s 3 Aim buses
           </p>
         </div>
         {live ? (
@@ -134,24 +147,14 @@ export function LiveGpsBoard({
       </div>
 
       <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-        {live
-          ? "Live locations from OneStep GPS. List shows distance and rough time to school."
-          : audience === "company"
-            ? "Preview layout for schools. When ONESTEP_GPS_API_KEY is valid, live bus pins replace this sample."
-            : "Sample layout until OneStep GPS returns live bus positions."}
+        Minnehaha operates three Aim buses. Bus 4 and Bus 5 have GPS units now.
+        The 3rd bus slot stays until they send that unit number.
         {pending ? " Updating…" : ""}
       </p>
 
       {error ? (
         <p className="rounded-2xl border border-red/20 bg-red/5 px-4 py-3 text-sm text-red">
           {error}
-        </p>
-      ) : null}
-
-      {!live && feed?.configured && !feed.buses.length && !error ? (
-        <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-          API key is set, but no bus positions came back yet. Confirm devices are
-          online in OneStep GPS.
         </p>
       ) : null}
 
@@ -186,17 +189,19 @@ export function LiveGpsBoard({
               </span>
               <span className="mt-1 h-0 w-0 border-x-8 border-t-8 border-x-transparent border-t-red-600" />
             </div>
-            {buses.map((bus) => (
-              <div
-                key={bus.id}
-                className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-                style={{ left: bus.map.left, top: bus.map.top }}
-              >
-                <div className="rounded-xl bg-[#f5c518] px-2.5 py-1.5 text-center text-[11px] font-extrabold text-navy shadow-[0_8px_16px_rgba(11,41,66,0.18)] ring-2 ring-white">
-                  {bus.label}
+            {buses.map((bus) =>
+              bus.pending ? null : (
+                <div
+                  key={bus.id}
+                  className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+                  style={{ left: bus.map.left, top: bus.map.top }}
+                >
+                  <div className="rounded-xl bg-[#f5c518] px-2.5 py-1.5 text-center text-[11px] font-extrabold text-navy shadow-[0_8px_16px_rgba(11,41,66,0.18)] ring-2 ring-white">
+                    {bus.label}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
             <div className="absolute bottom-3 left-3 rounded-xl bg-white/95 px-3 py-2 text-[11px] text-muted shadow-sm">
               <p>
                 <span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-[#f5c518]" />{" "}
@@ -214,58 +219,60 @@ export function LiveGpsBoard({
               Time to school
             </p>
             <ul className="space-y-2">
-              {buses.map((bus) => (
-                <li
-                  key={bus.id}
-                  className="rounded-xl border border-navy/15 bg-white px-3 py-3 shadow-[0_6px_18px_rgba(11,41,66,0.08)]"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-navy">{bus.label}</p>
-                      <p className="mt-0.5 text-sm text-muted">
-                        {"miles" in bus && bus.miles != null
-                          ? `${bus.miles} mi from school`
-                          : live
-                            ? "Distance needs school GPS pin"
-                            : `${(bus as PreviewBus).miles} mi from school`}
-                      </p>
+              {buses.map((bus) => {
+                const isPending = Boolean(bus.pending);
+                return (
+                  <li
+                    key={bus.id}
+                    className="rounded-xl border border-navy/15 bg-white px-3 py-3 shadow-[0_6px_18px_rgba(11,41,66,0.08)]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-navy">{bus.label}</p>
+                        <p className="mt-0.5 text-sm text-muted">
+                          {isPending
+                            ? "Waiting for Minnehaha unit number"
+                            : bus.miles != null
+                              ? `${bus.miles} mi from school`
+                              : live
+                                ? "Distance needs school GPS pin"
+                                : "Sample distance"}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          isPending
+                            ? "bg-amber-50 text-amber-900"
+                            : live
+                              ? "bg-emerald-50 text-emerald-800"
+                              : "bg-amber-50 text-amber-900"
+                        }`}
+                      >
+                        {isPending ? "GPS soon" : live ? "Live" : "Sample"}
+                      </span>
                     </div>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        live
-                          ? "bg-emerald-50 text-emerald-800"
-                          : "bg-amber-50 text-amber-900"
-                      }`}
-                    >
-                      {live ? "Live" : "Sample"}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm text-navy">
-                    {"etaMinutes" in bus && bus.etaMinutes != null ? (
-                      <>
-                        <span className="font-extrabold">
-                          {bus.etaMinutes} min
-                        </span>{" "}
-                        to school · {bus.status}
-                      </>
-                    ) : live ? (
-                      <>Waiting for school location · {bus.status}</>
-                    ) : (
-                      <>
-                        <span className="font-extrabold">
-                          {(bus as PreviewBus).etaMinutes} min
-                        </span>{" "}
-                        to school · {bus.status}
-                      </>
-                    )}
-                  </p>
-                </li>
-              ))}
+                    <p className="mt-2 text-sm text-navy">
+                      {isPending ? (
+                        <>Unit # coming later · {bus.status}</>
+                      ) : bus.etaMinutes != null ? (
+                        <>
+                          <span className="font-extrabold">
+                            {bus.etaMinutes} min
+                          </span>{" "}
+                          to school · {bus.status}
+                        </>
+                      ) : live ? (
+                        <>Waiting for school location · {bus.status}</>
+                      ) : (
+                        <>Sample ETA · {bus.status}</>
+                      )}
+                    </p>
+                  </li>
+                );
+              })}
             </ul>
             <p className="mt-3 px-1 text-xs italic text-muted">
-              {live
-                ? "Updates about every 30 seconds from OneStep GPS."
-                : "Illustrative locations until live GPS data arrives."}
+              Three Aim buses only. Add the 3rd GPS unit when Minnehaha shares it.
             </p>
           </div>
         </div>

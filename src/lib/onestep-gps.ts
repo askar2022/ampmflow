@@ -6,14 +6,19 @@ const ONESTEP_DEVICES_URL =
 export type LiveBusPoint = {
   id: string;
   label: string;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   miles: number | null;
   etaMinutes: number | null;
-  status: "On route" | "Arriving" | "At school" | "No signal";
+  status: "On route" | "Arriving" | "At school" | "No signal" | "GPS soon";
   updatedAt: string | null;
+  pending?: boolean;
   map: { left: string; top: string };
 };
+
+/** Minnehaha runs 3 Aim buses. Two GPS units known; third unit # coming later. */
+export const AIM_GPS_FLEET = ["Bus 4", "Bus 5", "3rd bus"] as const;
+export const AIM_GPS_PENDING_LABEL = "3rd bus";
 
 export type LiveGpsFeed = {
   configured: boolean;
@@ -135,11 +140,44 @@ function busLabelMap() {
   return defaults;
 }
 
-/** School bus labels currently wired from OneStep (Aim: Bus 4 + Bus 5 only). */
+/** School bus labels currently wired from OneStep (Aim: Bus 4 + Bus 5). */
 export function trackedBusLabels() {
   return [...new Set(Object.values(busLabelMap()))].sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true }),
   );
+}
+
+function pendingAimBus(): LiveBusPoint {
+  return {
+    id: "pending-third",
+    label: AIM_GPS_PENDING_LABEL,
+    lat: null,
+    lng: null,
+    miles: null,
+    etaMinutes: null,
+    status: "GPS soon",
+    updatedAt: null,
+    pending: true,
+    map: { left: "62%", top: "48%" },
+  };
+}
+
+/** Always show Aim’s 3-bus fleet: live units + pending slot until unit # arrives. */
+export function withAimFleetSlots(buses: LiveBusPoint[]): LiveBusPoint[] {
+  const byLabel = new Map(buses.map((bus) => [bus.label, bus]));
+  const ordered: LiveBusPoint[] = [];
+  for (const label of trackedBusLabels()) {
+    const live = byLabel.get(label);
+    if (live) ordered.push(live);
+  }
+  // Keep any unexpected mapped buses, then the pending third seat.
+  for (const bus of buses) {
+    if (!ordered.some((row) => row.id === bus.id)) ordered.push(bus);
+  }
+  if (!ordered.some((bus) => bus.label === AIM_GPS_PENDING_LABEL)) {
+    ordered.push(pendingAimBus());
+  }
+  return ordered;
 }
 
 function mappedDeviceLabel(device: Record<string, unknown>) {
@@ -308,7 +346,7 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       school,
     );
 
-    const buses: LiveBusPoint[] = parsed.map((row, index) => {
+    const liveBuses: LiveBusPoint[] = parsed.map((row, index) => {
       const miles = school
         ? Number(milesBetween(school, row).toFixed(1))
         : null;
@@ -325,7 +363,7 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       };
     });
 
-    buses.sort((a, b) => {
+    liveBuses.sort((a, b) => {
       if (a.etaMinutes == null && b.etaMinutes == null) {
         return a.label.localeCompare(b.label, undefined, { numeric: true });
       }
@@ -334,9 +372,11 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       return a.etaMinutes - b.etaMinutes;
     });
 
+    const buses = withAimFleetSlots(liveBuses);
+
     return {
       configured: true,
-      live: true,
+      live: liveBuses.length > 0,
       school,
       buses,
       fetchedAt,
