@@ -163,7 +163,7 @@ export function LateAlertBoard({
               href={`/company?school=${selectedSchool}`}
               className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
             >
-              Today’s Changes
+              Open requests
             </Link>
           </div>
         </div>

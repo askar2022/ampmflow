@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { AIM_FLEET_LABELS, ensureAimFleetVehicles, isAimSchool } from "@/lib/aim-fleet";
+import {
+  AIM_FLEET_LABELS,
+  ensureAimFleetVehicles,
+  isAimSchool,
+} from "@/lib/aim-fleet";
 import { loadVehicles } from "@/lib/gate";
-import { schoolLocalTime, todayKey } from "@/lib/dates";
+import { formatDateTime, schoolLocalTime, todayKey } from "@/lib/dates";
 import { loadCompanySchools, type CompanySchool } from "@/lib/company-access";
 import {
   companyAddressFor,
@@ -13,10 +17,18 @@ import {
   destinationFromStudent,
   planLine,
 } from "@/lib/change-notify";
-import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
+import {
+  loadFrontDeskChangesToday,
+  loadStudent,
+  loadStudents,
+} from "@/lib/transportation";
 import { changeRequestLabel, isPlanWaiting, isWaitingRide } from "@/lib/format";
 import type { EffectiveStudent, Trip } from "@/lib/types";
-import { CompanyBoard, type CompanyDesk, type CompanyRequest } from "./CompanyBoard";
+import {
+  CompanyBoard,
+  type CompanyDesk,
+  type CompanyRequest,
+} from "./CompanyBoard";
 
 function gradeOnly(grade: string) {
   return String(grade).replace(/^grade\s+/i, "") || "—";
@@ -90,52 +102,95 @@ function companyEmail(student: EffectiveStudent, trips: Trip[]) {
   return { subject: mail.subject, body: mail.text };
 }
 
-async function loadCompanyNeedUpdate(schoolId: string) {
-  const [changes, waitingAll, pending] = await Promise.all([
+type OpenStudent = {
+  student: EffectiveStudent;
+  requestedAt: Date;
+};
+
+async function loadCompanyOpenRequests(schoolId: string): Promise<OpenStudent[]> {
+  const [todayChanges, waitingAll, openRequests] = await Promise.all([
     loadFrontDeskChangesToday(schoolId),
     loadStudents(schoolId),
     prisma.changeRequest.findMany({
       where: {
         schoolId,
         status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
-        OR: [
-          { title: { startsWith: "Request for route" } },
-          { title: { contains: "route", mode: "insensitive" } },
-          { busNumber: null },
-        ],
       },
-      select: { studentId: true, title: true, details: true },
-      orderBy: { createdAt: "desc" },
+      select: {
+        studentId: true,
+        title: true,
+        details: true,
+        createdAt: true,
+        busNumber: true,
+      },
+      orderBy: { createdAt: "asc" },
     }),
   ]);
-  const byId = new Map(changes.map((student) => [student.id, student]));
-  for (const student of waitingAll) {
-    if (isWaiting(student) && !byId.has(student.id)) {
-      byId.set(student.id, student);
+
+  const byId = new Map<string, OpenStudent>();
+
+  function remember(student: EffectiveStudent, requestedAt: Date) {
+    const existing = byId.get(student.id);
+    if (!existing || requestedAt < existing.requestedAt) {
+      byId.set(student.id, { student, requestedAt });
     }
   }
-  for (const row of pending) {
-    if (!row.studentId || byId.has(row.studentId)) continue;
+
+  // Any unfinished change request — including last week — stays on this desk.
+  for (const row of openRequests) {
+    if (!row.studentId) continue;
+    if (byId.has(row.studentId)) {
+      const cur = byId.get(row.studentId)!;
+      if (row.createdAt < cur.requestedAt) {
+        byId.set(row.studentId, {
+          student: cur.student,
+          requestedAt: row.createdAt,
+        });
+      }
+      continue;
+    }
     const loaded = await loadStudent(row.studentId);
-    if (loaded?.effective) byId.set(loaded.effective.id, loaded.effective);
+    if (loaded?.effective) {
+      remember(loaded.effective, row.createdAt);
+    }
   }
-  // Route requests the school already listed — always show for company assign.
+
+  // Still waiting for a bus number (open AM/PM assignment).
+  for (const student of waitingAll) {
+    if (!isWaiting(student)) continue;
+    const match = openRequests.find((row) => row.studentId === student.id);
+    remember(student, match?.createdAt || new Date());
+  }
+
+  // Route-request enrollments that never got a bus.
   for (const student of waitingAll) {
     if (byId.has(student.id)) continue;
     if (
       student.enrollmentSource === "ROUTE_REQUEST" ||
       student.enrollmentSource === "NEW_APPLICATION"
     ) {
-      byId.set(student.id, student);
+      if (isWaiting(student)) remember(student, new Date());
     }
   }
-  return [...byId.values()];
+
+  // Today’s front-desk changes still need a company update.
+  for (const student of todayChanges) {
+    if (!isWaiting(student) && byId.has(student.id)) continue;
+    if (isWaiting(student) || !byId.has(student.id)) {
+      const match = openRequests.find((row) => row.studentId === student.id);
+      remember(student, match?.createdAt || new Date());
+    }
+  }
+
+  return [...byId.values()].sort(
+    (a, b) => a.requestedAt.getTime() - b.requestedAt.getTime(),
+  );
 }
 
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
   const aim = isAimSchool(school.name);
-  const [changes, vehicles, routes] = await Promise.all([
-    loadCompanyNeedUpdate(school.id),
+  const [openRows, vehicles, routes] = await Promise.all([
+    loadCompanyOpenRequests(school.id),
     (aim
       ? ensureAimFleetVehicles(school.id)
       : loadVehicles(school.id)
@@ -147,20 +202,24 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     }),
   ]);
 
-  const completed = await prisma.changeRequest.findMany({
-    where: {
-      schoolId: school.id,
-      status: "COMPLETED",
-      studentId: { in: changes.map((student) => student.id) },
-      busNumber: { not: null },
-    },
-    select: { studentId: true, reviewedAt: true, updatedAt: true },
-  });
+  const studentIds = openRows.map((row) => row.student.id);
+  const completed = studentIds.length
+    ? await prisma.changeRequest.findMany({
+        where: {
+          schoolId: school.id,
+          status: "COMPLETED",
+          studentId: { in: studentIds },
+          busNumber: { not: null },
+        },
+        select: { studentId: true, reviewedAt: true, updatedAt: true },
+      })
+    : [];
   const day = todayKey();
   const assignedIds = new Set(
     completed
-      .filter((row) =>
-        schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey === day,
+      .filter(
+        (row) =>
+          schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey === day,
       )
       .map((row) => row.studentId)
       .filter(Boolean),
@@ -177,8 +236,8 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
         .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
 
   const fleetBusNumbers = aim
-    ? AIM_FLEET_LABELS.map((label) =>
-        label.replace(/^Bus\s+/i, "").trim() || label,
+    ? AIM_FLEET_LABELS.map(
+        (label) => label.replace(/^Bus\s+/i, "").trim() || label,
       )
     : vehicles
         .filter(
@@ -196,7 +255,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     ]),
   ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-  const rows: CompanyRequest[] = changes.map((student) => {
+  const rows: CompanyRequest[] = openRows.map(({ student, requestedAt }) => {
     const request = requestFor(student);
     const trips: Trip[] = [
       ...(isPlanWaiting(student.am) ? (["AM"] as const) : []),
@@ -214,6 +273,8 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
           : "—",
       request,
       sitting: sittingWhere(student),
+      requestDate: formatDateTime(requestedAt),
+      requestDateKey: schoolLocalTime(requestedAt).dateKey,
       effectiveDate: companyEffectiveDate(student, used),
       email: companyEmail(student, trips),
       trips: used,
@@ -256,10 +317,8 @@ export default async function CompanyPage({
   if (!selected) {
     return (
       <div>
-        <h1 className="font-serif text-4xl text-navy">
-          {liveName}
-        </h1>
-        <p className="mt-1 text-lg font-semibold text-navy">Today’s Changes</p>
+        <h1 className="font-serif text-4xl text-navy">{liveName}</h1>
+        <p className="mt-1 text-lg font-semibold text-navy">Open requests</p>
         <p className="mt-2 text-muted">
           No school is assigned to this login yet. Ask AMPM Flow to add the
           schools you serve.

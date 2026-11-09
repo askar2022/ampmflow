@@ -14,6 +14,8 @@ export type CompanyRequest = {
   parent: string;
   request: string;
   sitting?: string;
+  requestDate?: string;
+  requestDateKey?: string;
   effectiveDate?: string;
   email: { subject: string; body: string };
   trips: Trip[];
@@ -119,6 +121,8 @@ export function CompanyBoard({
     window.location.assign(`/company?school=${id}`);
   }
 
+  const openCount = desk.rows.filter((row) => !row.changed).length;
+
   return (
     <div className="space-y-6">
       <div>
@@ -126,7 +130,7 @@ export function CompanyBoard({
           <div>
             <h1 className="font-serif text-4xl text-navy">{companyName}</h1>
             <p className="mt-1 text-lg font-semibold text-navy">
-              Today’s Changes
+              Open requests
             </p>
           </div>
           <Link
@@ -138,8 +142,8 @@ export function CompanyBoard({
         </div>
         <p className="mt-2 max-w-2xl text-muted">
           {desk.aimSchool
-            ? "The school already emailed you the student. Assign Bus 4, Bus 5, or the 3rd bus. The stop address shows where the student sits for pickup."
-            : "The school already emailed you the student — daycare, new address, or a new student. Here you only assign the bus."}
+            ? "Unfinished school requests stay here until you assign Bus 4, Bus 5, or the 3rd bus — including last week. Each row shows the request date and where the student sits for pickup."
+            : "Unfinished school requests stay here until you assign a bus — including older days. Each row shows the request date and stop address."}
         </p>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
@@ -157,8 +161,8 @@ export function CompanyBoard({
         </label>
         <p className="mt-3 text-sm font-semibold text-navy">
           {desk.rows.length
-            ? `${desk.rows.length} student${desk.rows.length === 1 ? "" : "s"} changed today at ${desk.schoolName}`
-            : `No students changed today at ${desk.schoolName}`}
+            ? `${openCount} open · ${desk.rows.length} student${desk.rows.length === 1 ? "" : "s"} at ${desk.schoolName}`
+            : `No open requests at ${desk.schoolName}`}
         </p>
       </div>
 
@@ -172,6 +176,7 @@ export function CompanyBoard({
                   <th>Grade</th>
                   <th>Teacher</th>
                   <th>Parent</th>
+                  <th>Request date</th>
                   <th>Request</th>
                   <th>Where student sits</th>
                   <th className="px-4"></th>
@@ -179,11 +184,17 @@ export function CompanyBoard({
               </thead>
               <tbody>
                 {desk.rows.map((row) => (
-                  <tr key={row.studentId} className="row-yellow border-t border-line">
+                  <tr
+                    key={row.studentId}
+                    className="row-yellow border-t border-line"
+                  >
                     <td className="px-4 py-3 font-normal">{row.name}</td>
                     <td className="font-normal">{row.grade}</td>
                     <td className="font-normal">{row.teacher || "—"}</td>
                     <td className="font-normal">{row.parent}</td>
+                    <td className="whitespace-nowrap font-semibold text-navy">
+                      {row.requestDate || "—"}
+                    </td>
                     <td className="max-w-[180px] font-extrabold text-navy">
                       {row.request}
                     </td>
@@ -221,8 +232,8 @@ export function CompanyBoard({
       ) : (
         <div className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
           When {desk.schoolName} sends a Request for Route, daycare, new
-          address, or new student, they show here with the stop address so you
-          can put them on the right bus.
+          address, or new student, they stay here with the request date until
+          you assign the bus — even if the request was last week.
         </div>
       )}
     </div>
