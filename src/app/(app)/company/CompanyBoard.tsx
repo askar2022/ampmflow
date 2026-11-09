@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ChangeRideAssign } from "@/app/(app)/changes/ChangeRideAssign";
 import type { CompanySchool } from "@/lib/company-access";
 import type { Trip } from "@/lib/types";
@@ -126,19 +125,9 @@ export function CompanyBoard({
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="font-serif text-4xl text-navy">{companyName}</h1>
-            <p className="mt-1 text-lg font-semibold text-navy">
-              Open requests
-            </p>
-          </div>
-          <Link
-            href={`/company/alerts?school=${desk.schoolId}`}
-            className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
-          >
-            Late Bus Alert
-          </Link>
+        <div>
+          <h1 className="font-serif text-4xl text-navy">{companyName}</h1>
+          <p className="mt-1 text-lg font-semibold text-navy">Open requests</p>
         </div>
         <p className="mt-2 max-w-2xl text-muted">
           {desk.aimSchool
