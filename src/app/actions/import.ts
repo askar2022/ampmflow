@@ -410,11 +410,49 @@ function findDayibAddress(cells: string[], name: string) {
   return "";
 }
 
+function applySheetRide(row: Row, ride: NonNullable<ReturnType<typeof parseSheetRide>>) {
+  if (ride.kind === "VAN") {
+    row.vehicle_name = ride.label;
+    row.transportation_type = "VAN";
+    row.am = ride.label;
+    row.pm = ride.label;
+    row.sheet_ride = ride.label;
+    delete row["bus number"];
+    delete row["am bus"];
+    delete row["pm bus"];
+    return;
+  }
+  row.transportation_type = "BUS";
+  row.sheet_ride = `${ride.label}${ride.trip ? ` ${ride.trip}` : ""}`;
+  delete row.vehicle_name;
+  // Keep AM and PM separate — never copy one trip onto the other.
+  if (ride.trip === "AM") {
+    row.am = ride.label;
+    row["am bus"] = ride.number;
+    delete row.pm;
+    delete row["pm bus"];
+    delete row["bus number"];
+  } else if (ride.trip === "PM") {
+    row.pm = ride.label;
+    row["pm bus"] = ride.number;
+    delete row.am;
+    delete row["am bus"];
+    delete row["bus number"];
+  } else {
+    row["bus number"] = ride.number;
+    row.am = ride.label;
+    row.pm = ride.label;
+    row["am bus"] = ride.number;
+    row["pm bus"] = ride.number;
+  }
+}
+
 function rowsFromDayibRouteSheet(
   lines: string[][],
   sheetName: string,
 ): Row[] {
   const ride = parseSheetRide(sheetName);
+  if (!ride) return [];
   const rows: Row[] = [];
   for (const line of lines) {
     if (isDayibMetaOrStopRow(line)) continue;
@@ -431,31 +469,9 @@ function rowsFromDayibRouteSheet(
       address,
       "parent phone": phone,
       "primary 1 phone": phone,
+      sheet_name: cleanSheetName(sheetName),
     };
-    if (ride?.kind === "VAN") {
-      row.vehicle_name = ride.label;
-      row.transportation_type = "VAN";
-      row.am = ride.label;
-      row.pm = ride.label;
-      row.sheet_ride = ride.label;
-    } else if (ride?.kind === "BUS") {
-      row.transportation_type = "BUS";
-      row.sheet_ride = `${ride.label}${ride.trip ? ` ${ride.trip}` : ""}`;
-      // Keep AM and PM separate — never copy one trip onto the other.
-      if (ride.trip === "AM") {
-        row.am = ride.label;
-        row["am bus"] = ride.number;
-      } else if (ride.trip === "PM") {
-        row.pm = ride.label;
-        row["pm bus"] = ride.number;
-      } else {
-        row["bus number"] = ride.number;
-        row.am = ride.label;
-        row.pm = ride.label;
-        row["am bus"] = ride.number;
-        row["pm bus"] = ride.number;
-      }
-    }
+    applySheetRide(row, ride);
     rows.push(row);
   }
   return rows;
@@ -465,33 +481,49 @@ function mergeRouteImportRows(rows: Row[]) {
   const merged = new Map<string, Row>();
   for (const row of rows) {
     const names = studentNamesFromRow(row);
+    if (!names.first || !names.last) continue;
     const phone = parentPhonesFromRow(row).phone1;
     const address =
       cell(row, "prim address", "home_address", "home address", "address") || "";
+    // Prefer name+phone so empty addresses do not smash different rides together.
     const key = [
       normName(names.first),
       normName(names.last),
-      digitsPhone(phone),
-      normAddress(address),
+      digitsPhone(phone) || normAddress(address) || "noop",
     ].join("|");
     const existing = merged.get(key);
     if (!existing) {
       merged.set(key, { ...row });
       continue;
     }
-    for (const [field, value] of Object.entries(row)) {
+    // Merge AM from one tab with PM from another — do not let one bus wipe the other.
+    for (const field of ["am", "am bus", "pm", "pm bus", "vehicle_name", "home address", "address", "parent phone", "primary 1 phone"] as const) {
+      const value = row[field];
       if (!value) continue;
       if (!existing[field]) existing[field] = value;
     }
+    if (row.transportation_type === "VAN" || existing.transportation_type === "VAN") {
+      existing.transportation_type =
+        existing.transportation_type || row.transportation_type;
+      if (row.vehicle_name && !existing.vehicle_name) {
+        existing.vehicle_name = row.vehicle_name;
+        existing.am = row.am || existing.am;
+        existing.pm = row.pm || existing.pm;
+      }
+    } else {
+      existing.transportation_type = "BUS";
+    }
+    const rides = [existing.sheet_ride, row.sheet_ride].filter(Boolean);
+    existing.sheet_ride = [...new Set(rides)].join(" + ");
   }
   return [...merged.values()];
 }
 
 function workbookIsRouteBook(workbook: XLSX.WorkBook) {
-  const routeSheets = workbook.SheetNames.filter((name) =>
-    Boolean(parseSheetRide(name)),
-  );
-  if (routeSheets.length >= 2) return true;
+  // One Bus/Van tab is enough — also covers saving a single sheet as its own file.
+  if (workbook.SheetNames.some((name) => Boolean(parseSheetRide(name)))) {
+    return true;
+  }
   for (const name of workbook.SheetNames.slice(0, 3)) {
     const lines = nonEmptyLines(sheetMatrix(workbook.Sheets[name]));
     if (looksLikeDayibRouteSheet(lines, name)) return true;
@@ -505,7 +537,14 @@ function rowsFromWorkbook(workbook: XLSX.WorkBook): Row[] {
     for (const name of workbook.SheetNames) {
       const sheet = workbook.Sheets[name];
       if (!sheet) continue;
-      collected.push(...rowsFromSheet(sheet, name));
+      const ride = parseSheetRide(name);
+      if (!ride) continue;
+      // Always read each Bus/Van tab with that tab's ride — never fall back to
+      // positional columns that would dump everyone onto one bus.
+      const lines = nonEmptyLines(sheetMatrix(sheet));
+      const rows = rowsFromDayibRouteSheet(lines, name);
+      for (const row of rows) applySheetRide(row, ride);
+      collected.push(...rows);
     }
     return mergeRouteImportRows(collected);
   }
