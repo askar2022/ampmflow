@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { loadLiveGpsFeed } from "@/app/actions/gps";
 import type { LiveBusPoint, LiveGpsFeed } from "@/lib/onestep-gps";
+import { LiveGpsMap, type MapMarker } from "@/components/LiveGpsMap";
 
 type BoardBus = {
   id: string;
@@ -11,8 +12,12 @@ type BoardBus = {
   miles: number | null;
   status: string;
   pending?: boolean;
+  lat?: number | null;
+  lng?: number | null;
   map: { left: string; top: string };
 };
+
+const AIM_PIN = { lat: 44.950661, lng: -93.257431 };
 
 /** Minnehaha: 3 Aim buses. GPS for Bus 4 + Bus 5 now; 3rd unit # later. */
 const SAMPLE: BoardBus[] = [
@@ -22,6 +27,8 @@ const SAMPLE: BoardBus[] = [
     etaMinutes: 7,
     miles: 1.3,
     status: "On route",
+    lat: AIM_PIN.lat - 0.018,
+    lng: AIM_PIN.lng + 0.028,
     map: { left: "34%", top: "58%" },
   },
   {
@@ -30,6 +37,8 @@ const SAMPLE: BoardBus[] = [
     etaMinutes: 4,
     miles: 0.8,
     status: "Arriving",
+    lat: AIM_PIN.lat + 0.012,
+    lng: AIM_PIN.lng - 0.022,
     map: { left: "48%", top: "42%" },
   },
   {
@@ -42,46 +51,6 @@ const SAMPLE: BoardBus[] = [
     map: { left: "62%", top: "48%" },
   },
 ];
-
-function schoolPin(feed: LiveGpsFeed | null) {
-  const livePoints =
-    feed?.buses.filter(
-      (bus) => !bus.pending && bus.lat != null && bus.lng != null,
-    ) || [];
-  if (!feed?.school || !livePoints.length) {
-    return { left: "40%", top: "28%" };
-  }
-  const points = livePoints.map((bus) => ({
-    lat: bus.lat as number,
-    lng: bus.lng as number,
-  }));
-  const lats = [...points.map((p) => p.lat), feed.school.lat];
-  const lngs = [...points.map((p) => p.lng), feed.school.lng];
-  let minLat = Math.min(...lats);
-  let maxLat = Math.max(...lats);
-  let minLng = Math.min(...lngs);
-  let maxLng = Math.max(...lngs);
-  if (minLat === maxLat) {
-    minLat -= 0.01;
-    maxLat += 0.01;
-  }
-  if (minLng === maxLng) {
-    minLng -= 0.01;
-    maxLng += 0.01;
-  }
-  const padLat = (maxLat - minLat) * 0.15;
-  const padLng = (maxLng - minLng) * 0.15;
-  minLat -= padLat;
-  maxLat += padLat;
-  minLng -= padLng;
-  maxLng += padLng;
-  const x = (feed.school.lng - minLng) / (maxLng - minLng);
-  const y = (maxLat - feed.school.lat) / (maxLat - minLat);
-  return {
-    left: `${Math.round(12 + x * 76)}%`,
-    top: `${Math.round(14 + y * 72)}%`,
-  };
-}
 
 export function LiveGpsBoard({
   schoolName,
@@ -101,9 +70,36 @@ export function LiveGpsBoard({
   const liveBuses =
     feed?.buses.filter((bus) => !bus.pending && bus.lat != null) || [];
   const live = Boolean(feed?.live && liveBuses.length);
-  const buses: Array<BoardBus | LiveBusPoint> =
-    feed?.buses?.length ? feed.buses : SAMPLE;
-  const school = schoolPin(feed);
+  const buses: Array<BoardBus | LiveBusPoint> = feed?.buses?.length
+    ? feed.buses
+    : SAMPLE;
+
+  const mapMarkers = useMemo(() => {
+    const markers: MapMarker[] = [];
+    const school =
+      feed?.school || (/aim/i.test(schoolName) ? AIM_PIN : null);
+    if (school) {
+      markers.push({
+        id: "school",
+        label: "School",
+        lat: school.lat,
+        lng: school.lng,
+        kind: "school",
+      });
+    }
+    for (const bus of buses) {
+      if (bus.pending) continue;
+      if (bus.lat == null || bus.lng == null) continue;
+      markers.push({
+        id: bus.id,
+        label: bus.label,
+        lat: bus.lat,
+        lng: bus.lng,
+        kind: "bus",
+      });
+    }
+    return markers;
+  }, [buses, feed?.school, schoolName]);
 
   function refresh() {
     start(async () => {
@@ -159,7 +155,7 @@ export function LiveGpsBoard({
         </p>
       ) : null}
       {feed?.debug && !live ? (
-        <p className="text-xs text-muted break-all">{feed.debug}</p>
+        <p className="break-all text-xs text-muted">{feed.debug}</p>
       ) : null}
 
       <section className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
@@ -172,41 +168,15 @@ export function LiveGpsBoard({
         </div>
 
         <div className="grid lg:grid-cols-[1.4fr_0.9fr]">
-          <div className="relative min-h-[320px] border-b border-line bg-[#eef3f7] lg:min-h-[420px] lg:border-b-0 lg:border-r">
-            <div
-              className="absolute inset-0 opacity-70"
-              style={{
-                backgroundImage:
-                  "linear-gradient(#d5dee8 1px, transparent 1px), linear-gradient(90deg, #d5dee8 1px, transparent 1px)",
-                backgroundSize: "48px 48px",
-              }}
-            />
-            <p className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-navy shadow-sm">
-              {live ? "Live map" : "Map preview"}
-            </p>
-            <div
-              className="absolute z-10 flex -translate-x-1/2 -translate-y-full flex-col items-center"
-              style={{ left: school.left, top: school.top }}
-            >
-              <span className="rounded-md bg-red-600 px-2 py-1 text-[11px] font-bold text-white shadow">
-                School
-              </span>
-              <span className="mt-1 h-0 w-0 border-x-8 border-t-8 border-x-transparent border-t-red-600" />
-            </div>
-            {buses.map((bus) =>
-              bus.pending ? null : (
-                <div
-                  key={bus.id}
-                  className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
-                  style={{ left: bus.map.left, top: bus.map.top }}
-                >
-                  <div className="rounded-xl bg-[#f5c518] px-2.5 py-1.5 text-center text-[11px] font-extrabold text-navy shadow-[0_8px_16px_rgba(11,41,66,0.18)] ring-2 ring-white">
-                    {bus.label}
-                  </div>
-                </div>
-              ),
+          <div className="relative border-b border-line lg:border-b-0 lg:border-r">
+            {mapMarkers.length ? (
+              <LiveGpsMap markers={mapMarkers} />
+            ) : (
+              <div className="flex min-h-[320px] items-center justify-center bg-[#eef3f7] text-sm text-muted lg:min-h-[420px]">
+                Waiting for map points…
+              </div>
             )}
-            <div className="absolute bottom-3 left-3 rounded-xl bg-white/95 px-3 py-2 text-[11px] text-muted shadow-sm">
+            <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-xl bg-white/95 px-3 py-2 text-[11px] text-muted shadow-sm">
               <p>
                 <span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-[#f5c518]" />{" "}
                 Bus {live ? "(live)" : "(sample)"}
@@ -276,7 +246,8 @@ export function LiveGpsBoard({
               })}
             </ul>
             <p className="mt-3 px-1 text-xs italic text-muted">
-              Three Aim buses only. Add the 3rd GPS unit when Minnehaha shares it.
+              Three Aim buses only. Add the 3rd GPS unit when Minnehaha shares
+              it.
             </p>
           </div>
         </div>
