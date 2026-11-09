@@ -15,6 +15,12 @@ import {
   type LateDelayMinutes,
 } from "@/lib/late-alert";
 import {
+  lateAlertStaffSmsNumbers,
+  loadLateAlertStaffPhones,
+  saveLateAlertStaffPhones,
+  type LateAlertStaffPhones,
+} from "@/lib/late-alert-staff";
+import {
   formatSmsMoney,
   loadCompanySmsCostReport,
   SMS_COST_CENTS,
@@ -60,13 +66,19 @@ export async function lateAlertPreview(input: {
     return { ok: false as const, error: "Choose a bus or van." };
   }
 
-  const phones = uniqueFamilyPhones(recipients);
-  const estimatedCents = phones.length * SMS_COST_CENTS;
+  const familyPhones = uniqueFamilyPhones(recipients);
+  const staff = await loadLateAlertStaffPhones(input.schoolId);
+  const staffPhones = lateAlertStaffSmsNumbers(staff).filter(
+    (phone) => !familyPhones.includes(phone),
+  );
+  const totalTexts = familyPhones.length + staffPhones.length;
+  const estimatedCents = totalTexts * SMS_COST_CENTS;
   return {
     ok: true as const,
     rideLabel: ride.label,
     minutes,
-    familyCount: phones.length,
+    familyCount: familyPhones.length,
+    staffCount: staffPhones.length,
     studentCount: recipients.length,
     preview: lateAlertSms({ rideLabel: ride.label, minutes }),
     smsReady: smsConfigured(),
@@ -112,17 +124,26 @@ export async function sendLateBusAlert(input: {
     return { ok: false as const, error: "Choose a bus or van." };
   }
 
-  const phones = uniqueFamilyPhones(recipients);
-  if (!phones.length) {
+  const familyPhones = uniqueFamilyPhones(recipients);
+  if (!familyPhones.length) {
     return {
       ok: false as const,
       error: `No parent phones are on file for ${ride.label}.`,
     };
   }
 
+  const staff = await loadLateAlertStaffPhones(input.schoolId);
+  const staffPhones = lateAlertStaffSmsNumbers(staff).filter(
+    (phone) => !familyPhones.includes(phone),
+  );
+  const phones = [...familyPhones, ...staffPhones];
+
   const body = lateAlertSms({ rideLabel: ride.label, minutes });
   const texted = await sendSms({ to: phones, body });
   const smsCount = texted.recipients.length;
+  const staffSent = texted.recipients.filter((phone) =>
+    staffPhones.includes(phone),
+  ).length;
   await writeAudit({
     user,
     schoolId: input.schoolId,
@@ -132,7 +153,8 @@ export async function sendLateBusAlert(input: {
       ride: ride.label,
       minutes,
       trips,
-      familyCount: phones.length,
+      familyCount: familyPhones.length,
+      staffCount: staffPhones.length,
       smsCount,
       centsEach: SMS_COST_CENTS,
       costCents: smsCount * SMS_COST_CENTS,
@@ -148,6 +170,12 @@ export async function sendLateBusAlert(input: {
     };
   }
 
+  const familyPart = `Texted ${familyPhones.length} famil${
+    familyPhones.length === 1 ? "y" : "ies"
+  }`;
+  const staffPart = staffSent
+    ? ` + ${staffSent} school staff`
+    : "";
   return {
     ok: true as const,
     rideLabel: ride.label,
@@ -155,9 +183,9 @@ export async function sendLateBusAlert(input: {
     sentCount: smsCount,
     skippedCount: texted.errors.length,
     costCents: smsCount * SMS_COST_CENTS,
-    message: `Texted ${smsCount} famil${
-      smsCount === 1 ? "y" : "ies"
-    } on ${ride.label} · ${formatSmsMoney(smsCount * SMS_COST_CENTS)}.`,
+    message: `${familyPart}${staffPart} on ${ride.label} · ${formatSmsMoney(
+      smsCount * SMS_COST_CENTS,
+    )}.`,
   };
 }
 
@@ -189,4 +217,25 @@ export async function loadSmsCostPopup(schoolId?: string) {
     schoolId: schoolId || undefined,
   });
   return { ok: true as const, report };
+}
+
+export async function saveCompanyLateAlertStaff(input: {
+  schoolId: string;
+  phone1: string;
+  phone2: string;
+}) {
+  const user = await getSession();
+  if (!user || user.role !== "BUS_COMPANY") {
+    return { ok: false as const, error: "Only the bus company can save this." };
+  }
+  if (!(await canCompanyAccessSchool(user, input.schoolId))) {
+    return { ok: false as const, error: "That school is not on your list." };
+  }
+  const phones: LateAlertStaffPhones = {
+    phone1: input.phone1,
+    phone2: input.phone2,
+  };
+  const saved = await saveLateAlertStaffPhones(input.schoolId, phones);
+  if (!saved.ok) return saved;
+  return { ok: true as const, phones: saved.phones };
 }

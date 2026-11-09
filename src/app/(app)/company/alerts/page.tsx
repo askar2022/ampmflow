@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadCompanySchools } from "@/lib/company-access";
 import { loadLateRides } from "@/lib/late-alert";
+import { loadLateAlertStaffPhones } from "@/lib/late-alert-staff";
 import { prisma } from "@/lib/prisma";
 import { LateAlertBoard } from "./LateAlertBoard";
 
@@ -41,7 +42,10 @@ export default async function CompanyLateAlertPage({
     );
   }
 
-  const rides = await loadLateRides(selected.id);
+  const [rides, staffPhones] = await Promise.all([
+    loadLateRides(selected.id),
+    loadLateAlertStaffPhones(selected.id),
+  ]);
 
   return (
     <LateAlertBoard
@@ -50,6 +54,8 @@ export default async function CompanyLateAlertPage({
       schoolId={selected.id}
       schoolName={selected.name}
       rides={rides}
+      staffPhone1={staffPhones.phone1}
+      staffPhone2={staffPhones.phone2}
     />
   );
 }
