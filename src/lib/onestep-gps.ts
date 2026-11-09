@@ -83,6 +83,7 @@ function extractDevices(payload: unknown): unknown[] {
   const row = asRecord(payload);
   if (!row) return [];
   for (const key of [
+    "result_list",
     "result",
     "results",
     "devices",
@@ -95,7 +96,14 @@ function extractDevices(payload: unknown): unknown[] {
     if (Array.isArray(value)) return value;
     const nested = asRecord(value);
     if (nested) {
-      for (const inner of ["result", "results", "devices", "data", "rows"]) {
+      for (const inner of [
+        "result_list",
+        "result",
+        "results",
+        "devices",
+        "data",
+        "rows",
+      ]) {
         if (Array.isArray(nested[inner])) return nested[inner] as unknown[];
       }
     }
