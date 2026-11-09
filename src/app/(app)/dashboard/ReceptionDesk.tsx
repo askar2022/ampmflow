@@ -32,6 +32,30 @@ function studentBuses(student: EffectiveStudent): string[] {
   ];
 }
 
+const AIM_DESK_BUSES = [
+  { value: "4", label: "Bus 4" },
+  { value: "5", label: "Bus 5" },
+  { value: "3rd bus", label: "Other bus" },
+] as const;
+
+function busFilterLabel(value: string) {
+  const aim = AIM_DESK_BUSES.find(
+    (item) => item.value.toLowerCase() === value.trim().toLowerCase(),
+  );
+  if (aim) return aim.label;
+  if (/^other\b/i.test(value) || /^3rd\b/i.test(value)) return "Other bus";
+  if (/^bus\s+/i.test(value.trim())) return value.trim();
+  return `Bus ${value}`;
+}
+
+function sameDeskBus(stored: string, wanted: string) {
+  const a = stored.trim().toLowerCase().replace(/^bus\s+/i, "");
+  const b = wanted.trim().toLowerCase().replace(/^bus\s+/i, "");
+  if (a === b) return true;
+  const other = /^(3rd(\s+bus)?|other(\s+bus)?)$/i;
+  return other.test(a) && other.test(b);
+}
+
 function uniqueSorted(values: string[]) {
   return [...new Set(values.filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
@@ -66,7 +90,10 @@ function deskRows(
         }
       } else if (ride.startsWith("van:")) {
         if (studentVanId[student.id] !== ride.slice(4)) return false;
-      } else if (ride && !studentBuses(student).includes(ride)) {
+      } else if (
+        ride &&
+        !studentBuses(student).some((bus) => sameDeskBus(bus, ride))
+      ) {
         return false;
       }
       if (!q) return true;
@@ -185,6 +212,7 @@ export function ReceptionDesk({
   students,
   buses,
   vans = [],
+  aimSchool = false,
   studentVanId = {},
   canPermanent,
   canSeeEmergency,
@@ -196,6 +224,7 @@ export function ReceptionDesk({
   students: DeskStudent[];
   buses: string[];
   vans?: { id: string; name: string }[];
+  aimSchool?: boolean;
   studentVanId?: Record<string, string>;
   canPermanent: boolean;
   canSeeEmergency: boolean;
@@ -257,14 +286,16 @@ export function ReceptionDesk({
     () => uniqueSorted(students.map((student) => teacherLabel(student))),
     [students],
   );
-  const busChoices = useMemo(
-    () =>
-      uniqueSorted([
-        ...buses,
-        ...students.flatMap((student) => studentBuses(student)),
-      ]),
-    [buses, students],
-  );
+  const busChoices = useMemo(() => {
+    if (aimSchool) {
+      return AIM_DESK_BUSES.map((item) => item.value);
+    }
+    return uniqueSorted([
+      ...buses,
+      ...students.flatMap((student) => studentBuses(student)),
+    ]);
+  }, [aimSchool, buses, students]);
+  const deskVans = aimSchool ? [] : vans;
   const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(
     () => deskRows(students, deferredQuery, grade, teacher, ride, studentVanId),
@@ -502,7 +533,7 @@ export function ReceptionDesk({
             </select>
           </label>
           <label className="text-xs font-semibold uppercase tracking-wider text-muted lg:w-44">
-            Bus or van
+            {aimSchool ? "Bus" : "Bus or van"}
             <select
               value={ride}
               onChange={(event) => {
@@ -516,15 +547,19 @@ export function ReceptionDesk({
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
             >
-              <option value="">All buses and vans</option>
-              <option value="none">No bus or van</option>
+              <option value="">
+                {aimSchool ? "All buses" : "All buses and vans"}
+              </option>
+              <option value="none">
+                {aimSchool ? "No bus" : "No bus or van"}
+              </option>
               <option value="waiting">Request for route</option>
               {busChoices.map((item) => (
                 <option key={`bus-${item}`} value={item}>
-                  Bus {item}
+                  {busFilterLabel(item)}
                 </option>
               ))}
-              {vans.map((van) => (
+              {deskVans.map((van) => (
                 <option key={van.id} value={`van:${van.id}`}>
                   {van.name}
                 </option>

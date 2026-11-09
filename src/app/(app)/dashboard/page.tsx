@@ -80,6 +80,7 @@ export default async function DashboardPage({
         students={students}
         buses={buses}
         vans={vans}
+        aimSchool={aim}
         studentVanId={studentVanId}
         busCompanyEmail={busCompanyEmail}
         coordinatorEmail={deskEmails.coordinatorEmail}
