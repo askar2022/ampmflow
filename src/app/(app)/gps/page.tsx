@@ -7,7 +7,7 @@ export default async function LiveGpsPage() {
   const session = await getSession();
   if (!session) return null;
 
-  const [school, routes, feed] = await Promise.all([
+  const [school, routes] = await Promise.all([
     prisma.school.findUnique({
       where: { id: session.schoolId },
       select: { name: true },
@@ -17,8 +17,9 @@ export default async function LiveGpsPage() {
       select: { number: true },
       orderBy: { number: "asc" },
     }),
-    fetchOneStepLiveBuses(school?.name),
   ]);
+
+  const feed = await fetchOneStepLiveBuses(school?.name);
 
   return (
     <LiveGpsBoard
