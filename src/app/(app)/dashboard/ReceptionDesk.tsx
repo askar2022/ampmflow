@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   removeReceptionStudent,
   saveReceptionChange,
+  saveReceptionStudentInfo,
 } from "@/app/actions/reception";
 import { planSummary, planTone } from "@/lib/format";
 import type { Destination, DurationType, EffectiveStudent, Trip } from "@/lib/types";
@@ -300,6 +301,11 @@ export function ReceptionDesk({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const [infoGrade, setInfoGrade] = useState("");
+  const [infoParentName, setInfoParentName] = useState("");
+  const [infoTeacherName, setInfoTeacherName] = useState("");
+  const [infoParentPhone, setInfoParentPhone] = useState("");
+  const [openInfo, setOpenInfo] = useState(false);
 
   const grades = useMemo(
     () =>
@@ -314,25 +320,29 @@ export function ReceptionDesk({
   );
   // Ride filter options come from the loaded roster only — Bus 1 AM / Bus 1 PM stay separate.
   const rideChoices = useMemo(() => {
-    const byValue = new Map<string, string>();
+    const byLabel = new Map<string, { value: string; label: string }>();
     for (const student of students) {
       for (const option of studentRideOptions(student)) {
-        byValue.set(option.value, option.label);
+        const key = option.label.trim().toLowerCase();
+        if (!byLabel.has(key)) byLabel.set(key, option);
       }
       const vanId = studentVanId[student.id];
       if (vanId && !aimSchool) {
         const van = vans.find((row) => row.id === vanId);
-        if (van) byValue.set(`van:${van.id}`, van.name);
+        if (van) {
+          const key = van.name.trim().toLowerCase();
+          if (!byLabel.has(key)) {
+            byLabel.set(key, { value: `van:${van.id}`, label: van.name });
+          }
+        }
       }
     }
-    return [...byValue.entries()]
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) =>
-        a.label.localeCompare(b.label, undefined, {
-          numeric: true,
-          sensitivity: "base",
-        }),
-      );
+    return [...byLabel.values()].sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      }),
+    );
   }, [aimSchool, studentVanId, students, vans]);
   const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(
@@ -342,6 +352,16 @@ export function ReceptionDesk({
   const browsing = Boolean(query.trim() || grade || teacher || ride);
   const matches = browsing ? filtered.slice(0, 80) : filtered.slice(0, 10);
   const selected = students.find((student) => student.id === selectedId) || null;
+  const familyByPhone = useMemo(() => {
+    if (!selected) return [] as DeskStudent[];
+    const phone = selected.parentPhone?.replace(/\D/g, "") || "";
+    if (phone.length < 10) return [selected];
+    const tail = phone.slice(-10);
+    return students.filter((student) => {
+      const other = student.parentPhone?.replace(/\D/g, "") || "";
+      return other.slice(-10) === tail;
+    });
+  }, [selected, students]);
 
   function choose(student: DeskStudent) {
     setSelectedId(student.id);
@@ -367,6 +387,26 @@ export function ReceptionDesk({
     setTeacherEmail(next.teacherEmail);
     setNote("");
     setConfirmPermanent(false);
+    setInfoGrade(student.grade === "—" ? "" : student.grade);
+    setInfoParentName(
+      student.parentName && student.parentName !== "—" ? student.parentName : "",
+    );
+    setInfoTeacherName(
+      student.teacherName && student.teacherName !== "Unassigned"
+        ? student.teacherName
+        : "",
+    );
+    setInfoParentPhone(
+      student.parentPhone && student.parentPhone !== "—"
+        ? student.parentPhone
+        : "",
+    );
+    setOpenInfo(
+      !student.grade ||
+        student.grade === "—" ||
+        !student.parentName ||
+        student.parentName === "—",
+    );
   }
 
   function toggleTrip(trip: Trip) {
@@ -729,7 +769,7 @@ export function ReceptionDesk({
               >
                 Back to list
               </button>
-              {!openForm && !openLeave && !openReplaceWarn ? (
+              {!openForm && !openLeave && !openReplaceWarn && !openInfo ? (
                 <>
                   <Link
                     href={`/waiting?student=${selected.id}`}
@@ -756,6 +796,18 @@ export function ReceptionDesk({
                     type="button"
                     onClick={() => {
                       setOpenForm(false);
+                      setOpenLeave(false);
+                      setOpenInfo(true);
+                      setError("");
+                    }}
+                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                  >
+                    Add grade / parent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenForm(false);
                       setOpenLeave(true);
                       setConfirmLeave(false);
                       setError("");
@@ -768,6 +820,104 @@ export function ReceptionDesk({
               ) : null}
             </div>
           </div>
+
+          {openInfo ? (
+            <form
+              className="mt-5 rounded-xl border border-line bg-paper p-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setError("");
+                setMessage("");
+                startTransition(async () => {
+                  const result = await saveReceptionStudentInfo({
+                    studentId: selected.id,
+                    grade: infoGrade,
+                    parentName: infoParentName,
+                    teacherName: infoTeacherName,
+                    parentPhone: infoParentPhone,
+                  });
+                  if (!result.ok) {
+                    setError(result.error);
+                    return;
+                  }
+                  setMessage(result.message);
+                  setOpenInfo(false);
+                  router.refresh();
+                });
+              }}
+            >
+              <h3 className="font-serif text-2xl text-navy">
+                Grade, parent, and family phone
+              </h3>
+              <p className="mt-1 text-sm text-muted">
+                Dayib route sheets do not include grade or parent name. Save them
+                here. The same phone groups siblings as one family.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-semibold">
+                  Grade
+                  <input
+                    value={infoGrade}
+                    onChange={(event) => setInfoGrade(event.target.value)}
+                    placeholder="K or 1"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Parent name
+                  <input
+                    value={infoParentName}
+                    onChange={(event) => setInfoParentName(event.target.value)}
+                    placeholder="Parent full name"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Teacher
+                  <input
+                    value={infoTeacherName}
+                    onChange={(event) => setInfoTeacherName(event.target.value)}
+                    placeholder="Teacher name"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Primary 1 phone
+                  <input
+                    value={infoParentPhone}
+                    onChange={(event) => setInfoParentPhone(event.target.value)}
+                    placeholder="(612) 555-0100"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+              </div>
+              {familyByPhone.length > 1 ? (
+                <p className="mt-3 text-sm font-semibold text-navy">
+                  Same phone family · {familyByPhone.map((row) => row.fullName).join(", ")}
+                </p>
+              ) : (
+                <p className="mt-3 text-sm text-muted">
+                  Students with this phone will group as one family after you save.
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {pending ? "Saving…" : "Save student info"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenInfo(false)}
+                  className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
+                >
+                  Close
+                </button>
+              </div>
+            </form>
+          ) : null}
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-line bg-paper p-4">

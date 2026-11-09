@@ -358,6 +358,134 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   };
 }
 
+/** Fill grade / parent / teacher after a Dayib route load (bus file has no school fields). */
+export async function saveReceptionStudentInfo(input: {
+  studentId: string;
+  grade?: string;
+  parentName?: string;
+  teacherName?: string;
+  parentPhone?: string;
+}) {
+  const user = await getSession();
+  if (!user) return { ok: false as const, error: "Please sign in." };
+  if (!["FRONT_DESK", "COORDINATOR", "ADMINISTRATOR"].includes(user.role)) {
+    return { ok: false as const, error: "You cannot edit student info." };
+  }
+
+  const loaded = await loadStudent(input.studentId);
+  if (!loaded || loaded.record.schoolId !== user.schoolId) {
+    return { ok: false as const, error: "Student not found." };
+  }
+
+  const grade = (input.grade || "").trim() || loaded.record.grade || "—";
+  const parentName =
+    (input.parentName || "").trim() || loaded.record.parentName || "—";
+  const teacherName =
+    (input.teacherName || "").trim() || loaded.effective.teacherName || "Unassigned";
+  const parentPhone =
+    (input.parentPhone || "").trim() || loaded.record.parentPhone || "—";
+
+  await prisma.student.update({
+    where: { id: loaded.record.id },
+    data: {
+      grade,
+      parentName,
+      parentPhone,
+    },
+  });
+
+  const classroomName =
+    teacherName === "Unassigned" ? `${grade} classroom` : teacherName;
+  let classroom = await prisma.classroom.findFirst({
+    where: { schoolId: user.schoolId, name: classroomName },
+    select: { id: true },
+  });
+  if (!classroom) {
+    classroom = await prisma.classroom.create({
+      data: {
+        schoolId: user.schoolId,
+        name: classroomName,
+        grade,
+      },
+      select: { id: true },
+    });
+  }
+  const teacher = await prisma.teacher.findFirst({
+    where: { classroomId: classroom.id },
+    select: { id: true },
+  });
+  if (!teacher) {
+    await prisma.teacher.create({
+      data: {
+        schoolId: user.schoolId,
+        classroomId: classroom.id,
+        name: teacherName,
+        email: "",
+      },
+    });
+  } else if (teacherName !== "Unassigned") {
+    await prisma.teacher
+      .update({ where: { id: teacher.id }, data: { name: teacherName } })
+      .catch(() => undefined);
+  }
+  await prisma.student.update({
+    where: { id: loaded.record.id },
+    data: { classroomId: classroom.id },
+  });
+
+  // Same phone = same family for later sibling grouping.
+  const phoneKey = parentPhone.replace(/\D/g, "");
+  if (phoneKey.length >= 10) {
+    const familyKey = `PHONE-${phoneKey.slice(-10)}`;
+    let family = await prisma.family
+      .findFirst({
+        where: { schoolId: user.schoolId, familyKey },
+        select: { id: true },
+      })
+      .catch(() => null);
+    if (!family) {
+      try {
+        family = await prisma.family.create({
+          data: {
+            schoolId: user.schoolId,
+            familyKey,
+            reviewNeeded: false,
+            reviewNote: "",
+          },
+          select: { id: true },
+        });
+      } catch {
+        family = await prisma.family
+          .findFirst({
+            where: { schoolId: user.schoolId, familyKey },
+            select: { id: true },
+          })
+          .catch(() => null);
+      }
+    }
+    if (family) {
+      await prisma.student
+        .updateMany({
+          where: {
+            schoolId: user.schoolId,
+            active: true,
+            OR: [
+              { id: loaded.record.id },
+              { parentPhone },
+            ],
+          },
+          data: { familyId: family.id },
+        })
+        .catch(() => undefined);
+    }
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/changes");
+  revalidatePath(`/students/${loaded.record.id}`);
+  return { ok: true as const, message: "Student info saved." };
+}
+
 export async function removeReceptionStudent(input: {
   studentId: string;
   reason: string;
