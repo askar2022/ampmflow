@@ -47,12 +47,11 @@ export default async function RosterPage() {
         <div>
           <h2 className="font-serif text-2xl">Upload students</h2>
           <p className="mt-1 text-sm text-muted">
-            Best for NIA: upload one file per ride named like VAN_6.xlsx or
-            Bus_1_AM.xlsx with columns First Name, Last Name, Addr Line1,
-            City/State/Zip, Phone Number, Pickup Time. Check Update existing
-            when you add more vans. If the company only sent AM, the same ride
-            is used for PM so students can go home until a PM list arrives. Stay
-            on this page until you see Finished.
+            Upload one Excel per ride: Bus_1_AM.xlsx, Bus_1_PM.xlsx, VAN_6.xlsx.
+            Headers must be First Name, Last Name, Addr Line1, City/State/Zip,
+            Phone Number, Pickup Time. AM and PM stay separate — check Update
+            existing when you load the next file. Stay on this page until you see
+            Finished.
           </p>
           <div className="mt-4">
             <ImportForm />

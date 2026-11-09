@@ -423,8 +423,8 @@ function findDayibAddress(cells: string[], name: string) {
 }
 
 function applySheetRide(row: Row, ride: NonNullable<ReturnType<typeof parseSheetRide>>) {
-  // Company often sends AM-only lists. Use the same ride for PM so students
-  // still have a way home until a real PM sheet is uploaded.
+  // Bus_1_AM.xlsx and Bus_1_PM.xlsx stay separate. Only unnamed rides
+  // (VAN_6.xlsx with no AM/PM) get the same assignment on both trips.
   if (ride.kind === "VAN") {
     row.vehicle_name = ride.label;
     row.transportation_type = "VAN";
@@ -434,10 +434,13 @@ function applySheetRide(row: Row, ride: NonNullable<ReturnType<typeof parseSheet
     delete row["pm bus"];
     if (ride.trip === "PM") {
       row.pm = ride.label;
+      delete row.am;
+    } else if (ride.trip === "AM") {
+      row.am = ride.label;
+      delete row.pm;
     } else {
       row.am = ride.label;
       row.pm = ride.label;
-      row.pm_from_am = "1";
     }
     return;
   }
@@ -447,13 +450,14 @@ function applySheetRide(row: Row, ride: NonNullable<ReturnType<typeof parseSheet
   if (ride.trip === "PM") {
     row.pm = ride.label;
     row["pm bus"] = ride.number;
+    delete row.am;
+    delete row["am bus"];
     delete row["bus number"];
   } else if (ride.trip === "AM") {
     row.am = ride.label;
     row["am bus"] = ride.number;
-    row.pm = ride.label;
-    row["pm bus"] = ride.number;
-    row.pm_from_am = "1";
+    delete row.pm;
+    delete row["pm bus"];
     delete row["bus number"];
   } else {
     row["bus number"] = ride.number;
@@ -461,7 +465,6 @@ function applySheetRide(row: Row, ride: NonNullable<ReturnType<typeof parseSheet
     row.pm = ride.label;
     row["am bus"] = ride.number;
     row["pm bus"] = ride.number;
-    row.pm_from_am = "1";
   }
 }
 
@@ -547,8 +550,11 @@ function rowsFromRouteRosterTable(
     };
     if (pickup) {
       if (ride.trip === "PM") row["pm pickup"] = pickup;
-      else row["am pickup"] = pickup;
-      if (ride.trip !== "PM") row["pm pickup"] = row["pm pickup"] || pickup;
+      else if (ride.trip === "AM") row["am pickup"] = pickup;
+      else {
+        row["am pickup"] = pickup;
+        row["pm pickup"] = pickup;
+      }
     }
     applySheetRide(row, ride);
     rows.push(row);
@@ -605,8 +611,20 @@ function mergeRouteImportRows(rows: Row[]) {
       merged.set(key, { ...row });
       continue;
     }
-    // Merge AM from one tab with PM from another — do not let one bus wipe the other.
-    for (const field of ["am", "am bus", "pm", "pm bus", "vehicle_name", "home address", "address", "parent phone", "primary 1 phone"] as const) {
+    // Merge AM from one file with PM from another — never let an AM file wipe PM.
+    for (const field of [
+      "am",
+      "am bus",
+      "pm",
+      "pm bus",
+      "am pickup",
+      "pm pickup",
+      "vehicle_name",
+      "home address",
+      "address",
+      "parent phone",
+      "primary 1 phone",
+    ] as const) {
       const value = row[field];
       if (!value) continue;
       if (!existing[field]) existing[field] = value;
@@ -1248,9 +1266,7 @@ export async function importStudents(formData: FormData) {
       pmPlan.bus ||
       (!splitTrips ? amBus : "");
     const amPickupTime = cell(row, "am pickup", "pickup time", "am_pickup");
-    const pmPickupTime =
-      cell(row, "pm pickup", "pm_pickup") ||
-      (row.pm_from_am === "1" ? amPickupTime : "");
+    const pmPickupTime = cell(row, "pm pickup", "pm_pickup");
     const amDest =
       cell(row, "am_destination").toUpperCase() || amPlan.dest || "HOME";
     const pmDest =
@@ -1355,7 +1371,8 @@ export async function importStudents(formData: FormData) {
         amDest,
         pmDest,
         vanName,
-        clearMissingTrips: splitTrips,
+        // Never delete the other trip when loading Bus_1_AM then Bus_1_PM.
+        clearMissingTrips: false,
         amPickupTime,
         pmPickupTime,
       });
@@ -1552,7 +1569,7 @@ export async function importStudents(formData: FormData) {
       pmDest,
       vanName,
       daycareId,
-      clearMissingTrips: splitTrips,
+      clearMissingTrips: false,
       amPickupTime,
       pmPickupTime,
     });

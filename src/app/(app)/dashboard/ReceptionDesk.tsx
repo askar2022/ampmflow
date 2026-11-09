@@ -651,18 +651,44 @@ export function ReceptionDesk({
           <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-paper text-base font-bold text-navy">
               <tr>
-                <th className="whitespace-nowrap px-4 py-3">Student name</th>
-                <th className="whitespace-nowrap py-3 pr-3">Grade</th>
-                <th className="whitespace-nowrap py-3 pr-3">Parent</th>
-                <th className="whitespace-nowrap py-3 pr-3">Teacher</th>
-                <th className="whitespace-nowrap py-3 pr-3">Address</th>
-                <th className="whitespace-nowrap py-3 pr-4">Primary 1 phone</th>
+                <th className="whitespace-nowrap px-4 py-3">First name</th>
+                <th className="whitespace-nowrap py-3 pr-3">Last name</th>
+                <th className="whitespace-nowrap py-3 pr-3">Addr Line1</th>
+                <th className="whitespace-nowrap py-3 pr-3">City/State/Zip</th>
+                <th className="whitespace-nowrap py-3 pr-3">Phone Number</th>
+                <th className="whitespace-nowrap py-3 pr-3">Pickup Time</th>
+                <th className="whitespace-nowrap py-3 pr-4">Bus / Van</th>
               </tr>
             </thead>
             <tbody>
               {matches.map((student) => {
                 const phone = primaryPhone(student);
                 const call = phone ? phoneHref(phone) : "";
+                const addressParts = (student.homeAddress || "")
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter(Boolean);
+                const line1 = addressParts[0] || "—";
+                const cityZip =
+                  addressParts.length > 1
+                    ? addressParts.slice(1).join(", ")
+                    : "—";
+                const pickup =
+                  ride.startsWith("ride:pm:") || ride.endsWith(" PM")
+                    ? student.pm.pickupTime || "—"
+                    : ride.startsWith("ride:am:") ||
+                        ride.endsWith(" AM") ||
+                        ride.startsWith("ride:van:") ||
+                        ride.startsWith("van:")
+                      ? student.am.pickupTime ||
+                        student.pm.pickupTime ||
+                        "—"
+                      : student.am.pickupTime ||
+                        student.pm.pickupTime ||
+                        "—";
+                const rides = studentRideOptions(student)
+                  .map((option) => option.label)
+                  .join(" · ");
                 return (
                   <tr
                     key={student.id}
@@ -670,28 +696,23 @@ export function ReceptionDesk({
                     onClick={() => choose(student)}
                   >
                     <td className="whitespace-nowrap px-4 py-3 font-semibold">
-                      {student.fullName}
+                      {student.firstName}
                       {hasDeskChange(student) ? (
                         <div className="text-[11px] font-semibold text-amber-800">
                           Changed today
                         </div>
                       ) : null}
                     </td>
-                    <td className="whitespace-nowrap py-3 pr-3">
-                      {gradeOnly(student.grade)}
-                    </td>
-                    <td className="whitespace-nowrap py-3 pr-3">
-                      {parentLabel(student)}
-                    </td>
-                    <td className="whitespace-nowrap py-3 pr-3">
-                      {teacherLabel(student) === "No teacher"
-                        ? "Unassigned"
-                        : teacherLabel(student)}
+                    <td className="whitespace-nowrap py-3 pr-3 font-semibold">
+                      {student.lastName}
                     </td>
                     <td className="whitespace-nowrap py-3 pr-3 text-muted">
-                      {student.homeAddress || "—"}
+                      {line1}
                     </td>
-                    <td className="whitespace-nowrap py-3 pr-4">
+                    <td className="whitespace-nowrap py-3 pr-3 text-muted">
+                      {cityZip}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
                       {phone && call ? (
                         <a
                           href={call}
@@ -704,24 +725,30 @@ export function ReceptionDesk({
                         "—"
                       )}
                     </td>
+                    <td className="whitespace-nowrap py-3 pr-3 font-semibold text-navy">
+                      {pickup}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-4 font-semibold text-navy">
+                      {rides || "—"}
+                    </td>
                   </tr>
                 );
               })}
               {!students.length ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-3 text-muted">
+                  <td colSpan={7} className="px-4 py-3 text-muted">
                     No students on the roster yet. Load them on Roster.
                   </td>
                 </tr>
               ) : !matches.length ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-3 text-muted">
+                  <td colSpan={7} className="px-4 py-3 text-muted">
                     No student matches those filters.
                   </td>
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-2 text-xs text-muted">
+                  <td colSpan={7} className="px-4 py-2 text-xs text-muted">
                     {filtered.length > matches.length
                       ? `Showing ${matches.length} of ${filtered.length}. Type a name or use the filters to see the rest.`
                       : `${matches.length} student${matches.length === 1 ? "" : "s"}`}
