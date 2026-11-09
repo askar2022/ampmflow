@@ -32,20 +32,11 @@ function studentBuses(student: EffectiveStudent): string[] {
   ];
 }
 
-const AIM_DESK_BUSES = [
-  { value: "4", label: "Bus 4" },
-  { value: "5", label: "Bus 5" },
-  { value: "3rd bus", label: "Other bus" },
-] as const;
-
 function busFilterLabel(value: string) {
-  const aim = AIM_DESK_BUSES.find(
-    (item) => item.value.toLowerCase() === value.trim().toLowerCase(),
-  );
-  if (aim) return aim.label;
-  if (/^other\b/i.test(value) || /^3rd\b/i.test(value)) return "Other bus";
-  if (/^bus\s+/i.test(value.trim())) return value.trim();
-  return `Bus ${value}`;
+  const clean = value.trim();
+  if (/^other\b/i.test(clean) || /^3rd\b/i.test(clean)) return "Other bus";
+  if (/^bus\s+/i.test(clean)) return clean;
+  return `Bus ${clean}`;
 }
 
 function sameDeskBus(stored: string, wanted: string) {
@@ -286,16 +277,16 @@ export function ReceptionDesk({
     () => uniqueSorted(students.map((student) => teacherLabel(student))),
     [students],
   );
-  const busChoices = useMemo(() => {
-    if (aimSchool) {
-      return AIM_DESK_BUSES.map((item) => item.value);
-    }
-    return uniqueSorted([
-      ...buses,
-      ...students.flatMap((student) => studentBuses(student)),
-    ]);
-  }, [aimSchool, buses, students]);
-  const deskVans = aimSchool ? [] : vans;
+  // Bus / van filter options come from the loaded roster only — not a hard-coded fleet.
+  const busChoices = useMemo(
+    () => uniqueSorted(students.flatMap((student) => studentBuses(student))),
+    [students],
+  );
+  const deskVans = useMemo(() => {
+    if (aimSchool) return [];
+    const used = new Set(Object.values(studentVanId).filter(Boolean));
+    return vans.filter((van) => used.has(van.id));
+  }, [aimSchool, vans, studentVanId]);
   const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(
     () => deskRows(students, deferredQuery, grade, teacher, ride, studentVanId),
