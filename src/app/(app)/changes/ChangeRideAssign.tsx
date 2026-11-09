@@ -48,9 +48,11 @@ export function ChangeRideAssign({
   studentName,
   grade,
   request,
+  sitting = "",
   effectiveDate = "",
   buses = [],
   vans = [],
+  hideVan = false,
   defaultTrips,
   companyAssigned = false,
   parentEmail = "",
@@ -62,9 +64,11 @@ export function ChangeRideAssign({
   studentName: string;
   grade: string;
   request?: string;
+  sitting?: string;
   effectiveDate?: string;
   buses?: string[];
   vans?: { id: string; name: string }[];
+  hideVan?: boolean;
   defaultTrips?: Trip[];
   companyAssigned?: boolean;
   parentEmail?: string;
@@ -156,13 +160,17 @@ export function ChangeRideAssign({
 
   function assign() {
     const bus = busNumber.trim();
-    const van = vanNumber.trim();
+    const van = hideVan ? "" : vanNumber.trim();
     if (bus && van) {
-      setError("Type the bus or the van, not both.");
+      setError("Type the bus number only.");
       return;
     }
     if (!bus && !van) {
-      setError("Type the bus number or the van number.");
+      setError(
+        hideVan
+          ? "Choose Bus 4, Bus 5, or the 3rd bus."
+          : "Type the bus number.",
+      );
       return;
     }
     const trips: Trip[] = trip === "BOTH" ? ["AM", "PM"] : [trip];
@@ -247,6 +255,11 @@ export function ChangeRideAssign({
             <p className="mt-0.5 text-sm text-muted">Grade {grade}</p>
             {request ? (
               <p className="mt-1 text-sm font-extrabold text-navy">{request}</p>
+            ) : null}
+            {sitting ? (
+              <p className="mt-1 text-sm font-semibold text-navy">
+                Where student sits · {sitting}
+              </p>
             ) : null}
             {effectiveDate ? (
               <p className="mt-0.5 text-sm text-muted">Effective {effectiveDate}</p>
@@ -368,7 +381,41 @@ export function ChangeRideAssign({
                     No nearby assignment available. Assign below.
                   </p>
                 ) : null}
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {buses.length ? (
+                  <div className="mt-3">
+                    <div className="text-sm font-semibold">
+                      {hideVan ? "Aim buses" : "Buses"}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {buses.map((number) => {
+                        const label = /^3rd/i.test(number)
+                          ? "3rd bus"
+                          : `Bus ${number}`;
+                        const on = busNumber.trim() === number;
+                        return (
+                          <button
+                            key={number}
+                            type="button"
+                            onClick={() => {
+                              setBusNumber(number);
+                              setVanNumber("");
+                            }}
+                            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${
+                              on
+                                ? "bg-navy text-white"
+                                : "border border-line bg-paper"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                <div
+                  className={`mt-3 grid gap-2 ${hideVan ? "" : "sm:grid-cols-2"}`}
+                >
                   <label className="block text-sm font-semibold">
                     Bus number
                     <input
@@ -385,29 +432,31 @@ export function ChangeRideAssign({
                           assign();
                         }
                       }}
-                      placeholder="4"
+                      placeholder={hideVan ? "4, 5, or 3rd bus" : "4"}
                       className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                     />
                   </label>
-                  <label className="block text-sm font-semibold">
-                    Van number
-                    <input
-                      list={`company-vans-${studentId}`}
-                      value={vanNumber}
-                      onChange={(event) => {
-                        setVanNumber(event.target.value);
-                        if (event.target.value.trim()) setBusNumber("");
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          assign();
-                        }
-                      }}
-                      placeholder="2"
-                      className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
-                    />
-                  </label>
+                  {hideVan ? null : (
+                    <label className="block text-sm font-semibold">
+                      Van number
+                      <input
+                        list={`company-vans-${studentId}`}
+                        value={vanNumber}
+                        onChange={(event) => {
+                          setVanNumber(event.target.value);
+                          if (event.target.value.trim()) setBusNumber("");
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            assign();
+                          }
+                        }}
+                        placeholder="2"
+                        className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
+                      />
+                    </label>
+                  )}
                 </div>
                 {buses.length ? (
                   <datalist id={`company-buses-${studentId}`}>
@@ -416,7 +465,7 @@ export function ChangeRideAssign({
                     ))}
                   </datalist>
                 ) : null}
-                {vans.length ? (
+                {!hideVan && vans.length ? (
                   <datalist id={`company-vans-${studentId}`}>
                     {vans.map((van) => (
                       <option key={van.id} value={van.name} />

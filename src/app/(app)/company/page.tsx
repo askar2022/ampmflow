@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { AIM_FLEET_LABELS, ensureAimFleetVehicles, isAimSchool } from "@/lib/aim-fleet";
 import { loadVehicles } from "@/lib/gate";
 import { schoolLocalTime, todayKey } from "@/lib/dates";
 import { loadCompanySchools, type CompanySchool } from "@/lib/company-access";
@@ -13,7 +14,7 @@ import {
   planLine,
 } from "@/lib/change-notify";
 import { loadFrontDeskChangesToday, loadStudent, loadStudents } from "@/lib/transportation";
-import { isPlanWaiting, isWaitingRide } from "@/lib/format";
+import { changeRequestLabel, isPlanWaiting, isWaitingRide } from "@/lib/format";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import { CompanyBoard, type CompanyDesk, type CompanyRequest } from "./CompanyBoard";
 
@@ -45,7 +46,27 @@ function requestFor(student: EffectiveStudent) {
       : "New student";
   }
   if (isWaiting(student)) return "New request";
-  return "Bus or van";
+  return "Needs bus";
+}
+
+function sittingWhere(student: EffectiveStudent) {
+  for (const plan of [student.pm, student.am]) {
+    if (plan.destination === "DAYCARE") {
+      return (
+        student.daycareAddress ||
+        plan.daycareName ||
+        student.daycareName ||
+        "Daycare"
+      );
+    }
+    if (plan.destination === "CUSTOM") {
+      return plan.customAddress || "New address";
+    }
+  }
+  if (student.homeAddress && student.homeAddress !== "—") {
+    return student.homeAddress;
+  }
+  return changeRequestLabel(student);
 }
 
 function companyEmail(student: EffectiveStudent, trips: Trip[]) {
@@ -77,8 +98,14 @@ async function loadCompanyNeedUpdate(schoolId: string) {
       where: {
         schoolId,
         status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
+        OR: [
+          { title: { startsWith: "Request for route" } },
+          { title: { contains: "route", mode: "insensitive" } },
+          { busNumber: null },
+        ],
       },
-      select: { studentId: true },
+      select: { studentId: true, title: true, details: true },
+      orderBy: { createdAt: "desc" },
     }),
   ]);
   const byId = new Map(changes.map((student) => [student.id, student]));
@@ -92,14 +119,27 @@ async function loadCompanyNeedUpdate(schoolId: string) {
     const loaded = await loadStudent(row.studentId);
     if (loaded?.effective) byId.set(loaded.effective.id, loaded.effective);
   }
+  // Route requests the school already listed — always show for company assign.
+  for (const student of waitingAll) {
+    if (byId.has(student.id)) continue;
+    if (
+      student.enrollmentSource === "ROUTE_REQUEST" ||
+      student.enrollmentSource === "NEW_APPLICATION"
+    ) {
+      byId.set(student.id, student);
+    }
+  }
   return [...byId.values()];
 }
 
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
-  try {
+  const aim = isAimSchool(school.name);
   const [changes, vehicles, routes] = await Promise.all([
     loadCompanyNeedUpdate(school.id),
-    loadVehicles(school.id).catch(() => []),
+    (aim
+      ? ensureAimFleetVehicles(school.id)
+      : loadVehicles(school.id)
+    ).catch(() => []),
     prisma.busRoute.findMany({
       where: { schoolId: school.id },
       select: { number: true },
@@ -126,12 +166,35 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       .filter(Boolean),
   );
 
-  const vans = vehicles
-    .filter(
-      (vehicle) =>
-        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
-    )
-    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+  const vans = aim
+    ? []
+    : vehicles
+        .filter(
+          (vehicle) =>
+            vehicle.vehicleType.toUpperCase() === "VAN" ||
+            /van/i.test(vehicle.name),
+        )
+        .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+
+  const fleetBusNumbers = aim
+    ? AIM_FLEET_LABELS.map((label) =>
+        label.replace(/^Bus\s+/i, "").trim() || label,
+      )
+    : vehicles
+        .filter(
+          (vehicle) =>
+            vehicle.vehicleType.toUpperCase() === "BUS" &&
+            !/van/i.test(vehicle.name),
+        )
+        .map((vehicle) => vehicle.name.replace(/^Bus\s+/i, "").trim())
+        .filter(Boolean);
+
+  const buses = [
+    ...new Set([
+      ...routes.map((route) => route.number),
+      ...fleetBusNumbers,
+    ]),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const rows: CompanyRequest[] = changes.map((student) => {
     const request = requestFor(student);
@@ -150,6 +213,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
           ? student.parentName
           : "—",
       request,
+      sitting: sittingWhere(student),
       effectiveDate: companyEffectiveDate(student, used),
       email: companyEmail(student, trips),
       trips: used,
@@ -160,19 +224,11 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
   return {
     schoolId: school.id,
     schoolName: school.name,
-    buses: [...new Set(routes.map((route) => route.number))],
+    buses,
     vans,
+    aimSchool: aim,
     rows,
   };
-  } catch {
-    return {
-      schoolId: school.id,
-      schoolName: school.name,
-      buses: [],
-      vans: [],
-      rows: [],
-    };
-  }
 }
 
 export default async function CompanyPage({

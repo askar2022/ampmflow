@@ -13,6 +13,7 @@ export type CompanyRequest = {
   teacher: string;
   parent: string;
   request: string;
+  sitting?: string;
   effectiveDate?: string;
   email: { subject: string; body: string };
   trips: Trip[];
@@ -93,6 +94,7 @@ export type CompanyDesk = {
   schoolName: string;
   buses: string[];
   vans: { id: string; name: string }[];
+  aimSchool?: boolean;
   rows: CompanyRequest[];
 };
 
@@ -135,8 +137,9 @@ export function CompanyBoard({
           </Link>
         </div>
         <p className="mt-2 max-w-2xl text-muted">
-          The school already emailed you the student — daycare, new
-          address, or a new student. Here you only assign the bus or van.
+          {desk.aimSchool
+            ? "The school already emailed you the student. Assign Bus 4, Bus 5, or the 3rd bus. The stop address shows where the student sits for pickup."
+            : "The school already emailed you the student — daycare, new address, or a new student. Here you only assign the bus."}
         </p>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
@@ -170,6 +173,7 @@ export function CompanyBoard({
                   <th>Teacher</th>
                   <th>Parent</th>
                   <th>Request</th>
+                  <th>Where student sits</th>
                   <th className="px-4"></th>
                 </tr>
               </thead>
@@ -180,8 +184,11 @@ export function CompanyBoard({
                     <td className="font-normal">{row.grade}</td>
                     <td className="font-normal">{row.teacher || "—"}</td>
                     <td className="font-normal">{row.parent}</td>
-                    <td className="max-w-[220px] font-extrabold text-navy">
+                    <td className="max-w-[180px] font-extrabold text-navy">
                       {row.request}
+                    </td>
+                    <td className="max-w-[240px] font-semibold text-navy">
+                      {row.sitting || "—"}
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex flex-wrap gap-2">
@@ -194,9 +201,11 @@ export function CompanyBoard({
                           studentName={row.name}
                           grade={row.grade}
                           request={row.request}
+                          sitting={row.sitting}
                           effectiveDate={row.effectiveDate}
                           buses={desk.buses}
                           vans={desk.vans}
+                          hideVan={desk.aimSchool}
                           companyAssigned={row.changed}
                           defaultTrips={row.trips}
                           nearbyEnabled
@@ -211,8 +220,9 @@ export function CompanyBoard({
         </div>
       ) : (
         <div className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-          When {desk.schoolName} sends a daycare, new address, or new student
-          request, they will show here.
+          When {desk.schoolName} sends a Request for Route, daycare, new
+          address, or new student, they show here with the stop address so you
+          can put them on the right bus.
         </div>
       )}
     </div>

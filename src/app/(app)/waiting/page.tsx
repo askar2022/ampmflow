@@ -94,12 +94,13 @@ export default async function WaitingPage() {
     <div className="space-y-6">
       <RouteRequestForm busCompanyEmail={busCompanyEmail} />
       <p className="max-w-2xl text-muted">
-        The school submits the request. The bus company assigns the bus or van.
-        This list is the record — your request and their update.
+        The school submits the request. The bus company assigns the bus (Aim:
+        Bus 4, Bus 5, or the 3rd bus). This list is the record — your request
+        and their update.
       </p>
       <RequestRecordTable
         rows={rows}
-        empty="No route requests yet. Submit a new request and it will stay here until the company assigns a bus or van."
+        empty="No route requests yet. Submit a new request and it will stay here until the company assigns a bus."
       />
     </div>
   );
