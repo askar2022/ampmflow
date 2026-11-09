@@ -135,6 +135,22 @@ function busLabelMap() {
   return defaults;
 }
 
+/** School bus labels currently wired from OneStep (Aim: Bus 4 + Bus 5 only). */
+export function trackedBusLabels() {
+  return [...new Set(Object.values(busLabelMap()))].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true }),
+  );
+}
+
+function mappedDeviceLabel(device: Record<string, unknown>) {
+  const map = busLabelMap();
+  for (const token of deviceTokens(device)) {
+    const mapped = map[token] || map[token.replace(/\D/g, "")];
+    if (mapped) return mapped;
+  }
+  return "";
+}
+
 function deviceTokens(device: Record<string, unknown>) {
   return [
     text(device.id, device.device_id, device.deviceId, device.imei),
@@ -157,22 +173,20 @@ function deviceTokens(device: Record<string, unknown>) {
 }
 
 function deviceLabel(device: Record<string, unknown>, index: number) {
-  const map = busLabelMap();
-  for (const token of deviceTokens(device)) {
-    const mapped = map[token] || map[token.replace(/\D/g, "")];
-    if (mapped) return mapped;
-  }
-  const label = text(
-    device.display_name,
-    device.displayName,
-    device.name,
-    device.device_name,
-    device.deviceName,
-    device.label,
-    device.plate_number,
-    device.vin_name,
+  return (
+    mappedDeviceLabel(device) ||
+    text(
+      device.display_name,
+      device.displayName,
+      device.name,
+      device.device_name,
+      device.deviceName,
+      device.label,
+      device.plate_number,
+      device.vin_name,
+    ) ||
+    `Bus ${index + 1}`
   );
-  return label || `Bus ${index + 1}`;
 }
 
 function statusForMiles(miles: number | null): LiveBusPoint["status"] {
@@ -275,11 +289,14 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
     devices.forEach((item, index) => {
       const device = asRecord(item);
       if (!device) return;
+      const label = mappedDeviceLabel(device);
+      // Only show buses we have mapped (Aim: Bus 4 + Bus 5 for now).
+      if (!label) return;
       const point = extractPoint(device);
       if (!point) return;
       parsed.push({
         id: text(device.id, device.device_id, device.imei) || `device-${index}`,
-        label: deviceLabel(device, index),
+        label,
         lat: point.lat,
         lng: point.lng,
         updatedAt: point.updatedAt,

@@ -13,52 +13,28 @@ type PreviewBus = {
   map: { left: string; top: string };
 };
 
+/** Aim preview until live GPS: only the buses Minnehaha has shared so far. */
 const SAMPLE: PreviewBus[] = [
   {
-    id: "1",
-    label: "Bus 1",
+    id: "4",
+    label: "Bus 4",
+    etaMinutes: 7,
+    miles: 1.3,
+    status: "On route",
+    map: { left: "34%", top: "58%" },
+  },
+  {
+    id: "5",
+    label: "Bus 5",
     etaMinutes: 4,
     miles: 0.8,
     status: "Arriving",
-    map: { left: "28%", top: "42%" },
-  },
-  {
-    id: "2",
-    label: "Bus 2",
-    etaMinutes: 9,
-    miles: 1.6,
-    status: "On route",
-    map: { left: "48%", top: "58%" },
-  },
-  {
-    id: "3",
-    label: "Bus 3",
-    etaMinutes: 14,
-    miles: 2.4,
-    status: "On route",
-    map: { left: "62%", top: "34%" },
+    map: { left: "48%", top: "42%" },
   },
 ];
 
-function buildSample(labels: string[]): PreviewBus[] {
-  const clean = [
-    ...new Set(labels.map((value) => value.trim()).filter(Boolean)),
-  ];
-  if (!clean.length) return SAMPLE;
-  return clean.slice(0, 12).map((label, index) => {
-    const etaMinutes = 3 + index * 4;
-    return {
-      id: `${index + 1}`,
-      label: /^bus\b/i.test(label) ? label : `Bus ${label}`,
-      etaMinutes,
-      miles: Number((0.6 + index * 0.7).toFixed(1)),
-      status: (etaMinutes <= 5 ? "Arriving" : "On route") as PreviewBus["status"],
-      map: {
-        left: `${22 + ((index * 17) % 50)}%`,
-        top: `${30 + ((index * 13) % 40)}%`,
-      },
-    };
-  });
+function buildSample(_labels: string[]): PreviewBus[] {
+  return SAMPLE;
 }
 
 function schoolPin(feed: LiveGpsFeed | null) {
