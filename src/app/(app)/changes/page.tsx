@@ -47,7 +47,6 @@ export default async function ChangesPage() {
         rows={rows}
         showTeacher
         showParent
-        showKind
         showDate
         empty="No open requests yet."
       />

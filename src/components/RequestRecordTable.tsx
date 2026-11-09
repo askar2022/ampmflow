@@ -12,27 +12,28 @@ export type RequestRecordRow = {
   waiting: boolean;
 };
 
+function requestLabel(row: RequestRecordRow) {
+  const kind = (row.kind || row.request || "").trim();
+  const detail = (row.detail || "").trim();
+  if (kind && detail && detail !== kind) return `${kind} · ${detail}`;
+  return kind || detail || "—";
+}
+
 export function RequestRecordTable({
   rows,
   showTeacher = false,
   showParent = false,
-  showKind = false,
   showDate = false,
   empty = "No open requests yet.",
 }: {
   rows: RequestRecordRow[];
   showTeacher?: boolean;
   showParent?: boolean;
-  showKind?: boolean;
   showDate?: boolean;
   empty?: string;
 }) {
   const colCount =
-    4 +
-    (showTeacher ? 1 : 0) +
-    (showParent ? 1 : 0) +
-    (showDate ? 1 : 0) +
-    (showKind ? 1 : 0);
+    4 + (showTeacher ? 1 : 0) + (showParent ? 1 : 0) + (showDate ? 1 : 0);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-card">
@@ -44,8 +45,7 @@ export function RequestRecordTable({
               <th>Grade</th>
               {showTeacher ? <th>Teacher</th> : null}
               {showParent ? <th>Parent</th> : null}
-              {showDate ? <th>Request date</th> : null}
-              {showKind ? <th>Request type</th> : null}
+              {showDate ? <th>Date</th> : null}
               <th>Request</th>
               <th className="px-4">Company update</th>
             </tr>
@@ -68,13 +68,8 @@ export function RequestRecordTable({
                       {row.requestDate || "—"}
                     </td>
                   ) : null}
-                  {showKind ? (
-                    <td className="font-extrabold text-navy">
-                      {row.kind || row.request}
-                    </td>
-                  ) : null}
-                  <td className="max-w-[260px] font-normal">
-                    {row.detail || row.request}
+                  <td className="max-w-[320px] font-extrabold text-navy">
+                    {requestLabel(row)}
                   </td>
                   <td className="px-4 py-3 font-extrabold text-navy">
                     {row.company}
