@@ -2,8 +2,20 @@
 
 import { useState } from "react";
 import type { CoordinatorAnalytics } from "@/lib/analytics";
+import { GpsReportBoard } from "@/components/GpsReportBoard";
 
 const TABS = ["Overview", "Changes", "Requests"] as const;
+
+type GpsTripRow = {
+  busLabel: string;
+  company: string;
+  trip: string;
+  dayKey: string;
+  firstPickupAt: string | null;
+  arrivedSchoolAt: string | null;
+  leftSchoolAt: string | null;
+  lastStopAt: string | null;
+};
 
 function Dot({ color, label, value }: { color: string; label: string; value: number }) {
   return (
@@ -31,24 +43,32 @@ function RiderTable({ data }: { data: CoordinatorAnalytics }) {
   const rows = [
     ...data.busCounts.map((row) => ({
       key: `bus-${row.name}`,
-      name: vehicleLabel("bus", row.name),
+      name: data.aimSchool
+        ? row.name
+        : vehicleLabel("bus", row.name),
       riders: row.riders,
       color: "bg-blue",
     })),
-    ...data.vanCounts.map((row) => ({
-      key: `van-${row.name}`,
-      name: vehicleLabel("van", row.name),
-      riders: row.riders,
-      color: "bg-teal",
-    })),
+    ...(data.aimSchool
+      ? []
+      : data.vanCounts.map((row) => ({
+          key: `van-${row.name}`,
+          name: vehicleLabel("van", row.name),
+          riders: row.riders,
+          color: "bg-teal",
+        }))),
   ];
   if (!rows.length) return null;
   const max = Math.max(1, ...rows.map((row) => row.riders));
   return (
     <div className="rounded-2xl border border-line bg-card p-5">
-      <div className="text-sm font-semibold">Each bus and van</div>
+      <div className="text-sm font-semibold">
+        {data.aimSchool ? "Each Aim bus" : "Each bus and van"}
+      </div>
       <p className="mt-1 text-xs text-muted">
-        Longer bars mean more students on that bus or van.
+        {data.aimSchool
+          ? "Bus 4, Bus 5, and the 3rd bus only."
+          : "Longer bars mean more students on that bus or van."}
       </p>
       <div className="mt-4 space-y-3">
         {rows.map((row) => (
@@ -153,16 +173,41 @@ function WeekChart({
   );
 }
 
-export function AnalyticsBoard({ data }: { data: CoordinatorAnalytics }) {
+export function AnalyticsBoard({
+  data,
+  schoolName,
+  schoolId,
+  gpsDayKey,
+  gpsDays,
+  gpsRows,
+}: {
+  data: CoordinatorAnalytics;
+  schoolName: string;
+  schoolId: string;
+  gpsDayKey: string;
+  gpsDays: Array<{ dayKey: string; count: number }>;
+  gpsRows: GpsTripRow[];
+}) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
 
   return (
     <div className="space-y-8">
+      <div>
+        <h1 className="font-serif text-4xl text-navy">Analytics</h1>
+        <p className="mt-1 text-muted">
+          Rider counts, weekly activity, and GPS arrival times in one place.
+        </p>
+      </div>
+
       <section>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div
+          className={`grid grid-cols-2 gap-3 ${data.aimSchool ? "sm:grid-cols-3" : "sm:grid-cols-4"}`}
+        >
           <Dot color="bg-blue" label="Students" value={data.students} />
           <Dot color="bg-navy" label="Bus riders" value={data.busRiders} />
-          <Dot color="bg-teal" label="Van riders" value={data.vanRiders} />
+          {data.aimSchool ? null : (
+            <Dot color="bg-teal" label="Van riders" value={data.vanRiders} />
+          )}
           <Dot color="bg-green" label="Waiting for a bus" value={data.waiting} />
         </div>
         <div className="mt-4">
@@ -213,7 +258,7 @@ export function AnalyticsBoard({ data }: { data: CoordinatorAnalytics }) {
               <Card
                 label="Still waiting"
                 value={data.pendingRequests}
-                note="On Request for Route"
+                note="On Submit new request"
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -251,6 +296,17 @@ export function AnalyticsBoard({ data }: { data: CoordinatorAnalytics }) {
             <WeekChart weeks={data.weeks} showChanges={false} showRequests />
           </div>
         ) : null}
+      </section>
+
+      <section className="border-t border-line pt-8">
+        <GpsReportBoard
+          schoolName={schoolName}
+          schoolId={schoolId}
+          initialDayKey={gpsDayKey}
+          initialDays={gpsDays}
+          initialRows={gpsRows}
+          embedded
+        />
       </section>
     </div>
   );

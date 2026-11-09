@@ -1,4 +1,9 @@
 import { addDays, format, parseISO, startOfWeek, subWeeks } from "date-fns";
+import {
+  AIM_FLEET_LABELS,
+  ensureAimFleetVehicles,
+  isAimSchool,
+} from "./aim-fleet";
 import { schoolDayBounds, todayKey } from "./dates";
 import { loadVehicles } from "./gate";
 import { prisma } from "./prisma";
@@ -33,6 +38,7 @@ export type CoordinatorAnalytics = {
   weekLabel: string;
   monthLabel: string;
   weeks: WeekBars[];
+  aimSchool: boolean;
 };
 
 function weekRange(offset = 0) {
@@ -149,6 +155,14 @@ export async function loadCoordinatorAnalytics(
   const thisWeek = weekRange(0);
   const month = monthRange();
   const weekWindows = [3, 2, 1, 0].map((offset) => weekRange(offset));
+  const school = await prisma.school.findUnique({
+    where: { id: schoolId },
+    select: { name: true },
+  });
+  const aimSchool = isAimSchool(school?.name);
+  if (aimSchool) {
+    await ensureAimFleetVehicles(schoolId).catch(() => undefined);
+  }
 
   const [
     students,
@@ -206,23 +220,53 @@ export async function loadCoordinatorAnalytics(
     ),
   ]);
 
-  const buses = new Set(routes.map((route) => route.number.trim()).filter(Boolean))
-    .size;
-  const vanList = vehicles.filter(
-    (vehicle) =>
-      vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
-  );
+  const vanList = aimSchool
+    ? []
+    : vehicles.filter(
+        (vehicle) =>
+          vehicle.vehicleType.toUpperCase() === "VAN" ||
+          /van/i.test(vehicle.name),
+      );
   const vans = vanList.length;
-  const { busCounts, vanCounts } = await loadVehicleCounts(schoolId, vanList);
+  let { busCounts, vanCounts } = await loadVehicleCounts(schoolId, vanList);
+
+  if (aimSchool) {
+    const aimKeys = AIM_FLEET_LABELS.map((label) =>
+      label.replace(/^Bus\s+/i, "").trim().toLowerCase(),
+    );
+    const byName = new Map(
+      busCounts.map((row) => [row.name.trim().toLowerCase(), row]),
+    );
+    busCounts = AIM_FLEET_LABELS.map((label) => {
+      const key = label.replace(/^Bus\s+/i, "").trim().toLowerCase();
+      const match =
+        byName.get(key) ||
+        byName.get(label.toLowerCase()) ||
+        byName.get(`bus ${key}`);
+      return { name: label, riders: match?.riders || 0 };
+    });
+    // Drop any leftover Bus 1/2/3 etc.
+    busCounts = busCounts.filter((row) =>
+      aimKeys.includes(row.name.replace(/^Bus\s+/i, "").trim().toLowerCase()) ||
+      AIM_FLEET_LABELS.some(
+        (label) => label.toLowerCase() === row.name.toLowerCase(),
+      ),
+    );
+    vanCounts = [];
+  }
+
+  const buses = aimSchool
+    ? AIM_FLEET_LABELS.length
+    : new Set(routes.map((route) => route.number.trim()).filter(Boolean)).size;
 
   return {
     students,
     buses,
-    vans,
+    vans: aimSchool ? 0 : vans,
     busRiders,
-    vanRiders,
+    vanRiders: aimSchool ? 0 : vanRiders,
     busCounts,
-    vanCounts,
+    vanCounts: aimSchool ? [] : vanCounts,
     waiting,
     changesWeek,
     changesMonth,
@@ -232,5 +276,6 @@ export async function loadCoordinatorAnalytics(
     weekLabel: `${format(parseISO(thisWeek.start), "MMM d")} – ${format(parseISO(thisWeek.end), "MMM d")}`,
     monthLabel: format(parseISO(month.start), "MMMM yyyy"),
     weeks: weekCounts,
+    aimSchool,
   };
 }

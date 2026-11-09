@@ -21,12 +21,14 @@ export function GpsReportBoard({
   initialDayKey,
   initialDays,
   initialRows,
+  embedded = false,
 }: {
   schoolName: string;
   schoolId: string;
   initialDayKey: string;
   initialDays: Array<{ dayKey: string; count: number }>;
   initialRows: TripRow[];
+  embedded?: boolean;
 }) {
   const [dayKey, setDayKey] = useState(initialDayKey);
   const [days, setDays] = useState(initialDays);
@@ -64,10 +66,14 @@ export function GpsReportBoard({
   }, [schoolId]);
 
   return (
-    <div className="space-y-5">
+    <div id="gps-report" className="space-y-5 scroll-mt-24">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-4xl text-navy">GPS Report</h1>
+          {embedded ? (
+            <h2 className="font-serif text-2xl text-navy">GPS Report</h2>
+          ) : (
+            <h1 className="font-serif text-4xl text-navy">GPS Report</h1>
+          )}
           <p className="mt-1 text-muted">
             {schoolName} · Minnehaha’s 3 Aim buses only (Bus 4, Bus 5, 3rd bus)
           </p>
