@@ -676,11 +676,18 @@ export async function requestRoute(input: RouteRequestInput) {
     }
   }
 
-  await prisma.changeRequest
-    .create({
+  if (!loaded?.record.id) {
+    return {
+      ok: false as const,
+      error: "Could not save the student for this request. Try again.",
+    };
+  }
+
+  try {
+    await prisma.changeRequest.create({
       data: {
         schoolId: user.schoolId,
-        studentId: loaded?.record.id ?? null,
+        studentId: loaded.record.id,
         trip: "AM+PM",
         source: user.role,
         title: `Request for route — ${firstName} ${lastName}`,
@@ -701,8 +708,13 @@ export async function requestRoute(input: RouteRequestInput) {
         payload: JSON.stringify({ kind: "ROUTE_REQUEST" }),
         createdById: user.id,
       },
-    })
-    .catch(() => undefined);
+    });
+  } catch {
+    return {
+      ok: false as const,
+      error: "Could not save the route request for the bus company. Try again.",
+    };
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/waiting");

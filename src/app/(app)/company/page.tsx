@@ -17,11 +17,7 @@ import {
   destinationFromStudent,
   planLine,
 } from "@/lib/change-notify";
-import {
-  loadFrontDeskChangesToday,
-  loadStudent,
-  loadStudents,
-} from "@/lib/transportation";
+import { loadCompanyOpenRequests } from "@/lib/company-open-requests";
 import { changeRequestLabel, isPlanWaiting, isWaitingRide } from "@/lib/format";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import {
@@ -100,91 +96,6 @@ function companyEmail(student: EffectiveStudent, trips: Trip[]) {
     pmPickup: used.includes("PM") ? student.pm.pickupTime : "",
   });
   return { subject: mail.subject, body: mail.text };
-}
-
-type OpenStudent = {
-  student: EffectiveStudent;
-  requestedAt: Date;
-};
-
-async function loadCompanyOpenRequests(schoolId: string): Promise<OpenStudent[]> {
-  const [todayChanges, waitingAll, openRequests] = await Promise.all([
-    loadFrontDeskChangesToday(schoolId),
-    loadStudents(schoolId),
-    prisma.changeRequest.findMany({
-      where: {
-        schoolId,
-        status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
-      },
-      select: {
-        studentId: true,
-        title: true,
-        details: true,
-        createdAt: true,
-        busNumber: true,
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-  ]);
-
-  const byId = new Map<string, OpenStudent>();
-
-  function remember(student: EffectiveStudent, requestedAt: Date) {
-    const existing = byId.get(student.id);
-    if (!existing || requestedAt < existing.requestedAt) {
-      byId.set(student.id, { student, requestedAt });
-    }
-  }
-
-  // Any unfinished change request — including last week — stays on this desk.
-  for (const row of openRequests) {
-    if (!row.studentId) continue;
-    if (byId.has(row.studentId)) {
-      const cur = byId.get(row.studentId)!;
-      if (row.createdAt < cur.requestedAt) {
-        byId.set(row.studentId, {
-          student: cur.student,
-          requestedAt: row.createdAt,
-        });
-      }
-      continue;
-    }
-    const loaded = await loadStudent(row.studentId);
-    if (loaded?.effective) {
-      remember(loaded.effective, row.createdAt);
-    }
-  }
-
-  // Still waiting for a bus number (open AM/PM assignment).
-  for (const student of waitingAll) {
-    if (!isWaiting(student)) continue;
-    const match = openRequests.find((row) => row.studentId === student.id);
-    remember(student, match?.createdAt || new Date());
-  }
-
-  // Route-request enrollments that never got a bus.
-  for (const student of waitingAll) {
-    if (byId.has(student.id)) continue;
-    if (
-      student.enrollmentSource === "ROUTE_REQUEST" ||
-      student.enrollmentSource === "NEW_APPLICATION"
-    ) {
-      if (isWaiting(student)) remember(student, new Date());
-    }
-  }
-
-  // Today’s front-desk changes still need a company update.
-  for (const student of todayChanges) {
-    if (!isWaiting(student) && byId.has(student.id)) continue;
-    if (isWaiting(student) || !byId.has(student.id)) {
-      const match = openRequests.find((row) => row.studentId === student.id);
-      remember(student, match?.createdAt || new Date());
-    }
-  }
-
-  return [...byId.values()].sort(
-    (a, b) => a.requestedAt.getTime() - b.requestedAt.getTime(),
-  );
 }
 
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
