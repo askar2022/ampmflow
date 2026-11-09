@@ -97,7 +97,7 @@ export function AppShell({
               {user.role === "BUS_COMPANY" ? (
                 <input type="hidden" name="next" value="company" />
               ) : null}
-              <button className="min-h-[44px] rounded-[12px] border border-navy/25 bg-white px-4 text-[14px] font-semibold text-navy sm:min-h-8 sm:rounded-full sm:px-3 sm:text-[13px]">
+              <button className="inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full border border-navy/25 bg-white px-5 py-2 text-[14px] font-semibold text-navy sm:min-h-10 sm:px-5 sm:text-[13px]">
                 Sign Out
               </button>
             </form>
