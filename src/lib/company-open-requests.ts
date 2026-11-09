@@ -5,6 +5,7 @@ import type { EffectiveStudent } from "./types";
 
 type OpenRequestRow = {
   id: string;
+  schoolId: string;
   studentId: string | null;
   title: string;
   details: string;
@@ -54,39 +55,64 @@ async function ensureWaitingAssignments(
   }
 }
 
-async function findStudentByName(schoolId: string, title: string) {
+async function findStudentByName(schoolIds: string[], title: string) {
   const full = nameFromRouteTitle(title);
   const parts = full.split(/\s+/).filter(Boolean);
   if (parts.length < 2) return null;
   const firstName = parts[0];
   const lastName = parts.slice(1).join(" ");
-  return prisma.student.findFirst({
+  const exact = await prisma.student.findFirst({
     where: {
-      schoolId,
+      schoolId: { in: schoolIds },
       active: true,
       firstName: { equals: firstName, mode: "insensitive" },
       lastName: { equals: lastName, mode: "insensitive" },
     },
     select: { id: true },
   });
+  if (exact) return exact;
+
+  // Soft match for typos like "askat" vs "Askar".
+  const prefix = lastName.slice(0, Math.min(4, lastName.length));
+  if (prefix.length < 2) return null;
+  return prisma.student.findFirst({
+    where: {
+      schoolId: { in: schoolIds },
+      active: true,
+      firstName: { equals: firstName, mode: "insensitive" },
+      lastName: { startsWith: prefix, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
 }
 
 /**
- * Every unfinished school request for this school — including last week and
- * requests that were saved without a studentId link.
+ * Every unfinished school request for this campus — including last week,
+ * duplicate school rows with the same name, and requests saved without a
+ * studentId link.
  */
 export async function loadCompanyOpenRequests(
-  schoolId: string,
+  schoolIdOrIds: string | string[],
 ): Promise<CompanyOpenStudent[]> {
-  const [waitingAll, openRequests] = await Promise.all([
-    loadStudents(schoolId),
+  const schoolIds = [
+    ...new Set(
+      (Array.isArray(schoolIdOrIds) ? schoolIdOrIds : [schoolIdOrIds]).filter(
+        Boolean,
+      ),
+    ),
+  ];
+  if (!schoolIds.length) return [];
+
+  const [waitingLists, openRequests] = await Promise.all([
+    Promise.all(schoolIds.map((schoolId) => loadStudents(schoolId))),
     prisma.changeRequest.findMany({
       where: {
-        schoolId,
+        schoolId: { in: schoolIds },
         status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
       },
       select: {
         id: true,
+        schoolId: true,
         studentId: true,
         title: true,
         details: true,
@@ -97,6 +123,7 @@ export async function loadCompanyOpenRequests(
       orderBy: { createdAt: "asc" },
     }) as Promise<OpenRequestRow[]>,
   ]);
+  const waitingAll = waitingLists.flat();
 
   const byId = new Map<string, CompanyOpenStudent>();
 
@@ -119,7 +146,7 @@ export async function loadCompanyOpenRequests(
     let studentId = row.studentId;
 
     if (!studentId) {
-      const match = await findStudentByName(schoolId, row.title);
+      const match = await findStudentByName(schoolIds, row.title);
       if (match) {
         studentId = match.id;
         await prisma.changeRequest

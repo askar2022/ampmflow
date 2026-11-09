@@ -8,7 +8,11 @@ import {
 } from "@/lib/aim-fleet";
 import { loadVehicles } from "@/lib/gate";
 import { formatDateTime, schoolLocalTime, todayKey } from "@/lib/dates";
-import { loadCompanySchools, type CompanySchool } from "@/lib/company-access";
+import {
+  companySchoolGroupIds,
+  loadCompanySchools,
+  type CompanySchool,
+} from "@/lib/company-access";
 import {
   companyAddressFor,
   companyChangeEmail,
@@ -19,6 +23,7 @@ import {
 } from "@/lib/change-notify";
 import { loadCompanyOpenRequests } from "@/lib/company-open-requests";
 import { changeRequestLabel, isPlanWaiting, isWaitingRide } from "@/lib/format";
+import { saveSchoolBusCompanyEmail, usableOpsEmail } from "@/lib/ops-change-emails";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import {
   CompanyBoard,
@@ -98,26 +103,49 @@ function companyEmail(student: EffectiveStudent, trips: Trip[]) {
   return { subject: mail.subject, body: mail.text };
 }
 
-async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
+async function loadSchoolDesk(
+  school: CompanySchool,
+  companyLoginEmail = "",
+): Promise<CompanyDesk> {
   const aim = isAimSchool(school.name);
-  const [openRows, vehicles, routes] = await Promise.all([
-    loadCompanyOpenRequests(school.id),
-    (aim
-      ? ensureAimFleetVehicles(school.id)
-      : loadVehicles(school.id)
-    ).catch(() => []),
-    prisma.busRoute.findMany({
-      where: { schoolId: school.id },
-      select: { number: true },
-      orderBy: { number: "asc" },
-    }),
+  const schoolIds = await companySchoolGroupIds(school);
+  // Keep every Aim/campus row linked so future requests land on the desk.
+  const linkedEmail = usableOpsEmail(companyLoginEmail);
+  if (linkedEmail) {
+    await Promise.all(
+      schoolIds.map((schoolId) =>
+        saveSchoolBusCompanyEmail(schoolId, linkedEmail).catch(() => undefined),
+      ),
+    );
+  }
+  const [openRows, vehicleLists, routeLists] = await Promise.all([
+    loadCompanyOpenRequests(schoolIds),
+    Promise.all(
+      schoolIds.map((schoolId) =>
+        (aim
+          ? ensureAimFleetVehicles(schoolId)
+          : loadVehicles(schoolId)
+        ).catch(() => []),
+      ),
+    ),
+    Promise.all(
+      schoolIds.map((schoolId) =>
+        prisma.busRoute.findMany({
+          where: { schoolId },
+          select: { number: true },
+          orderBy: { number: "asc" },
+        }),
+      ),
+    ),
   ]);
+  const vehicles = vehicleLists.flat();
+  const routes = routeLists.flat();
 
   const studentIds = openRows.map((row) => row.student.id);
   const completed = studentIds.length
     ? await prisma.changeRequest.findMany({
         where: {
-          schoolId: school.id,
+          schoolId: { in: schoolIds },
           status: "COMPLETED",
           studentId: { in: studentIds },
           busNumber: { not: null },
@@ -238,7 +266,7 @@ export default async function CompanyPage({
     );
   }
 
-  const desk = await loadSchoolDesk(selected);
+  const desk = await loadSchoolDesk(selected, session.email);
 
   return (
     <CompanyBoard

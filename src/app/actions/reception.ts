@@ -578,6 +578,10 @@ export async function requestRoute(input: RouteRequestInput) {
   if (!address) return { ok: false as const, error: "Enter the student address." };
   if (!grade) return { ok: false as const, error: "Enter the grade." };
 
+  await saveSchoolBusCompanyEmail(user.schoolId, busCompanyEmail).catch(
+    () => undefined,
+  );
+
   let loaded = input.studentId
     ? await loadStudent(input.studentId)
     : null;

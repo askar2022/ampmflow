@@ -116,8 +116,33 @@ export async function loadSchoolOpenRequests(
   }
 
   for (const row of openRequests) {
-    if (!row.studentId) continue;
-    const loaded = await loadStudent(row.studentId);
+    let studentId = row.studentId;
+    if (!studentId) {
+      const full = row.title.replace(/^Request for route\s*[—\-]\s*/i, "").trim();
+      const parts = full.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        const match = await prisma.student.findFirst({
+          where: {
+            schoolId,
+            active: true,
+            firstName: { equals: parts[0], mode: "insensitive" },
+            lastName: { equals: parts.slice(1).join(" "), mode: "insensitive" },
+          },
+          select: { id: true },
+        });
+        if (match) {
+          studentId = match.id;
+          await prisma.changeRequest
+            .update({
+              where: { id: row.id },
+              data: { studentId: match.id },
+            })
+            .catch(() => undefined);
+        }
+      }
+    }
+    if (!studentId) continue;
+    const loaded = await loadStudent(studentId);
     if (!loaded?.effective) continue;
     const fromDetails =
       row.details
