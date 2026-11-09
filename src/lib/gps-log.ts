@@ -251,6 +251,98 @@ async function clearParkedFalseStarts(args: {
   }
 }
 
+/**
+ * Remove the bad “same time for first pickup and last stop” rows
+ * (and the twin Bus 4 / Bus 5 stamps from one poll).
+ */
+export async function scrubFalseGpsTripStamps(
+  schoolId: string,
+  dayKey = todayKey(),
+) {
+  await ensureGpsBusLogTable();
+  type Row = {
+    id: string;
+    busLabel: string;
+    trip: string;
+    eventType: string;
+    recordedAt: Date;
+    lat: number | null;
+    lng: number | null;
+  };
+  const rows = await prisma.$queryRaw<Row[]>`
+    SELECT "id", "busLabel", "trip", "eventType", "recordedAt", "lat", "lng"
+    FROM "GpsBusLog"
+    WHERE "schoolId" = ${schoolId}
+      AND "dayKey" = ${dayKey}
+      AND "eventType" IN (${"first_pickup"}, ${"last_stop"}, ${"arrived"})
+  `.catch(() => [] as Row[]);
+
+  const byBusTrip = new Map<string, { first?: Row; last?: Row; arrived?: Row }>();
+  for (const row of rows) {
+    const key = `${row.busLabel}::${row.trip}`;
+    const slot = byBusTrip.get(key) || {};
+    if (row.eventType === "first_pickup") slot.first = row;
+    if (row.eventType === "last_stop") slot.last = row;
+    if (row.eventType === "arrived") slot.arrived = row;
+    byBusTrip.set(key, slot);
+  }
+
+  const deleteIds = new Set<string>();
+  for (const slot of byBusTrip.values()) {
+    const { first, last, arrived } = slot;
+    if (!first) continue;
+
+    // Twin stamp: first pickup and last stop in the same minute / same spot.
+    if (last) {
+      const gap = Math.abs(last.recordedAt.getTime() - first.recordedAt.getTime());
+      const sameSpot =
+        first.lat != null &&
+        first.lng != null &&
+        last.lat != null &&
+        last.lng != null &&
+        milesBetween(
+          { lat: first.lat, lng: first.lng },
+          { lat: last.lat, lng: last.lng },
+        ) < MOVE_MILES;
+      if (gap < LAST_STOP_GAP_MS || sameSpot) {
+        deleteIds.add(last.id);
+        // Without a real school arrival, the "first pickup" was also a false HQ ping.
+        if (!arrived) deleteIds.add(first.id);
+      }
+    } else if (!arrived) {
+      // Lone first_pickup with no arrival and no later stop — likely parked HQ.
+      deleteIds.add(first.id);
+    }
+  }
+
+  // Same clock minute on Bus 4 and Bus 5 first_pickup = one poll wrote both.
+  const firsts = [...byBusTrip.values()]
+    .map((slot) => slot.first)
+    .filter((row): row is Row => Boolean(row));
+  for (let i = 0; i < firsts.length; i += 1) {
+    for (let j = i + 1; j < firsts.length; j += 1) {
+      const a = firsts[i];
+      const b = firsts[j];
+      if (a.busLabel === b.busLabel) continue;
+      if (a.trip !== b.trip) continue;
+      const gap = Math.abs(a.recordedAt.getTime() - b.recordedAt.getTime());
+      if (gap > 60_000) continue;
+      const slotA = byBusTrip.get(`${a.busLabel}::${a.trip}`);
+      const slotB = byBusTrip.get(`${b.busLabel}::${b.trip}`);
+      if (!slotA?.arrived) deleteIds.add(a.id);
+      if (!slotB?.arrived) deleteIds.add(b.id);
+      if (slotA?.last && !slotA.arrived) deleteIds.add(slotA.last.id);
+      if (slotB?.last && !slotB.arrived) deleteIds.add(slotB.last.id);
+    }
+  }
+
+  for (const id of deleteIds) {
+    await prisma.$executeRaw`
+      DELETE FROM "GpsBusLog" WHERE "id" = ${id}
+    `.catch(() => undefined);
+  }
+}
+
 export async function recordLiveGpsBuses(args: {
   schoolId: string;
   company?: string;
@@ -261,6 +353,7 @@ export async function recordLiveGpsBuses(args: {
   const day = todayKey();
   const trip = tripForNow();
   const now = new Date();
+  await scrubFalseGpsTripStamps(args.schoolId, day);
 
   for (const bus of args.buses) {
     if (bus.pending || bus.lat == null || bus.lng == null) continue;
@@ -498,6 +591,8 @@ export async function loadGpsTripReport(args: {
 }): Promise<GpsTripReportRow[]> {
   await ensureGpsBusLogTable();
   const day = args.dayKey || todayKey();
+  await scrubFalseGpsTripStamps(args.schoolId, day);
+
   type EventRow = {
     busLabel: string;
     company: string;
@@ -573,17 +668,37 @@ export async function loadGpsTripReport(args: {
     }
   }
 
-  // Hide fake "last stop" that is just the same parked HQ ping as first pickup.
+  // Never show twin first/last times (same poll / parked HQ).
   for (const row of map.values()) {
-    if (!row.firstPickupAt || !row.lastStopAt) continue;
-    const meta = firstMeta.get(`${row.busLabel}::${row.trip}`);
-    const gap = row.lastStopAt.getTime() - row.firstPickupAt.getTime();
-    if (gap < LAST_STOP_GAP_MS) {
-      row.lastStopAt = null;
-      continue;
+    if (row.firstPickupAt && row.lastStopAt) {
+      const gap = Math.abs(
+        row.lastStopAt.getTime() - row.firstPickupAt.getTime(),
+      );
+      if (gap < LAST_STOP_GAP_MS) {
+        row.lastStopAt = null;
+        if (!row.arrivedSchoolAt) row.firstPickupAt = null;
+      }
     }
-    if (meta?.lat != null && meta.lng != null) {
-      // keep last_stop; movement already required at write time
+  }
+
+  // Bus 4 and Bus 5 must not share the same first-pickup minute unless both arrived.
+  const amFirst = [...map.values()].filter(
+    (row) => row.trip === "AM" && row.firstPickupAt && !row.arrivedSchoolAt,
+  );
+  for (let i = 0; i < amFirst.length; i += 1) {
+    for (let j = i + 1; j < amFirst.length; j += 1) {
+      const a = amFirst[i];
+      const b = amFirst[j];
+      if (!a.firstPickupAt || !b.firstPickupAt) continue;
+      const gap = Math.abs(
+        a.firstPickupAt.getTime() - b.firstPickupAt.getTime(),
+      );
+      if (gap <= 60_000) {
+        a.firstPickupAt = null;
+        a.lastStopAt = null;
+        b.firstPickupAt = null;
+        b.lastStopAt = null;
+      }
     }
   }
 
