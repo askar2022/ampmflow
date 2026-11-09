@@ -23,7 +23,6 @@ export function RouteRequestForm({
   busCompanyEmail?: string;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...empty, busCompanyEmail });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -35,165 +34,145 @@ export function RouteRequestForm({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-serif text-4xl">Request for Route</h1>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
-        >
-          Submit new request
-        </button>
-      </div>
-      {message && !open ? (
-        <p className="rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
-          {message}
+      <div>
+        <h1 className="font-serif text-4xl text-navy">Submit new request</h1>
+        <p className="mt-2 max-w-2xl text-muted">
+          Fill the form once. It emails the parent and Minnehaha, then the
+          student stays in the list below until they assign Bus 4, Bus 5, or
+          the 3rd bus.
         </p>
-      ) : null}
-      {open ? (
-    <form
-      className="rounded-2xl border border-line bg-card p-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        setError("");
-        setMessage("");
-        start(async () => {
-          const result = await requestRoute(form);
-          if (!result.ok) {
-            setError(result.error);
-            return;
-          }
-          setMessage(result.message);
-          setForm({ ...empty, busCompanyEmail: form.busCompanyEmail });
-          setOpen(false);
-          router.refresh();
-        });
-      }}
-    >
-      <h2 className="font-serif text-2xl">Submit a route request</h2>
-      <p className="mt-1 text-sm text-muted">
-        Fill this form. The button emails the parent and the bus company. The
-        student stays in the list below as a record until the company assigns
-        a bus or van.
-      </p>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-semibold">
-          First name
-          <input
-            required
-            value={form.firstName}
-            onChange={(event) => setField("firstName", event.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold">
-          Last name
-          <input
-            required
-            value={form.lastName}
-            onChange={(event) => setField("lastName", event.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold">
-          Grade
-          <input
-            required
-            value={form.grade}
-            onChange={(event) => setField("grade", event.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold">
-          Teacher name
-          <input
-            value={form.teacherName}
-            onChange={(event) => setField("teacherName", event.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold">
-          Primary 1 phone
-          <input
-            required
-            value={form.parentPhone}
-            onChange={(event) => setField("parentPhone", event.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold">
-          Parent email
-          <input
-            type="email"
-            required
-            value={form.parentEmail}
-            onChange={(event) => setField("parentEmail", event.target.value)}
-            placeholder="parent@email.com"
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold sm:col-span-2">
-          Bus company email
-          <input
-            type="email"
-            required
-            value={form.busCompanyEmail}
-            onChange={(event) => setField("busCompanyEmail", event.target.value)}
-            placeholder="bus@company.com"
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold sm:col-span-2">
-          Student address
-          <input
-            required
-            value={form.address}
-            onChange={(event) => setField("address", event.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
-        <label className="text-sm font-semibold sm:col-span-2">
-          Emergency contact
-          <input
-            value={form.emergencyContact}
-            onChange={(event) => setField("emergencyContact", event.target.value)}
-            className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
-          />
-        </label>
       </div>
 
-      {error ? (
-        <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red">{error}</p>
-      ) : null}
-      {message ? (
-        <p className="mt-3 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
-          {message}
-        </p>
-      ) : null}
+      <form
+        className="rounded-2xl border border-line bg-card p-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setError("");
+          setMessage("");
+          start(async () => {
+            const result = await requestRoute(form);
+            if (!result.ok) {
+              setError(result.error);
+              return;
+            }
+            setMessage(result.message);
+            setForm({ ...empty, busCompanyEmail: form.busCompanyEmail });
+            router.refresh();
+          });
+        }}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-semibold">
+            First name
+            <input
+              required
+              autoFocus
+              value={form.firstName}
+              onChange={(event) => setField("firstName", event.target.value)}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Last name
+            <input
+              required
+              value={form.lastName}
+              onChange={(event) => setField("lastName", event.target.value)}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Grade
+            <input
+              required
+              value={form.grade}
+              onChange={(event) => setField("grade", event.target.value)}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Teacher name
+            <input
+              value={form.teacherName}
+              onChange={(event) => setField("teacherName", event.target.value)}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Primary 1 phone
+            <input
+              required
+              value={form.parentPhone}
+              onChange={(event) => setField("parentPhone", event.target.value)}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold">
+            Parent email
+            <input
+              type="email"
+              required
+              value={form.parentEmail}
+              onChange={(event) => setField("parentEmail", event.target.value)}
+              placeholder="parent@email.com"
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Bus company email
+            <input
+              type="email"
+              required
+              value={form.busCompanyEmail}
+              onChange={(event) =>
+                setField("busCompanyEmail", event.target.value)
+              }
+              placeholder="bus@company.com"
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Student address
+            <input
+              required
+              value={form.address}
+              onChange={(event) => setField("address", event.target.value)}
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Emergency contact
+            <input
+              value={form.emergencyContact}
+              onChange={(event) =>
+                setField("emergencyContact", event.target.value)
+              }
+              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+            />
+          </label>
+        </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {pending ? "Sending both emails…" : "Email parent and bus company"}
-        </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => {
-            setOpen(false);
-            setError("");
-          }}
-          className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
-      ) : null}
+        {error ? (
+          <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red">
+            {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p className="mt-3 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
+            {message}
+          </p>
+        ) : null}
+
+        <div className="mt-4">
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {pending ? "Sending…" : "Submit request"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

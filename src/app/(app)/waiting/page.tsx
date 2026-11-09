@@ -93,14 +93,16 @@ export default async function WaitingPage() {
   return (
     <div className="space-y-6">
       <RouteRequestForm busCompanyEmail={busCompanyEmail} />
-      <p className="max-w-2xl text-muted">
-        The school submits the request. The bus company assigns the bus (Aim:
-        Bus 4, Bus 5, or the 3rd bus). This list is the record — your request
-        and their update.
-      </p>
+      <div>
+        <h2 className="font-serif text-2xl text-navy">Request record</h2>
+        <p className="mt-1 max-w-2xl text-sm text-muted">
+          After you submit, the student stays here until Minnehaha assigns a
+          bus.
+        </p>
+      </div>
       <RequestRecordTable
         rows={rows}
-        empty="No route requests yet. Submit a new request and it will stay here until the company assigns a bus."
+        empty="No requests yet. Use the form above — the student will show here until the company assigns a bus."
       />
     </div>
   );

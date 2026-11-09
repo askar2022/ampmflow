@@ -667,7 +667,7 @@ export function ReceptionDesk({
                     href={`/waiting?student=${selected.id}`}
                     className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
                   >
-                    Request for Route
+                    Submit new request
                   </Link>
                   <button
                     type="button"
