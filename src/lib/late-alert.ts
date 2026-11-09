@@ -1,3 +1,8 @@
+import {
+  AIM_FLEET_LABELS,
+  ensureAimFleetVehicles,
+  isAimSchool,
+} from "./aim-fleet";
 import { loadVehicles } from "./gate";
 import { prisma } from "./prisma";
 import { parentSmsNumbers } from "./sms";
@@ -41,6 +46,17 @@ function busLabel(raw: string) {
   return clean ? `Bus ${clean}` : "Bus";
 }
 
+function aimFleetRide(label: string): LateRide {
+  const fill = label.replace(/^Bus\s+/i, "").trim() || label;
+  const normalized = /3rd bus/i.test(label) ? "3rd bus" : busLabel(label);
+  return {
+    key: `bus:${normalized.toLowerCase()}`,
+    label: normalized,
+    kind: "bus",
+    fill,
+  };
+}
+
 function rideFromPlan(
   plan: PlanSnapshot,
   vehicleName?: string | null,
@@ -58,7 +74,7 @@ function rideFromPlan(
       fill: label.replace(/^Van\s+/i, ""),
     };
   }
-  if (vehicleName && /van/i.test(vehicleName)) {
+  if (vehicleName && /van/i.test(vehicleName) && !/3rd bus/i.test(vehicleName)) {
     const label = vanLabel(vehicleName);
     return {
       key: `van:${label.toLowerCase()}`,
@@ -66,6 +82,12 @@ function rideFromPlan(
       kind: "van",
       fill: label.replace(/^Van\s+/i, ""),
     };
+  }
+  if (
+    vehicleName &&
+    (/^bus\b/i.test(vehicleName.trim()) || /3rd bus/i.test(vehicleName))
+  ) {
+    return aimFleetRide(vehicleName);
   }
   if (plan.busNumber) {
     const label = busLabel(plan.busNumber);
@@ -79,6 +101,10 @@ function rideFromPlan(
   return null;
 }
 
+function aimLateRidesOnly(): LateRide[] {
+  return AIM_FLEET_LABELS.map((label) => aimFleetRide(label));
+}
+
 export function lateAlertSms(args: {
   rideLabel: string;
   minutes: number;
@@ -89,6 +115,17 @@ export function lateAlertSms(args: {
 }
 
 export async function loadLateRides(schoolId: string): Promise<LateRide[]> {
+  const school = await prisma.school.findUnique({
+    where: { id: schoolId },
+    select: { name: true },
+  });
+
+  // Aim / Minnehaha: only Bus 4, Bus 5, and 3rd bus — never Bus 1–3 or vans.
+  if (isAimSchool(school?.name)) {
+    await ensureAimFleetVehicles(schoolId).catch(() => undefined);
+    return aimLateRidesOnly();
+  }
+
   const [students, vehicles, routes] = await Promise.all([
     loadStudents(schoolId),
     loadVehicles(schoolId).catch(() => []),
@@ -130,6 +167,13 @@ export async function loadLateRides(schoolId: string): Promise<LateRide[]> {
         kind: "van",
         fill: label.replace(/^Van\s+/i, ""),
       });
+    } else if (
+      vehicle.vehicleType.toUpperCase() === "BUS" ||
+      /^bus\b/i.test(vehicle.name) ||
+      /3rd bus/i.test(vehicle.name)
+    ) {
+      const ride = aimFleetRide(vehicle.name);
+      rides.set(ride.key, ride);
     }
   }
   for (const student of students) {

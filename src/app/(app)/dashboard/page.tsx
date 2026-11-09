@@ -1,4 +1,9 @@
 import { getSession } from "@/lib/auth";
+import {
+  AIM_FLEET_LABELS,
+  ensureAimFleetVehicles,
+  isAimSchool,
+} from "@/lib/aim-fleet";
 import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
 import {
@@ -17,29 +22,52 @@ export default async function DashboardPage({
   if (!session) return null;
   const { student: selectedId = "" } = await searchParams;
 
+  const school = await prisma.school.findUnique({
+    where: { id: session.schoolId },
+    select: { name: true },
+  });
+  const aim = isAimSchool(school?.name);
+
   const students = await loadStudents(session.schoolId);
   const [routes, vehicles, vanRows, busCompanyEmail, deskEmails] =
     await Promise.all([
-    prisma.busRoute.findMany({
-      where: { schoolId: session.schoolId },
-      select: { number: true },
-      orderBy: { number: "asc" },
-    }),
-    loadVehicles(session.schoolId).catch(() => []),
-    prisma.student.findMany({
-      where: { schoolId: session.schoolId, active: true, vehicleId: { not: null } },
-      select: { id: true, vehicleId: true },
-    }),
-    defaultBusCompanyEmail(session.schoolId),
-    loadSchoolDeskNotifyEmails(session.schoolId),
-  ]);
-  const buses = [...new Set(routes.map((route) => route.number))];
-  const vans = vehicles
-    .filter(
-      (vehicle) =>
-        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
-    )
-    .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+      prisma.busRoute.findMany({
+        where: { schoolId: session.schoolId },
+        select: { number: true },
+        orderBy: { number: "asc" },
+      }),
+      (aim
+        ? ensureAimFleetVehicles(session.schoolId)
+        : loadVehicles(session.schoolId)
+      ).catch(() => []),
+      prisma.student.findMany({
+        where: {
+          schoolId: session.schoolId,
+          active: true,
+          vehicleId: { not: null },
+        },
+        select: { id: true, vehicleId: true },
+      }),
+      defaultBusCompanyEmail(session.schoolId),
+      loadSchoolDeskNotifyEmails(session.schoolId),
+    ]);
+
+  const buses = aim
+    ? AIM_FLEET_LABELS.map((label) =>
+        label.replace(/^Bus\s+/i, "").trim() || label,
+      )
+    : [...new Set(routes.map((route) => route.number))];
+
+  const vans = aim
+    ? []
+    : vehicles
+        .filter(
+          (vehicle) =>
+            vehicle.vehicleType.toUpperCase() === "VAN" ||
+            /van/i.test(vehicle.name),
+        )
+        .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+
   const studentVanId = Object.fromEntries(
     vanRows
       .filter((row) => row.vehicleId)
@@ -57,7 +85,9 @@ export default async function DashboardPage({
         coordinatorEmail={deskEmails.coordinatorEmail}
         frontDeskEmail={deskEmails.frontDeskEmail}
         initialStudentId={selectedId}
-        canPermanent={session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"}
+        canPermanent={
+          session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"
+        }
         canSeeEmergency={
           session.role === "ADMINISTRATOR" ||
           session.role === "COORDINATOR" ||

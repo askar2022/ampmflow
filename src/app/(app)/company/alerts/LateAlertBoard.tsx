@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   lateAlertPreview,
+  saveCompanyLateAlertStaff,
   sendLateBusAlert,
 } from "@/app/actions/late-alert";
 import type { CompanySchool } from "@/lib/company-access";
@@ -19,6 +20,7 @@ type Preview = {
   rideLabel: string;
   minutes: number;
   familyCount: number;
+  staffCount: number;
   studentCount: number;
   preview: string;
   smsReady: boolean;
@@ -32,12 +34,16 @@ export function LateAlertBoard({
   schoolId,
   schoolName,
   rides,
+  staffPhone1 = "",
+  staffPhone2 = "",
 }: {
   companyName: string;
   schools: CompanySchool[];
   schoolId: string;
   schoolName: string;
   rides: LateRide[];
+  staffPhone1?: string;
+  staffPhone2?: string;
 }) {
   const delays = lateDelayOptions();
   const [selectedSchool, setSelectedSchool] = useState(schoolId);
@@ -49,7 +55,11 @@ export function LateAlertBoard({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [staffSaved, setStaffSaved] = useState("");
+  const [phone1, setPhone1] = useState(staffPhone1);
+  const [phone2, setPhone2] = useState(staffPhone2);
   const [costRefresh, setCostRefresh] = useState(0);
+  const [staffVersion, setStaffVersion] = useState(0);
   const [pending, start] = useTransition();
 
   const trips: Trip[] = useMemo(
@@ -82,7 +92,7 @@ export function LateAlertBoard({
     return () => {
       cancelled = true;
     };
-  }, [selectedSchool, rideKey, minutes, trips]);
+  }, [selectedSchool, rideKey, minutes, trips, staffVersion]);
 
   function chooseSchool(id: string) {
     if (id === selectedSchool) return;
@@ -91,11 +101,12 @@ export function LateAlertBoard({
 
   function send() {
     if (!rideKey) {
-      setError("Choose a bus or van.");
+      setError("Choose a bus.");
       return;
     }
     setError("");
     setMessage("");
+    setStaffSaved("");
     start(async () => {
       const result = await sendLateBusAlert({
         schoolId: selectedSchool,
@@ -109,6 +120,27 @@ export function LateAlertBoard({
       }
       setMessage(result.message);
       setCostRefresh((value) => value + 1);
+    });
+  }
+
+  function saveStaffPhones() {
+    setError("");
+    setMessage("");
+    setStaffSaved("");
+    start(async () => {
+      const result = await saveCompanyLateAlertStaff({
+        schoolId: selectedSchool,
+        phone1,
+        phone2,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setPhone1(result.phones.phone1);
+      setPhone2(result.phones.phone2);
+      setStaffSaved("School staff phones saved. They get the same late-bus text.");
+      setStaffVersion((value) => value + 1);
     });
   }
 
@@ -136,8 +168,9 @@ export function LateAlertBoard({
           </div>
         </div>
         <p className="mt-2 max-w-2xl text-muted">
-          Text parents when a bus or van is running late. Each text is 8¢ —
-          open SMS cost for this week and month by bus or van.
+          Text parents when a bus is running late. Aim uses Bus 4, Bus 5, and
+          the 3rd bus only. Each text is 8¢ — open SMS cost for this week and
+          month by bus.
         </p>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
@@ -155,8 +188,51 @@ export function LateAlertBoard({
         </label>
       </div>
 
+      <section className="rounded-2xl border border-line bg-card p-4">
+        <h2 className="text-sm font-semibold text-navy">
+          School staff texts (optional)
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Up to two phones also get every late-bus text for {schoolName}, so
+          school staff know when parents are notified.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm font-semibold text-navy">
+            Staff phone 1
+            <input
+              type="tel"
+              value={phone1}
+              onChange={(event) => setPhone1(event.target.value)}
+              placeholder="612-555-0100"
+              className="mt-1 block min-h-[44px] w-full rounded-[12px] border border-line bg-white px-3 font-normal"
+            />
+          </label>
+          <label className="block text-sm font-semibold text-navy">
+            Staff phone 2
+            <input
+              type="tel"
+              value={phone2}
+              onChange={(event) => setPhone2(event.target.value)}
+              placeholder="612-555-0101"
+              className="mt-1 block min-h-[44px] w-full rounded-[12px] border border-line bg-white px-3 font-normal"
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={saveStaffPhones}
+          className="mt-3 rounded-full border border-line px-4 py-2 text-sm font-semibold disabled:opacity-60"
+        >
+          {pending ? "Saving…" : "Save staff phones"}
+        </button>
+        {staffSaved ? (
+          <p className="mt-2 text-sm text-green-900">{staffSaved}</p>
+        ) : null}
+      </section>
+
       <section className="rounded-2xl border border-line bg-card p-5">
-        <h2 className="text-sm font-semibold text-navy">1. Select bus or van</h2>
+        <h2 className="text-sm font-semibold text-navy">1. Select bus</h2>
         {rides.length ? (
           <div className="mt-3 flex flex-wrap gap-2">
             {rides.map((ride) => {
@@ -179,7 +255,7 @@ export function LateAlertBoard({
           </div>
         ) : (
           <p className="mt-3 text-sm text-muted">
-            No buses or vans are on file yet for {schoolName}.
+            No Aim buses are on file yet for {schoolName}.
           </p>
         )}
 
@@ -228,8 +304,11 @@ export function LateAlertBoard({
           <div className="mt-6 space-y-3">
             <div className="rounded-xl border border-navy/20 bg-navy/5 px-4 py-3 text-sm text-navy">
               <span className="font-extrabold">{preview.familyCount}</span>{" "}
-              famil{preview.familyCount === 1 ? "y" : "ies"} will receive a
-              text for {preview.rideLabel}
+              famil{preview.familyCount === 1 ? "y" : "ies"}
+              {preview.staffCount
+                ? ` + ${preview.staffCount} school staff`
+                : ""}{" "}
+              will receive a text for {preview.rideLabel}
               {preview.studentCount
                 ? ` (${preview.studentCount} student${
                     preview.studentCount === 1 ? "" : "s"
