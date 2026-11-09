@@ -37,9 +37,8 @@ export function RouteRequestForm({
       <div>
         <h1 className="font-serif text-4xl text-navy">Submit new request</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          Fill the form once. It emails the parent and Minnehaha. The student
-          then shows on Open requests until they assign Bus 4, Bus 5, or the
-          3rd bus.
+          This form is only for students who are new to the school and need a
+          bus.
         </p>
       </div>
 
