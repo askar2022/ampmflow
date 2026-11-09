@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadCompanySchools } from "@/lib/company-access";
 import { LiveGpsBoard } from "@/components/LiveGpsBoard";
+import { fetchOneStepLiveBuses } from "@/lib/onestep-gps";
 import { prisma } from "@/lib/prisma";
 
 export default async function CompanyLiveGpsPage({
@@ -30,17 +31,22 @@ export default async function CompanyLiveGpsPage({
     );
   }
 
-  const routes = await prisma.busRoute.findMany({
-    where: { schoolId: selected.id },
-    select: { number: true },
-    orderBy: { number: "asc" },
-  });
+  const [routes, feed] = await Promise.all([
+    prisma.busRoute.findMany({
+      where: { schoolId: selected.id },
+      select: { number: true },
+      orderBy: { number: "asc" },
+    }),
+    fetchOneStepLiveBuses(),
+  ]);
 
   return (
     <LiveGpsBoard
       schoolName={selected.name}
+      schoolId={selected.id}
       busLabels={routes.map((route) => route.number)}
       audience="company"
+      initialFeed={feed}
     />
   );
 }
