@@ -47,12 +47,12 @@ export default async function RosterPage() {
         <div>
           <h2 className="font-serif text-2xl">Upload students</h2>
           <p className="mt-1 text-sm text-muted">
-            Load the school Excel again if students are already on the list.
-            Teacher and bus from the file are written onto those students and
-            then show on Front Desk and Print list. For Dayib route sheets, the
-            title and run times at the top are skipped — only student names are
-            loaded, from every Bus and Van tab. Stay on this page until you see
-            Finished.
+            Best for NIA: upload one file per ride named like VAN_6.xlsx or
+            Bus_1_AM.xlsx with columns First Name, Last Name, Addr Line1,
+            City/State/Zip, Phone Number, Pickup Time. Check Update existing
+            when you add more vans. If the company only sent AM, the same ride
+            is used for PM so students can go home until a PM list arrives. Stay
+            on this page until you see Finished.
           </p>
           <div className="mt-4">
             <ImportForm />

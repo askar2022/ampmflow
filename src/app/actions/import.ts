@@ -259,6 +259,15 @@ const HEADER_ALIASES = new Set([
   "zip code",
   "enrollment status",
   "source",
+  "addr line1",
+  "addr line 1",
+  "address line 1",
+  "city/state/zip",
+  "city state zip",
+  "phone number",
+  "pickup time",
+  "am pickup",
+  "pm pickup",
 ]);
 
 const POSITIONAL_KEYS = ["id", "student", "grade", "teacher", "room", "am", "pm"];
@@ -305,7 +314,10 @@ function looksLikePersonName(value: string) {
 }
 
 function parseSheetRide(sheetName: string) {
-  const name = cleanSheetName(sheetName);
+  // VAN_6.xlsx, Bus_1_AM, "NIA Academy Van 6 (AM)", etc.
+  const name = cleanSheetName(sheetName)
+    .replace(/\.(xlsx|xls|csv)$/i, "")
+    .replace(/[_-]+/g, " ");
   const trip = /\bPM\b/i.test(name) ? "PM" : /\bAM\b/i.test(name) ? "AM" : null;
   const van = name.match(/\bvan\s*#?\s*([0-9]+)\b/i);
   if (van) {
@@ -411,32 +423,37 @@ function findDayibAddress(cells: string[], name: string) {
 }
 
 function applySheetRide(row: Row, ride: NonNullable<ReturnType<typeof parseSheetRide>>) {
+  // Company often sends AM-only lists. Use the same ride for PM so students
+  // still have a way home until a real PM sheet is uploaded.
   if (ride.kind === "VAN") {
     row.vehicle_name = ride.label;
     row.transportation_type = "VAN";
-    row.am = ride.label;
-    row.pm = ride.label;
-    row.sheet_ride = ride.label;
+    row.sheet_ride = `${ride.label}${ride.trip ? ` ${ride.trip}` : ""}`;
     delete row["bus number"];
     delete row["am bus"];
     delete row["pm bus"];
+    if (ride.trip === "PM") {
+      row.pm = ride.label;
+    } else {
+      row.am = ride.label;
+      row.pm = ride.label;
+      row.pm_from_am = "1";
+    }
     return;
   }
   row.transportation_type = "BUS";
   row.sheet_ride = `${ride.label}${ride.trip ? ` ${ride.trip}` : ""}`;
   delete row.vehicle_name;
-  // Keep AM and PM separate — never copy one trip onto the other.
-  if (ride.trip === "AM") {
-    row.am = ride.label;
-    row["am bus"] = ride.number;
-    delete row.pm;
-    delete row["pm bus"];
-    delete row["bus number"];
-  } else if (ride.trip === "PM") {
+  if (ride.trip === "PM") {
     row.pm = ride.label;
     row["pm bus"] = ride.number;
-    delete row.am;
-    delete row["am bus"];
+    delete row["bus number"];
+  } else if (ride.trip === "AM") {
+    row.am = ride.label;
+    row["am bus"] = ride.number;
+    row.pm = ride.label;
+    row["pm bus"] = ride.number;
+    row.pm_from_am = "1";
     delete row["bus number"];
   } else {
     row["bus number"] = ride.number;
@@ -444,7 +461,99 @@ function applySheetRide(row: Row, ride: NonNullable<ReturnType<typeof parseSheet
     row.pm = ride.label;
     row["am bus"] = ride.number;
     row["pm bus"] = ride.number;
+    row.pm_from_am = "1";
   }
+}
+
+function looksLikeRouteRosterTable(lines: string[][]) {
+  if (!lines.length) return false;
+  const first = lines[0].map((value) => value.trim().toLowerCase());
+  const hasFirst = first.some((value) => value.includes("first name") || value === "first");
+  const hasLast = first.some((value) => value.includes("last name") || value === "last");
+  const hasAddr = first.some(
+    (value) =>
+      value.includes("addr") ||
+      value.includes("address") ||
+      value.includes("phone"),
+  );
+  return hasFirst && hasLast && hasAddr;
+}
+
+function headerIndex(headers: string[], ...wanted: string[]) {
+  const list = headers.map((value) => normHeader(value));
+  for (const key of wanted) {
+    const needle = normHeader(key);
+    const hit = list.findIndex(
+      (header) => header === needle || header.includes(needle),
+    );
+    if (hit >= 0) return hit;
+  }
+  return -1;
+}
+
+/** Clean First/Last/Address/Phone/Pickup tables saved as VAN_6.xlsx, Bus_1_AM.xlsx, etc. */
+function rowsFromRouteRosterTable(
+  lines: string[][],
+  ride: NonNullable<ReturnType<typeof parseSheetRide>>,
+): Row[] {
+  const headers = lines[0].map((value) => value.trim());
+  const firstIdx = headerIndex(headers, "first name", "first", "name (first)");
+  const lastIdx = headerIndex(headers, "last name", "last", "name (last)");
+  const addrIdx = headerIndex(
+    headers,
+    "addr line1",
+    "addr line 1",
+    "address line 1",
+    "address",
+    "home address",
+  );
+  const cityIdx = headerIndex(
+    headers,
+    "city/state/zip",
+    "city state zip",
+    "city",
+    "prim c s z",
+  );
+  const phoneIdx = headerIndex(
+    headers,
+    "phone number",
+    "phone",
+    "parent phone",
+    "primary 1 phone",
+    "prim phone1",
+  );
+  const pickupIdx = headerIndex(headers, "pickup time", "am pickup", "pickup");
+  if (firstIdx < 0 || lastIdx < 0) return [];
+
+  const rows: Row[] = [];
+  for (const line of lines.slice(1)) {
+    const firstName = (line[firstIdx] || "").trim();
+    const lastName = (line[lastIdx] || "").trim();
+    if (!firstName || !lastName) continue;
+    if (/^first$/i.test(firstName) || /^name$/i.test(firstName)) continue;
+    const line1 = addrIdx >= 0 ? (line[addrIdx] || "").trim().replace(/,$/, "") : "";
+    const cityZip = cityIdx >= 0 ? (line[cityIdx] || "").trim() : "";
+    const address = [line1, cityZip].filter(Boolean).join(", ");
+    const phone = phoneIdx >= 0 ? (line[phoneIdx] || "").trim() : "";
+    const pickup = pickupIdx >= 0 ? (line[pickupIdx] || "").trim() : "";
+    const row: Row = {
+      "first name": firstName,
+      "last name": lastName,
+      "home address": address,
+      address,
+      "parent phone": phone,
+      "primary 1 phone": phone,
+      sheet_name: ride.label,
+    };
+    if (pickup) {
+      if (ride.trip === "PM") row["pm pickup"] = pickup;
+      else row["am pickup"] = pickup;
+      if (ride.trip !== "PM") row["pm pickup"] = row["pm pickup"] || pickup;
+    }
+    applySheetRide(row, ride);
+    rows.push(row);
+  }
+  return rows;
 }
 
 function rowsFromDayibRouteSheet(
@@ -519,32 +628,51 @@ function mergeRouteImportRows(rows: Row[]) {
   return [...merged.values()];
 }
 
-function workbookIsRouteBook(workbook: XLSX.WorkBook) {
+function workbookIsRouteBook(workbook: XLSX.WorkBook, fileName = "") {
+  if (parseSheetRide(fileName)) return true;
   // One Bus/Van tab is enough — also covers saving a single sheet as its own file.
   if (workbook.SheetNames.some((name) => Boolean(parseSheetRide(name)))) {
     return true;
   }
   for (const name of workbook.SheetNames.slice(0, 3)) {
     const lines = nonEmptyLines(sheetMatrix(workbook.Sheets[name]));
-    if (looksLikeDayibRouteSheet(lines, name)) return true;
+    if (looksLikeDayibRouteSheet(lines, name) || looksLikeRouteRosterTable(lines)) {
+      return true;
+    }
   }
   return false;
 }
 
-function rowsFromWorkbook(workbook: XLSX.WorkBook): Row[] {
-  if (workbookIsRouteBook(workbook)) {
+function rowsFromRouteSource(
+  sheet: XLSX.WorkSheet,
+  sheetName: string,
+  ride: NonNullable<ReturnType<typeof parseSheetRide>>,
+) {
+  const lines = nonEmptyLines(sheetMatrix(sheet));
+  if (looksLikeRouteRosterTable(lines)) {
+    return rowsFromRouteRosterTable(lines, ride);
+  }
+  const rows = rowsFromDayibRouteSheet(lines, sheetName);
+  for (const row of rows) applySheetRide(row, ride);
+  return rows;
+}
+
+function rowsFromWorkbook(workbook: XLSX.WorkBook, fileName = ""): Row[] {
+  const fileRide = parseSheetRide(fileName);
+  if (workbookIsRouteBook(workbook, fileName)) {
     const collected: Row[] = [];
     for (const name of workbook.SheetNames) {
       const sheet = workbook.Sheets[name];
       if (!sheet) continue;
-      const ride = parseSheetRide(name);
+      const ride = parseSheetRide(name) || fileRide;
       if (!ride) continue;
-      // Always read each Bus/Van tab with that tab's ride — never fall back to
-      // positional columns that would dump everyone onto one bus.
-      const lines = nonEmptyLines(sheetMatrix(sheet));
-      const rows = rowsFromDayibRouteSheet(lines, name);
-      for (const row of rows) applySheetRide(row, ride);
-      collected.push(...rows);
+      collected.push(...rowsFromRouteSource(sheet, name, ride));
+    }
+    // File named VAN_6.xlsx with a generic Sheet1 tab.
+    if (!collected.length && fileRide) {
+      const firstName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[firstName];
+      if (sheet) collected.push(...rowsFromRouteSource(sheet, firstName, fileRide));
     }
     return mergeRouteImportRows(collected);
   }
@@ -681,6 +809,8 @@ async function applyStudentPlans(args: {
   vanName: string;
   daycareId?: string;
   clearMissingTrips?: boolean;
+  amPickupTime?: string;
+  pmPickupTime?: string;
 }) {
   if (args.clearMissingTrips) {
     if (!args.amType) {
@@ -699,6 +829,8 @@ async function applyStudentPlans(args: {
     ["PM", args.pmType, args.pmBus, args.pmDest],
   ] as const) {
     if (!type) continue;
+    const pickupTime =
+      trip === "AM" ? args.amPickupTime || "" : args.pmPickupTime || "";
     if (type === "VAN") {
       const vanLabel = args.vanName || "Van";
       await prisma.transportationAssignment.upsert({
@@ -711,6 +843,7 @@ async function applyStudentPlans(args: {
           busRouteId: null,
           waitingForAssignment: false,
           notes: vanLabel,
+          pickupTime,
           updatedById: args.userId,
         },
         update: {
@@ -719,6 +852,7 @@ async function applyStudentPlans(args: {
           busRouteId: null,
           waitingForAssignment: false,
           notes: vanLabel,
+          pickupTime,
           updatedById: args.userId,
         },
       });
@@ -753,6 +887,7 @@ async function applyStudentPlans(args: {
         busRouteId: type === "BUS" ? route?.id : null,
         daycareId: dest === "DAYCARE" ? args.daycareId : null,
         waitingForAssignment: type === "BUS" && !route,
+        pickupTime,
         updatedById: args.userId,
       },
       update: {
@@ -762,6 +897,7 @@ async function applyStudentPlans(args: {
         busRouteId: type === "BUS" ? route?.id : null,
         daycareId: dest === "DAYCARE" ? args.daycareId : null,
         waitingForAssignment: type === "BUS" && !route,
+        pickupTime,
         updatedById: args.userId,
       },
     });
@@ -884,12 +1020,12 @@ export async function importStudents(formData: FormData) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  const rows = rowsFromWorkbook(workbook);
+  const rows = rowsFromWorkbook(workbook, file.name || "");
   if (!rows.length) {
     return {
       ok: false,
       error:
-        "No student rows found. For Dayib route sheets, load starts at the student names — not the title or run times at the top.",
+        "No student rows found. Name the file like VAN_6.xlsx or Bus_1_AM.xlsx, with First Name, Last Name, address, phone, and Pickup Time columns.",
     };
   }
 
@@ -1111,6 +1247,10 @@ export async function importStudents(formData: FormData) {
       cell(row, "pm_bus", "pm bus") ||
       pmPlan.bus ||
       (!splitTrips ? amBus : "");
+    const amPickupTime = cell(row, "am pickup", "pickup time", "am_pickup");
+    const pmPickupTime =
+      cell(row, "pm pickup", "pm_pickup") ||
+      (row.pm_from_am === "1" ? amPickupTime : "");
     const amDest =
       cell(row, "am_destination").toUpperCase() || amPlan.dest || "HOME";
     const pmDest =
@@ -1216,6 +1356,8 @@ export async function importStudents(formData: FormData) {
         pmDest,
         vanName,
         clearMissingTrips: splitTrips,
+        amPickupTime,
+        pmPickupTime,
       });
       await prisma.student
         .update({
@@ -1411,6 +1553,8 @@ export async function importStudents(formData: FormData) {
       vanName,
       daycareId,
       clearMissingTrips: splitTrips,
+      amPickupTime,
+      pmPickupTime,
     });
     } catch (error) {
       errors.push(
@@ -1521,7 +1665,7 @@ async function rowsFromUpload(
 ) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  return rowsFromWorkbook(workbook).map((row) => {
+  return rowsFromWorkbook(workbook, file.name || "").map((row) => {
     const names = studentNamesFromRow(row);
     const firstName = names.first;
     const lastName = names.last;
