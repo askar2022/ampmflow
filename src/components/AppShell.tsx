@@ -18,7 +18,7 @@ const NAV: { href: string; label: string; roles: SessionUser["role"][] }[] = [
   { href: "/gps-report", label: "GPS Report", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
   { href: "/analytics", label: "Analytics", roles: ["COORDINATOR", "ADMINISTRATOR"] },
   { href: "/buses", label: "Roster", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK"] },
-  { href: "/print", label: "Reports", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK", "TEACHER"] },
+  { href: "/print", label: "Print list", roles: ["COORDINATOR", "ADMINISTRATOR", "FRONT_DESK", "TEACHER"] },
   { href: "/company", label: "Today’s Changes", roles: ["BUS_COMPANY"] },
   { href: "/company/alerts", label: "Late Bus Alert", roles: ["BUS_COMPANY"] },
   { href: "/company/gps", label: "Live GPS", roles: ["BUS_COMPANY"] },

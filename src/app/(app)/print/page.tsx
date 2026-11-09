@@ -15,11 +15,13 @@ export default async function PrintPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-serif text-4xl text-navy">Reports</h1>
+        <h1 className="font-serif text-4xl text-navy">
+          Print list · bus company
+        </h1>
         <p className="mt-2 max-w-3xl text-muted">
           {lists.aimSchool
-            ? "Select Bus 4, Bus 5, or the 3rd bus to view its student roster. You can print the roster or email it to the driver. Parent Pickup students are excluded."
-            : "Select a bus or van to view its student roster. You can print the roster or email it directly to the driver. Parent Pickup students are excluded."}
+            ? "Print or email each Aim bus roster for Minnehaha (Bus 4, Bus 5, or the 3rd bus). Full school numbers stay on Analytics. Parent Pickup students are excluded."
+            : "Print or email each bus roster for the bus company. Full school numbers stay on Analytics. Parent Pickup students are excluded."}
         </p>
       </div>
 
