@@ -34,6 +34,27 @@ model School {
   gateStatuses   GateDayStatus[]
   gateHistory    GateStatusHistory[]
   gradeConfirms  GradeDismissalConfirm[]
+  gpsBusLogs     GpsBusLog[]
+}
+
+model GpsBusLog {
+  id         String   @id @default(cuid())
+  schoolId   String
+  company    String   @default("Minnehaha")
+  busLabel   String
+  eventType  String
+  status     String   @default("")
+  miles      Float?
+  etaMinutes Int?
+  lat        Float?
+  lng        Float?
+  dayKey     String
+  trip       String   @default("AM")
+  recordedAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([schoolId, dayKey, recordedAt(sort: Desc)])
 }
 
 model User {
@@ -298,14 +319,16 @@ model AuditLog {
 }
 
 model SchoolSettings {
-  id                String @id @default(cuid())
-  schoolId          String @unique
-  changeDeadline    String @default("14:15")
-  snapshotTime      String @default("14:45")
-  weeklyReportTime  String @default("12:00")
-  opsChangeEmails   String @default("")
-  leadershipEmails  String @default("")
-  school            School @relation(fields: [schoolId], references: [id])
+  id                   String @id @default(cuid())
+  schoolId             String @unique
+  changeDeadline       String @default("14:15")
+  snapshotTime         String @default("14:45")
+  weeklyReportTime     String @default("12:00")
+  opsChangeEmails      String @default("")
+  leadershipEmails     String @default("")
+  lateAlertStaffPhone1 String @default("")
+  lateAlertStaffPhone2 String @default("")
+  school               School @relation(fields: [schoolId], references: [id])
 }
 
 model ChangeEvent {

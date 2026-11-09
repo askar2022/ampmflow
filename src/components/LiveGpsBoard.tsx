@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { loadLiveGpsFeed } from "@/app/actions/gps";
+import {
+  loadGpsArrivalHistory,
+  loadLiveGpsFeed,
+} from "@/app/actions/gps";
 import type { LiveBusPoint, LiveGpsFeed } from "@/lib/onestep-gps";
 import { LiveGpsMap, type MapMarker } from "@/components/LiveGpsMap";
 
@@ -14,7 +17,18 @@ type BoardBus = {
   pending?: boolean;
   lat?: number | null;
   lng?: number | null;
+  updatedAt?: string | null;
   map: { left: string; top: string };
+};
+
+type ArrivalRow = {
+  id: string;
+  company: string;
+  busLabel: string;
+  trip: string;
+  dayKey: string;
+  stamp: string;
+  recordedAt: string;
 };
 
 const AIM_PIN = { lat: 44.950661, lng: -93.257431 };
@@ -52,19 +66,47 @@ const SAMPLE: BoardBus[] = [
   },
 ];
 
+function formatBusClock(iso?: string | null) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(d);
+}
+
 export function LiveGpsBoard({
   schoolName,
   schoolId,
   audience = "school",
   initialFeed = null,
+  initialStamp = "",
+  initialDayKey = "",
+  initialArrivals = [],
+  initialArrivalDays = [],
 }: {
   schoolName: string;
   schoolId?: string;
   busLabels?: string[];
   audience?: "school" | "company";
   initialFeed?: LiveGpsFeed | null;
+  initialStamp?: string;
+  initialDayKey?: string;
+  initialArrivals?: ArrivalRow[];
+  initialArrivalDays?: Array<{ dayKey: string; count: number }>;
 }) {
   const [feed, setFeed] = useState<LiveGpsFeed | null>(initialFeed);
+  const [stamp, setStamp] = useState(initialStamp);
+  const [arrivals, setArrivals] = useState<ArrivalRow[]>(initialArrivals);
+  const [arrivalDays, setArrivalDays] = useState(initialArrivalDays);
+  const [historyDay, setHistoryDay] = useState(
+    initialDayKey || initialArrivalDays[0]?.dayKey || "",
+  );
   const [error, setError] = useState(initialFeed?.error || "");
   const [pending, start] = useTransition();
   const liveBuses =
@@ -73,6 +115,14 @@ export function LiveGpsBoard({
   const buses: Array<BoardBus | LiveBusPoint> = feed?.buses?.length
     ? feed.buses
     : SAMPLE;
+
+  const arrivalByBus = useMemo(() => {
+    const map = new Map<string, ArrivalRow>();
+    for (const row of arrivals) {
+      if (!map.has(row.busLabel)) map.set(row.busLabel, row);
+    }
+    return map;
+  }, [arrivals]);
 
   const mapMarkers = useMemo(() => {
     const markers: MapMarker[] = [];
@@ -109,7 +159,23 @@ export function LiveGpsBoard({
         return;
       }
       setFeed(result.feed);
+      setStamp(result.stamp);
+      setArrivals(result.arrivals);
+      setArrivalDays(result.arrivalDays);
+      if (!historyDay) setHistoryDay(result.dayKey);
       setError(result.feed.error || "");
+    });
+  }
+
+  function loadHistory(dayKey: string) {
+    setHistoryDay(dayKey);
+    start(async () => {
+      const result = await loadGpsArrivalHistory({ schoolId, dayKey });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setArrivals(result.arrivals);
     });
   }
 
@@ -128,6 +194,9 @@ export function LiveGpsBoard({
           <p className="mt-1 text-muted">
             {schoolName} · Minnehaha’s 3 Aim buses
           </p>
+          {stamp ? (
+            <p className="mt-1 text-sm font-medium text-navy">{stamp}</p>
+          ) : null}
         </div>
         {live ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900">
@@ -145,7 +214,9 @@ export function LiveGpsBoard({
 
       <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
         Minnehaha operates three Aim buses. Bus 4 and Bus 5 have GPS units now.
-        The 3rd bus slot stays until they send that unit number.
+        The 3rd bus slot stays until they send that unit number. Arrival times
+        are saved automatically when a bus reaches school so you can look them
+        up later.
         {pending ? " Updating…" : ""}
       </p>
 
@@ -195,6 +266,11 @@ export function LiveGpsBoard({
             <ul className="space-y-2">
               {buses.map((bus) => {
                 const isPending = Boolean(bus.pending);
+                const clock =
+                  formatBusClock(bus.updatedAt) ||
+                  formatBusClock(feed?.fetchedAt) ||
+                  stamp;
+                const arrival = arrivalByBus.get(bus.label);
                 return (
                   <li
                     key={bus.id}
@@ -241,6 +317,13 @@ export function LiveGpsBoard({
                         <>Sample ETA · {bus.status}</>
                       )}
                     </p>
+                    {!isPending && clock ? (
+                      <p className="mt-1.5 text-xs font-medium text-muted">
+                        {bus.status === "At school" && arrival
+                          ? `Arrived ${arrival.stamp}`
+                          : `As of ${clock}`}
+                      </p>
+                    ) : null}
                   </li>
                 );
               })}
@@ -251,6 +334,70 @@ export function LiveGpsBoard({
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-extrabold uppercase tracking-wide text-navy">
+              Arrival log
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Saved when a bus reaches school (AM and PM). Use the day dropdown
+              to go back. Full pickup / drop-off history is on GPS Report.
+            </p>
+          </div>
+          <label className="text-sm font-semibold text-navy">
+            History day
+            <select
+              className="ml-2 min-h-[40px] rounded-lg border border-line bg-white px-3 py-2 font-medium"
+              value={historyDay || arrivalDays[0]?.dayKey || ""}
+              onChange={(e) => loadHistory(e.target.value)}
+            >
+              {[
+                ...new Map(
+                  [
+                    ...(historyDay ? [{ dayKey: historyDay, count: 0 }] : []),
+                    ...arrivalDays,
+                  ].map((d) => [d.dayKey, d]),
+                ).values(),
+              ]
+                .sort((a, b) => b.dayKey.localeCompare(a.dayKey))
+                .map((day) => (
+                  <option key={day.dayKey} value={day.dayKey}>
+                    {day.dayKey}
+                    {day.count ? ` · ${day.count}` : ""}
+                  </option>
+                ))}
+            </select>
+          </label>
+        </div>
+
+        {arrivals.length ? (
+          <ul className="mt-3 divide-y divide-line rounded-xl border border-line bg-white">
+            {arrivals.map((row) => (
+              <li
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm"
+              >
+                <span className="font-semibold text-navy">
+                  {row.company} · {row.busLabel} · {row.trip}
+                </span>
+                <span className="text-muted">{row.stamp}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-3 rounded-xl border border-dashed border-line bg-paper px-3 py-4 text-sm text-muted">
+            No arrivals saved for this day yet. When a live bus reaches school,
+            the time is stored here automatically.
+          </p>
+        )}
+        <p className="mt-2 text-xs text-muted">
+          {audience === "company"
+            ? "Use this log when the school asks what time each bus arrived."
+            : "Use this log when you need to show the bus company arrival times."}
+        </p>
       </section>
     </div>
   );

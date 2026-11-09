@@ -1,3 +1,4 @@
+import { ensureAimFleetVehicles, isAimSchool } from "./aim-fleet";
 import { formatLongDate, schoolNow } from "./dates";
 import { planSummary } from "./format";
 import { loadVehicles } from "./gate";
@@ -6,6 +7,13 @@ import { prisma } from "./prisma";
 import { groupByBus, stamp } from "./reports";
 import { loadStudents } from "./transportation";
 import type { EffectiveStudent } from "./types";
+
+function isVanVehicle(vehicle: { name: string; vehicleType: string }) {
+  return (
+    vehicle.vehicleType.toUpperCase() === "VAN" ||
+    /^van\b/i.test(vehicle.name.trim())
+  );
+}
 
 export type VanRider = {
   id: string;
@@ -48,6 +56,11 @@ export type DriverVan = {
   driverName?: string;
 };
 
+/** Named fleet rows selected by vehicleId (Aim Bus 4/5/3rd bus, or true vans elsewhere). */
+export type DriverFleetVehicle = DriverVan & {
+  kind: "bus" | "van";
+};
+
 export function studentBusNumbers(student: EffectiveStudent) {
   return [
     ...new Set(
@@ -78,10 +91,7 @@ export async function loadRidership(schoolId: string): Promise<Ridership> {
     .filter(([, riders]) => riders.length)
     .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
 
-  const vans = vehicles.filter(
-    (vehicle) =>
-      vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
-  );
+  const vans = vehicles.filter((vehicle) => isVanVehicle(vehicle));
   const vanIds = vans.map((vehicle) => vehicle.id);
   const vanStudents = vanIds.length
     ? await prisma.student.findMany({
@@ -163,7 +173,13 @@ export function ridershipText(list: Ridership) {
 }
 
 export async function loadDriverLists(schoolId: string) {
-  const [students, vehicles, vanRows] = await Promise.all([
+  const school = await prisma.school.findUnique({
+    where: { id: schoolId },
+    select: { name: true },
+  });
+  const aim = isAimSchool(school?.name);
+
+  const [students, loadedVehicles, vanRows] = await Promise.all([
     loadStudents(schoolId),
     loadVehicles(schoolId).catch(() => []),
     prisma.student.findMany({
@@ -171,24 +187,38 @@ export async function loadDriverLists(schoolId: string) {
       select: { id: true, vehicleId: true },
     }),
   ]);
+  const vehicles = aim
+    ? await ensureAimFleetVehicles(schoolId).catch(() => loadedVehicles)
+    : loadedVehicles;
+
   const vanByStudent = new Map(
     vanRows.map((row) => [row.id, row.vehicleId] as const),
   );
-  const vans = vehicles
-    .filter(
-      (vehicle) =>
-        vehicle.vehicleType.toUpperCase() === "VAN" || /van/i.test(vehicle.name),
-    )
+
+  // Aim has no vans — Minnehaha fleet is Bus 4, Bus 5, and 3rd bus.
+  // Other schools keep vehicleId rows that are true vans.
+  const fleetVehicles: DriverFleetVehicle[] = vehicles
+    .filter((vehicle) => (aim ? !isVanVehicle(vehicle) : isVanVehicle(vehicle)))
     .map((vehicle) => ({
       id: vehicle.id,
       name: vehicle.name,
       driverName: vehicle.driverName || "",
+      kind: isVanVehicle(vehicle) ? ("van" as const) : ("bus" as const),
     }));
+
+  // Keep `vans` for older callers; Aim fills this with the three buses.
+  const vans = fleetVehicles.map(({ id, name, driverName }) => ({
+    id,
+    name,
+    driverName,
+  }));
+
   const busDrivers: Record<string, string> = {};
   for (const vehicle of vehicles) {
-    const isBus =
-      vehicle.vehicleType.toUpperCase() === "BUS" && !/van/i.test(vehicle.name);
-    if (!isBus) continue;
+    if (isVanVehicle(vehicle)) continue;
+    if (vehicle.vehicleType.toUpperCase() !== "BUS" && !/^bus\b/i.test(vehicle.name)) {
+      continue;
+    }
     const number = vehicle.name.replace(/^Bus\s+/i, "").trim();
     if (number) busDrivers[number] = vehicle.driverName || "";
   }
@@ -204,10 +234,19 @@ export async function loadDriverLists(schoolId: string) {
     buses: studentBusNumbers(student),
     vanId: vanByStudent.get(student.id) || null,
   }));
-  const buses = [
+  const routeBuses = [
     ...new Set(riders.flatMap((rider) => rider.buses)),
   ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  return { riders, buses, vans, busDrivers };
+  // Aim Reports uses the Minnehaha fleet rows (Bus 4 / Bus 5 / 3rd bus), not van slots.
+  const buses = aim ? [] : routeBuses;
+  return {
+    riders,
+    buses,
+    vans,
+    fleetVehicles,
+    busDrivers,
+    aimSchool: aim,
+  };
 }
 
 export function oneVehicleText(args: {

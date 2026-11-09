@@ -290,18 +290,25 @@ function pendingAimBus(): LiveBusPoint {
 
 export function withAimFleetSlots(buses: LiveBusPoint[]): LiveBusPoint[] {
   const byLabel = new Map(buses.map((bus) => [bus.label, bus]));
-  const ordered: LiveBusPoint[] = [];
-  for (const label of trackedBusLabels()) {
-    const live = byLabel.get(label);
-    if (live) ordered.push(live);
-  }
-  for (const bus of buses) {
-    if (!ordered.some((row) => row.id === bus.id)) ordered.push(bus);
-  }
-  if (!ordered.some((bus) => bus.label === AIM_GPS_PENDING_LABEL)) {
-    ordered.push(pendingAimBus());
-  }
-  return ordered;
+  // Aim / Minnehaha: only the three fleet slots — never extra OneStep units.
+  return AIM_GPS_FLEET.map((label) => {
+    if (label === AIM_GPS_PENDING_LABEL) {
+      return byLabel.get(label) || pendingAimBus();
+    }
+    return (
+      byLabel.get(label) || {
+        id: `missing-${label}`,
+        label,
+        lat: null,
+        lng: null,
+        miles: null,
+        etaMinutes: null,
+        status: "No signal" as const,
+        updatedAt: null,
+        map: { left: "50%", top: "50%" },
+      }
+    );
+  });
 }
 
 function deviceDisplayName(device: Record<string, unknown>) {

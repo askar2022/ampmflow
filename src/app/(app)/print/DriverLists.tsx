@@ -56,11 +56,13 @@ export function DriverLists({
   buses,
   vans,
   busDrivers = {},
+  aimSchool = false,
 }: {
   riders: DriverRider[];
   buses: string[];
   vans: DriverVan[];
   busDrivers?: Record<string, string>;
+  aimSchool?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Selected>(null);
@@ -155,7 +157,9 @@ export function DriverLists({
               setSelected(null);
               setMessage("");
             }}
-            placeholder="Bus 1 or Van 1"
+            placeholder={
+              aimSchool ? "Bus 4, Bus 5, or 3rd bus" : "Bus 1 or Van 1"
+            }
             className="mt-2 min-h-[44px] w-full rounded-[12px] border border-line bg-paper px-4 text-base font-medium text-navy outline-none focus:border-teal"
           />
         </label>
@@ -187,8 +191,9 @@ export function DriverLists({
         </div>
         {!buses.length && !vans.length ? (
           <p className="mt-3 text-sm text-muted">
-            No bus or van assignments yet. Save a bus number on Front Desk, or
-            assign a van, then search here.
+            {aimSchool
+              ? "No bus assignments yet. Assign students to Bus 4, Bus 5, or the 3rd bus, then search here."
+              : "No bus or van assignments yet. Save a bus number on Front Desk, or assign a van, then search here."}
           </p>
         ) : null}
       </section>
@@ -321,7 +326,9 @@ export function DriverLists({
             No vehicle selected
           </h2>
           <p className="mt-2 text-sm text-muted">
-            Choose a bus or van above to view its student roster.
+            {aimSchool
+              ? "Choose Bus 4, Bus 5, or the 3rd bus above to view its student roster."
+              : "Choose a bus or van above to view its student roster."}
           </p>
         </section>
       )}
