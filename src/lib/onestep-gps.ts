@@ -27,6 +27,7 @@ export type LiveGpsFeed = {
   school: { lat: number; lng: number } | null;
   buses: LiveBusPoint[];
   fetchedAt: string;
+  debug?: string;
 };
 
 function apiKey() {
@@ -49,13 +50,20 @@ export function schoolGpsPoint(): { lat: number; lng: number } | null {
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object"
+  return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
 }
 
 function num(...values: unknown[]) {
   for (const value of values) {
+    if (typeof value === "string" && value.includes(",")) {
+      const [a, b] = value.split(",").map((part) => Number(part.trim()));
+      if (Number.isFinite(a) && Number.isFinite(b)) {
+        // Prefer lat,lng order when both look valid.
+        if (Math.abs(a) <= 90 && Math.abs(b) <= 180) return a;
+      }
+    }
     const n = Number(value);
     if (Number.isFinite(n)) return n;
   }
@@ -65,6 +73,7 @@ function num(...values: unknown[]) {
 function text(...values: unknown[]) {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   return "";
 }
@@ -73,38 +82,127 @@ function extractDevices(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   const row = asRecord(payload);
   if (!row) return [];
-  for (const key of ["result", "results", "devices", "data", "rows"]) {
-    if (Array.isArray(row[key])) return row[key] as unknown[];
+  for (const key of [
+    "result",
+    "results",
+    "devices",
+    "data",
+    "rows",
+    "items",
+    "list",
+  ]) {
+    const value = row[key];
+    if (Array.isArray(value)) return value;
+    const nested = asRecord(value);
+    if (nested) {
+      for (const inner of ["result", "results", "devices", "data", "rows"]) {
+        if (Array.isArray(nested[inner])) return nested[inner] as unknown[];
+      }
+    }
   }
   return [];
 }
 
+function deepLatLng(
+  value: unknown,
+  depth = 0,
+): { lat: number; lng: number } | null {
+  if (value == null || depth > 5) return null;
+
+  if (Array.isArray(value)) {
+    if (
+      value.length >= 2 &&
+      typeof value[0] === "number" &&
+      typeof value[1] === "number"
+    ) {
+      const a = value[0];
+      const b = value[1];
+      // GeoJSON is often [lng, lat]
+      if (Math.abs(b) <= 90 && Math.abs(a) <= 180) return { lat: b, lng: a };
+      if (Math.abs(a) <= 90 && Math.abs(b) <= 180) return { lat: a, lng: b };
+    }
+    for (const item of value) {
+      const found = deepLatLng(item, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const row = asRecord(value);
+  if (!row) return null;
+
+  const lat = num(
+    row.lat,
+    row.latitude,
+    row.Latitude,
+    row.LAT,
+    row.y,
+    row.Y,
+  );
+  const lng = num(
+    row.lng,
+    row.lon,
+    row.long,
+    row.longitude,
+    row.Longitude,
+    row.LNG,
+    row.LON,
+    row.x,
+    row.X,
+  );
+  if (
+    lat != null &&
+    lng != null &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180 &&
+    !(lat === 0 && lng === 0)
+  ) {
+    return { lat, lng };
+  }
+
+  if (typeof row.lat_lng === "string" || typeof row.latlng === "string") {
+    const raw = String(row.lat_lng || row.latlng);
+    const [a, b] = raw.split(",").map((part) => Number(part.trim()));
+    if (Number.isFinite(a) && Number.isFinite(b) && Math.abs(a) <= 90) {
+      return { lat: a, lng: b };
+    }
+  }
+
+  for (const key of [
+    "latest_device_point",
+    "latest_point",
+    "latestPoint",
+    "last_point",
+    "point",
+    "location",
+    "gps",
+    "position",
+    "coords",
+    "coordinates",
+  ]) {
+    if (key in row) {
+      const found = deepLatLng(row[key], depth + 1);
+      if (found) return found;
+    }
+  }
+
+  for (const child of Object.values(row)) {
+    if (child && typeof child === "object") {
+      const found = deepLatLng(child, depth + 1);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function extractPoint(device: Record<string, unknown>) {
+  const point = deepLatLng(device);
+  if (!point) return null;
   const nested =
     asRecord(device.latest_device_point) ||
     asRecord(device.latest_point) ||
     asRecord(device.latestPoint) ||
-    asRecord(device.point) ||
-    asRecord(device.location) ||
     device;
-
-  const lat = num(
-    nested?.lat,
-    nested?.latitude,
-    nested?.y,
-    device.lat,
-    device.latitude,
-  );
-  const lng = num(
-    nested?.lng,
-    nested?.lon,
-    nested?.longitude,
-    nested?.x,
-    device.lng,
-    device.longitude,
-  );
-  if (lat == null || lng == null) return null;
-
   const updatedAt =
     text(
       nested?.dt_tracker,
@@ -115,14 +213,12 @@ function extractPoint(device: Record<string, unknown>) {
       device.dt_tracker,
       device.updated_at,
     ) || null;
-
-  return { lat, lng, updatedAt };
+  return { ...point, updatedAt };
 }
 
 /**
  * Aim Academy (Minnehaha): OneStep unit numbers → school bus labels.
  * 1038 = Bus 5, 1119 = Bus 4. Third bus will be added when the company sends it.
- * Override/extend with ONESTEP_BUS_MAP like: 1038=Bus 5,1119=Bus 4
  */
 function busLabelMap() {
   const defaults: Record<string, string> = {
@@ -140,7 +236,6 @@ function busLabelMap() {
   return defaults;
 }
 
-/** School bus labels currently wired from OneStep (Aim: Bus 4 + Bus 5). */
 export function trackedBusLabels() {
   return [...new Set(Object.values(busLabelMap()))].sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true }),
@@ -162,7 +257,6 @@ function pendingAimBus(): LiveBusPoint {
   };
 }
 
-/** Always show Aim’s 3-bus fleet: live units + pending slot until unit # arrives. */
 export function withAimFleetSlots(buses: LiveBusPoint[]): LiveBusPoint[] {
   const byLabel = new Map(buses.map((bus) => [bus.label, bus]));
   const ordered: LiveBusPoint[] = [];
@@ -170,7 +264,6 @@ export function withAimFleetSlots(buses: LiveBusPoint[]): LiveBusPoint[] {
     const live = byLabel.get(label);
     if (live) ordered.push(live);
   }
-  // Keep any unexpected mapped buses, then the pending third seat.
   for (const bus of buses) {
     if (!ordered.some((row) => row.id === bus.id)) ordered.push(bus);
   }
@@ -180,51 +273,35 @@ export function withAimFleetSlots(buses: LiveBusPoint[]): LiveBusPoint[] {
   return ordered;
 }
 
+function deviceDisplayName(device: Record<string, unknown>) {
+  return text(
+    device.display_name,
+    device.displayName,
+    device.name,
+    device.device_name,
+    device.deviceName,
+    device.label,
+    device.plate_number,
+    device.vin_name,
+    device.device_id,
+    device.id,
+  );
+}
+
 function mappedDeviceLabel(device: Record<string, unknown>) {
   const map = busLabelMap();
-  for (const token of deviceTokens(device)) {
-    const mapped = map[token] || map[token.replace(/\D/g, "")];
-    if (mapped) return mapped;
+  const blob = JSON.stringify(device).toLowerCase();
+
+  // Strong match on known unit numbers anywhere in the device payload.
+  for (const [unit, label] of Object.entries(map)) {
+    if (blob.includes(unit.toLowerCase())) return label;
   }
+
+  const name = deviceDisplayName(device).toLowerCase();
+  if (/\bbus\s*4\b/.test(name) || name === "4") return "Bus 4";
+  if (/\bbus\s*5\b/.test(name) || name === "5") return "Bus 5";
+
   return "";
-}
-
-function deviceTokens(device: Record<string, unknown>) {
-  return [
-    text(device.id, device.device_id, device.deviceId, device.imei),
-    text(
-      device.display_name,
-      device.displayName,
-      device.name,
-      device.device_name,
-      device.deviceName,
-      device.label,
-      device.plate_number,
-      device.vin_name,
-    ),
-  ]
-    .filter(Boolean)
-    .flatMap((value) => {
-      const digits = value.match(/\d{3,}/g) || [];
-      return [value, value.toLowerCase(), ...digits];
-    });
-}
-
-function deviceLabel(device: Record<string, unknown>, index: number) {
-  return (
-    mappedDeviceLabel(device) ||
-    text(
-      device.display_name,
-      device.displayName,
-      device.name,
-      device.device_name,
-      device.deviceName,
-      device.label,
-      device.plate_number,
-      device.vin_name,
-    ) ||
-    `Bus ${index + 1}`
-  );
 }
 
 function statusForMiles(miles: number | null): LiveBusPoint["status"] {
@@ -237,7 +314,6 @@ function statusForMiles(miles: number | null): LiveBusPoint["status"] {
 function etaFromMiles(miles: number | null) {
   if (miles == null) return null;
   if (miles <= 0.15) return 0;
-  // Rough city average ~15 mph for arrival estimate.
   return Math.max(1, Math.round((miles / 15) * 60));
 }
 
@@ -279,6 +355,58 @@ function projectMap(
   });
 }
 
+async function requestDevices(key: string) {
+  const attempts: Array<{ label: string; url: string; headers?: HeadersInit }> =
+    [
+      {
+        label: "query-api-key",
+        url: `${ONESTEP_DEVICES_URL}&api-key=${encodeURIComponent(key)}`,
+      },
+      {
+        label: "query-api_key",
+        url: `${ONESTEP_DEVICES_URL}&api_key=${encodeURIComponent(key)}`,
+      },
+      {
+        label: "header-x-api-key",
+        url: ONESTEP_DEVICES_URL,
+        headers: { "X-API-Key": key, Accept: "application/json" },
+      },
+    ];
+
+  let lastError = "";
+  for (const attempt of attempts) {
+    const response = await fetch(attempt.url, {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        ...(attempt.headers || {}),
+      },
+    });
+    const raw = await response.text();
+    if (!response.ok) {
+      lastError = `${attempt.label} → ${response.status}: ${raw.slice(0, 100)}`;
+      continue;
+    }
+    let payload: unknown = null;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      lastError = `${attempt.label} → not JSON: ${raw.slice(0, 100)}`;
+      continue;
+    }
+    const devices = extractDevices(payload);
+    if (devices.length) {
+      return { devices, via: attempt.label, rawPreview: raw.slice(0, 240) };
+    }
+    // Accept empty array as a valid successful response.
+    if (Array.isArray(payload) || asRecord(payload)) {
+      return { devices, via: attempt.label, rawPreview: raw.slice(0, 240) };
+    }
+    lastError = `${attempt.label} → unexpected shape`;
+  }
+  throw new Error(lastError || "OneStep GPS request failed.");
+}
+
 export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
   const fetchedAt = new Date().toISOString();
   const school = schoolGpsPoint();
@@ -288,34 +416,15 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       configured: false,
       live: false,
       school,
-      buses: [],
+      buses: withAimFleetSlots([]),
       fetchedAt,
       error: "ONESTEP_GPS_API_KEY is not set in Vercel.",
     };
   }
 
   try {
-    const url = `${ONESTEP_DEVICES_URL}&api-key=${encodeURIComponent(key)}`;
-    const response = await fetch(url, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      return {
-        configured: true,
-        live: false,
-        school,
-        buses: [],
-        fetchedAt,
-        error: `OneStep GPS returned ${response.status}${
-          body ? `: ${body.slice(0, 120)}` : ""
-        }`,
-      };
-    }
-
-    const payload = (await response.json().catch(() => null)) as unknown;
-    const devices = extractDevices(payload);
+    const { devices, via, rawPreview } = await requestDevices(key);
+    const names: string[] = [];
     const parsed: Array<{
       id: string;
       label: string;
@@ -323,15 +432,17 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       lng: number;
       updatedAt: string | null;
     }> = [];
+    let withPoints = 0;
 
     devices.forEach((item, index) => {
       const device = asRecord(item);
       if (!device) return;
-      const label = mappedDeviceLabel(device);
-      // Only show buses we have mapped (Aim: Bus 4 + Bus 5 for now).
-      if (!label) return;
+      const name = deviceDisplayName(device) || `device-${index + 1}`;
+      names.push(name);
       const point = extractPoint(device);
-      if (!point) return;
+      if (point) withPoints += 1;
+      const label = mappedDeviceLabel(device);
+      if (!label || !point) return;
       parsed.push({
         id: text(device.id, device.device_id, device.imei) || `device-${index}`,
         label,
@@ -341,12 +452,19 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       });
     });
 
+    // De-dupe by bus label (prefer first).
+    const unique = new Map<string, (typeof parsed)[number]>();
+    for (const row of parsed) {
+      if (!unique.has(row.label)) unique.set(row.label, row);
+    }
+    const uniqueRows = [...unique.values()];
+
     const maps = projectMap(
-      parsed.map((row) => ({ lat: row.lat, lng: row.lng })),
+      uniqueRows.map((row) => ({ lat: row.lat, lng: row.lng })),
       school,
     );
 
-    const liveBuses: LiveBusPoint[] = parsed.map((row, index) => {
+    const liveBuses: LiveBusPoint[] = uniqueRows.map((row, index) => {
       const miles = school
         ? Number(milesBetween(school, row).toFixed(1))
         : null;
@@ -363,16 +481,17 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       };
     });
 
-    liveBuses.sort((a, b) => {
-      if (a.etaMinutes == null && b.etaMinutes == null) {
-        return a.label.localeCompare(b.label, undefined, { numeric: true });
-      }
-      if (a.etaMinutes == null) return 1;
-      if (b.etaMinutes == null) return -1;
-      return a.etaMinutes - b.etaMinutes;
-    });
+    liveBuses.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
 
     const buses = withAimFleetSlots(liveBuses);
+    let error: string | undefined;
+    if (!devices.length) {
+      error =
+        "OneStep connected, but returned 0 devices. Ask Minnehaha to confirm the API key includes Aim Bus 4 (1119) and Bus 5 (1038).";
+    } else if (!liveBuses.length) {
+      const sample = names.slice(0, 8).join(", ") || "unnamed";
+      error = `OneStep returned ${devices.length} device(s), ${withPoints} with GPS points, but none matched unit 1038/1119 yet. Devices seen: ${sample}.`;
+    }
 
     return {
       configured: true,
@@ -380,13 +499,15 @@ export async function fetchOneStepLiveBuses(): Promise<LiveGpsFeed> {
       school,
       buses,
       fetchedAt,
+      error,
+      debug: `via=${via}; devices=${devices.length}; points=${withPoints}; matched=${liveBuses.length}; preview=${rawPreview}`,
     };
   } catch (error) {
     return {
       configured: true,
       live: false,
       school,
-      buses: [],
+      buses: withAimFleetSlots([]),
       fetchedAt,
       error:
         error instanceof Error

@@ -101,7 +101,8 @@ export function LiveGpsBoard({
   const liveBuses =
     feed?.buses.filter((bus) => !bus.pending && bus.lat != null) || [];
   const live = Boolean(feed?.live && liveBuses.length);
-  const buses: Array<BoardBus | LiveBusPoint> = live ? feed!.buses : SAMPLE;
+  const buses: Array<BoardBus | LiveBusPoint> =
+    feed?.buses?.length ? feed.buses : SAMPLE;
   const school = schoolPin(feed);
 
   function refresh() {
@@ -153,9 +154,12 @@ export function LiveGpsBoard({
       </p>
 
       {error ? (
-        <p className="rounded-2xl border border-red/20 bg-red/5 px-4 py-3 text-sm text-red">
+        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           {error}
         </p>
+      ) : null}
+      {feed?.debug && !live ? (
+        <p className="text-xs text-muted break-all">{feed.debug}</p>
       ) : null}
 
       <section className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
