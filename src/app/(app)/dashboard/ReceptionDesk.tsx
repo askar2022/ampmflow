@@ -59,13 +59,6 @@ function studentRideOptions(student: EffectiveStudent) {
   return options;
 }
 
-function busFilterLabel(value: string) {
-  const clean = value.trim();
-  if (/^other\b/i.test(clean) || /^3rd\b/i.test(clean)) return "Other bus";
-  if (/^bus\s+/i.test(clean)) return clean;
-  return `Bus ${clean}`;
-}
-
 function sameDeskBus(stored: string, wanted: string) {
   const a = stored.trim().toLowerCase().replace(/^bus\s+/i, "");
   const b = wanted.trim().toLowerCase().replace(/^bus\s+/i, "");
