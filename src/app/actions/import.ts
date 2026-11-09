@@ -263,16 +263,237 @@ const HEADER_ALIASES = new Set([
 
 const POSITIONAL_KEYS = ["id", "student", "grade", "teacher", "room", "am", "pm"];
 
-function rowsFromSheet(sheet: XLSX.WorkSheet): Row[] {
+const NAME_LAST_FIRST =
+  /^[A-Za-z][A-Za-z'\-.]*\s*,\s*[A-Za-z][A-Za-z'\-.]*(?:\s+[A-Za-z][A-Za-z'\-.]*)*$/;
+
+function sheetMatrix(sheet: XLSX.WorkSheet) {
   const matrix = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
     header: 1,
     defval: "",
     raw: false,
   });
-  const lines = matrix
-    .map((line) => line.map((value) => String(value ?? "").trim()))
-    .filter((line) => line.some(Boolean));
+  return matrix.map((line) =>
+    line.map((value) => String(value ?? "").trim()),
+  );
+}
+
+function nonEmptyLines(matrix: string[][]) {
+  return matrix.filter((line) => line.some(Boolean));
+}
+
+function looksLikePersonName(value: string) {
+  const clean = value.split("/")[0]?.trim() || "";
+  return NAME_LAST_FIRST.test(clean);
+}
+
+function parseSheetRide(sheetName: string) {
+  const name = sheetName.trim();
+  const trip = /\bPM\b/i.test(name) ? "PM" : /\bAM\b/i.test(name) ? "AM" : null;
+  const van = name.match(/\bvan\s*([0-9]+)\b/i);
+  if (van) {
+    return {
+      kind: "VAN" as const,
+      label: `Van ${van[1]}`,
+      number: van[1],
+      trip,
+    };
+  }
+  const bus = name.match(/\bbus\s*([0-9]+)\b/i);
+  if (bus) {
+    return {
+      kind: "BUS" as const,
+      label: `Bus ${bus[1]}`,
+      number: bus[1],
+      trip,
+    };
+  }
+  return null;
+}
+
+function looksLikeDayibRouteSheet(lines: string[][], sheetName: string) {
+  if (parseSheetRide(sheetName)) return true;
+  const sample = lines
+    .slice(0, 12)
+    .flat()
+    .join(" ")
+    .toLowerCase();
+  if (
+    /dayib|attendance sheet|start time|end time|max load|effective dates/.test(
+      sample,
+    )
+  ) {
+    return true;
+  }
+  const nameHits = lines.filter((line) =>
+    line.some((cell) => looksLikePersonName(cell) && !cell.includes("/")),
+  ).length;
+  return nameHits >= 3 && !HEADER_ALIASES.has((lines[0]?.[0] || "").toLowerCase());
+}
+
+function isDayibMetaOrStopRow(cells: string[]) {
+  const joined = cells.filter(Boolean).join(" ");
+  const lower = joined.toLowerCase();
+  // Timed stop headers: "7:18 AM Ahmed, Asad / 2100 Cliff Rd..."
+  if (/\d{1,2}:\d{2}\s*(am|pm)/i.test(joined) && /\//.test(joined)) return true;
+  if (cells.some((cell) => cell.includes("/") && looksLikePersonName(cell))) {
+    return true;
+  }
+  // Top title / run summary block — not student list rows.
+  if (
+    /dayib bus transportation|attendance sheet|start time|end time|total time|\bdistance\b|max load|effective dates/.test(
+      lower,
+    )
+  ) {
+    return true;
+  }
+  if (/\brun\b/.test(lower) && !cells.some((cell) => looksLikePersonName(cell))) {
+    return true;
+  }
+  return false;
+}
+
+function findDayibName(cells: string[]) {
+  for (const cell of cells) {
+    if (cell.includes("/")) continue;
+    if (looksLikePersonName(cell)) return cell.trim();
+  }
+  return "";
+}
+
+function findDayibPhone(cells: string[]) {
+  for (const cell of cells) {
+    const match = cell.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+    if (match) return match[0];
+  }
+  return "";
+}
+
+function findDayibAddress(cells: string[], name: string) {
+  for (const cell of cells) {
+    if (!cell || cell === name) continue;
+    if (looksLikePersonName(cell)) continue;
+    if (/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(cell) && cell.length < 20) {
+      continue;
+    }
+    if (
+      /\d/.test(cell) &&
+      /(st|street|ave|avenue|rd|road|dr|drive|ln|lane|way|ct|court|blvd|circle|cir|apt|mn\b|\d{5})/i.test(
+        cell,
+      )
+    ) {
+      return cell.replace(/\s+/g, " ").trim();
+    }
+  }
+  return "";
+}
+
+function rowsFromDayibRouteSheet(
+  lines: string[][],
+  sheetName: string,
+): Row[] {
+  const ride = parseSheetRide(sheetName);
+  const rows: Row[] = [];
+  for (const line of lines) {
+    if (isDayibMetaOrStopRow(line)) continue;
+    const fullName = findDayibName(line);
+    if (!fullName) continue;
+    const names = splitName(fullName);
+    if (!names.first || !names.last || names.last === "—") continue;
+    const address = findDayibAddress(line, fullName);
+    const phone = findDayibPhone(line);
+    const row: Row = {
+      "first name": names.first,
+      "last name": names.last,
+      "home address": address,
+      address,
+      "parent phone": phone,
+      "primary 1 phone": phone,
+    };
+    if (ride?.kind === "VAN") {
+      row.vehicle_name = ride.label;
+      row.transportation_type = "VAN";
+      row.am = ride.label;
+      row.pm = ride.label;
+    } else if (ride?.kind === "BUS") {
+      row.transportation_type = "BUS";
+      row["bus number"] = ride.number;
+      if (!ride.trip || ride.trip === "AM") {
+        row.am = ride.label;
+        row.am_bus = ride.number;
+        row["am bus"] = ride.number;
+      }
+      if (!ride.trip || ride.trip === "PM") {
+        row.pm = ride.label;
+        row.pm_bus = ride.number;
+        row["pm bus"] = ride.number;
+      }
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+function mergeRouteImportRows(rows: Row[]) {
+  const merged = new Map<string, Row>();
+  for (const row of rows) {
+    const names = studentNamesFromRow(row);
+    const phone = parentPhonesFromRow(row).phone1;
+    const address =
+      cell(row, "prim address", "home_address", "home address", "address") || "";
+    const key = [
+      normName(names.first),
+      normName(names.last),
+      digitsPhone(phone),
+      normAddress(address),
+    ].join("|");
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...row });
+      continue;
+    }
+    for (const [field, value] of Object.entries(row)) {
+      if (!value) continue;
+      if (!existing[field]) existing[field] = value;
+    }
+  }
+  return [...merged.values()];
+}
+
+function workbookIsRouteBook(workbook: XLSX.WorkBook) {
+  const routeSheets = workbook.SheetNames.filter((name) =>
+    Boolean(parseSheetRide(name)),
+  );
+  if (routeSheets.length >= 2) return true;
+  for (const name of workbook.SheetNames.slice(0, 3)) {
+    const lines = nonEmptyLines(sheetMatrix(workbook.Sheets[name]));
+    if (looksLikeDayibRouteSheet(lines, name)) return true;
+  }
+  return false;
+}
+
+function rowsFromWorkbook(workbook: XLSX.WorkBook): Row[] {
+  if (workbookIsRouteBook(workbook)) {
+    const collected: Row[] = [];
+    for (const name of workbook.SheetNames) {
+      const sheet = workbook.Sheets[name];
+      if (!sheet) continue;
+      collected.push(...rowsFromSheet(sheet, name));
+    }
+    return mergeRouteImportRows(collected);
+  }
+  const sheetName =
+    workbook.SheetNames.find((name) => /master/i.test(name)) ||
+    workbook.SheetNames[0];
+  return rowsFromSheet(workbook.Sheets[sheetName], sheetName);
+}
+
+function rowsFromSheet(sheet: XLSX.WorkSheet, sheetName = ""): Row[] {
+  const lines = nonEmptyLines(sheetMatrix(sheet));
   if (!lines.length) return [];
+
+  if (looksLikeDayibRouteSheet(lines, sheetName)) {
+    return rowsFromDayibRouteSheet(lines, sheetName);
+  }
 
   const first = lines[0].map((value) => value.trim().toLowerCase());
   const hasHeader = first.some(
@@ -558,12 +779,14 @@ export async function importStudents(formData: FormData) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheetName =
-    workbook.SheetNames.find((name) => /master/i.test(name)) ||
-    workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rows = rowsFromSheet(sheet);
-  if (!rows.length) return { ok: false, error: "The file has no data rows." };
+  const rows = rowsFromWorkbook(workbook);
+  if (!rows.length) {
+    return {
+      ok: false,
+      error:
+        "No student rows found. For Dayib route sheets, load starts at the student names — not the title or run times at the top.",
+    };
+  }
 
   await ensureGateTables();
   await ensureStudentContactColumns().catch(() => undefined);
@@ -627,7 +850,12 @@ export async function importStudents(formData: FormData) {
       slugStudentId(firstName, lastName, familyKey, index);
     if (!firstName || !lastName) {
       excludedNoName += 1;
-      errors.push(`Row ${index + 2}: Student first and last name are required.`);
+      // Skip blank / title rows quietly — only flag rows that look incomplete.
+      const occupied = Object.values(row).filter((value) => String(value || "").trim())
+        .length;
+      if (occupied >= 3) {
+        errors.push(`Row ${index + 2}: Student first and last name are required.`);
+      }
       continue;
     }
 
@@ -737,18 +965,18 @@ export async function importStudents(formData: FormData) {
       "routenannumb",
       "bus number",
     );
-    const rideValue =
-      vehicleName ||
-      cell(row, "am_type", "am bus", "am route", "morning", "am") ||
-      sharedBus ||
-      transportType;
+    const amRide = cell(row, "am_type", "am bus", "am route", "morning", "am");
+    const pmRide = cell(row, "pm_type", "pm bus", "pm route", "afternoon", "pm");
+    const rideValue = vehicleName || amRide || pmRide || sharedBus || transportType;
     const amPlan = parsePlan(
       /van/i.test(transportType) || /van/i.test(vehicleName)
         ? vehicleName || transportType
-        : rideValue,
+        : amRide || (!pmRide ? rideValue : ""),
     );
     const pmPlan = parsePlan(
-      cell(row, "pm_type", "pm bus", "pm route", "afternoon", "pm") || rideValue,
+      /van/i.test(transportType) || /van/i.test(vehicleName)
+        ? vehicleName || transportType
+        : pmRide || (!amRide ? rideValue : ""),
     );
     let daycareName = cell(row, "daycare_name", "daycare");
     if (!daycareName && (amPlan.dest === "DAYCARE" || pmPlan.dest === "DAYCARE")) {
@@ -1179,11 +1407,7 @@ async function rowsFromUpload(
 ) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const workbook = XLSX.read(buffer, { type: "buffer" });
-  const sheetName =
-    workbook.SheetNames.find((name) => /master/i.test(name)) ||
-    workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  return rowsFromSheet(sheet).map((row) => {
+  return rowsFromWorkbook(workbook).map((row) => {
     const names = studentNamesFromRow(row);
     const firstName = names.first;
     const lastName = names.last;
