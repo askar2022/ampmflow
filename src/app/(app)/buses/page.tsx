@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getSchoolIdentityById } from "@/lib/school";
 import { ensureStudentContactColumns } from "@/lib/transportation";
 import { ImportForm } from "../students/import/ImportForm";
+import { ClearGhostVans } from "./ClearGhostVans";
 import { ClearRoster } from "./ClearRoster";
 import { StudentArchive } from "./StudentArchive";
 
@@ -62,6 +63,7 @@ export default async function RosterPage() {
             Download sample CSV
           </a>
           <div className="mt-6 space-y-4">
+            <ClearGhostVans />
             <ClearRoster
               schoolName={school?.name || "this school"}
               count={students}

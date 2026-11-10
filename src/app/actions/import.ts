@@ -685,7 +685,8 @@ function rowsFromWorkbook(workbook: XLSX.WorkBook, fileName = ""): Row[] {
     for (const name of workbook.SheetNames) {
       const sheet = workbook.Sheets[name];
       if (!sheet) continue;
-      const ride = parseSheetRide(name) || fileRide;
+      // File name wins (BUS 2PM.xlsx) so an old Excel tab like "Van 2" cannot steal the ride.
+      const ride = fileRide || parseSheetRide(name);
       if (!ride) continue;
       collected.push(...rowsFromRouteSource(sheet, name, ride));
     }
@@ -908,6 +909,7 @@ async function applyStudentPlans(args: {
         busRouteId: type === "BUS" ? route?.id : null,
         daycareId: dest === "DAYCARE" ? args.daycareId : null,
         waitingForAssignment: type === "BUS" && !route,
+        notes: type === "VAN" ? args.vanName || "Van" : "",
         pickupTime,
         updatedById: args.userId,
       },
@@ -918,6 +920,8 @@ async function applyStudentPlans(args: {
         busRouteId: type === "BUS" ? route?.id : null,
         daycareId: dest === "DAYCARE" ? args.daycareId : null,
         waitingForAssignment: type === "BUS" && !route,
+        // Clear leftover "Van 2" notes when this trip is a bus.
+        notes: type === "VAN" ? args.vanName || "Van" : "",
         pickupTime,
         updatedById: args.userId,
       },
@@ -928,6 +932,13 @@ async function applyStudentPlans(args: {
     await prisma.$executeRaw`
       UPDATE "Student"
       SET "vehicleId" = ${vehicleId}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${args.studentId}
+    `;
+  } else if (args.amType === "BUS" || args.pmType === "BUS") {
+    // Bus file must not leave a ghost van on the student.
+    await prisma.$executeRaw`
+      UPDATE "Student"
+      SET "vehicleId" = NULL, "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${args.studentId}
     `;
   }
