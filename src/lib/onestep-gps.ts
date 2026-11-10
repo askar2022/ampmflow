@@ -450,6 +450,22 @@ export async function fetchOneStepLiveBuses(
 ): Promise<LiveGpsFeed> {
   const fetchedAt = new Date().toISOString();
   const school = schoolGpsPoint(schoolName);
+  const aimSchool = Boolean(schoolName && /aim/i.test(schoolName));
+
+  // OneStep / Minnehaha GPS is Aim-only. Other schools stay separate until
+  // their bus company gets its own feed.
+  if (!aimSchool) {
+    return {
+      configured: false,
+      live: false,
+      school: null,
+      buses: [],
+      fetchedAt,
+      error:
+        "Live GPS for this school is not connected yet. Minnehaha Aim tracking stays on Aim Academy only — each school uses its own bus company and routes.",
+    };
+  }
+
   const key = apiKey();
   if (!key) {
     return {

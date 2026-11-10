@@ -75,7 +75,9 @@ export function GpsReportBoard({
             <h1 className="font-serif text-4xl text-navy">GPS Report</h1>
           )}
           <p className="mt-1 text-muted">
-            {schoolName} · Minnehaha’s 3 Aim buses only (Bus 4, Bus 5, 3rd bus)
+            {/aim/i.test(schoolName)
+              ? `${schoolName} · Minnehaha’s 3 Aim buses only (Bus 4, Bus 5, 3rd bus)`
+              : `${schoolName} · GPS history for this school only`}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">

@@ -109,12 +109,16 @@ export function LiveGpsBoard({
   );
   const [error, setError] = useState(initialFeed?.error || "");
   const [pending, start] = useTransition();
+  const aimSchool = /aim/i.test(schoolName);
   const liveBuses =
     feed?.buses.filter((bus) => !bus.pending && bus.lat != null) || [];
   const live = Boolean(feed?.live && liveBuses.length);
+  // Never show Aim sample buses on NIA or other schools.
   const buses: Array<BoardBus | LiveBusPoint> = feed?.buses?.length
     ? feed.buses
-    : SAMPLE;
+    : aimSchool
+      ? SAMPLE
+      : [];
 
   const arrivalByBus = useMemo(() => {
     const map = new Map<string, ArrivalRow>();
@@ -192,7 +196,9 @@ export function LiveGpsBoard({
         <div>
           <h1 className="font-serif text-4xl text-navy">Live GPS</h1>
           <p className="mt-1 text-muted">
-            {schoolName} · Minnehaha’s 3 Aim buses
+            {aimSchool
+              ? `${schoolName} · Minnehaha’s 3 Aim buses`
+              : `${schoolName} · this school’s routes only`}
           </p>
           {stamp ? (
             <p className="mt-1 text-sm font-medium text-navy">{stamp}</p>
@@ -205,18 +211,19 @@ export function LiveGpsBoard({
           </span>
         ) : (
           <span className="rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-950">
-            {feed?.configured
-              ? "Connected · waiting for bus positions"
-              : "Preview · waiting for bus company API"}
+            {aimSchool
+              ? feed?.configured
+                ? "Connected · waiting for bus positions"
+                : "Preview · waiting for bus company API"
+              : "Not connected for this school yet"}
           </span>
         )}
       </div>
 
       <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-        Minnehaha operates three Aim buses. Bus 4 and Bus 5 have GPS units now.
-        The 3rd bus slot stays until they send that unit number. Arrival times
-        are saved automatically when a bus reaches school so you can look them
-        up later.
+        {aimSchool
+          ? "Minnehaha operates three Aim buses. Bus 4 and Bus 5 have GPS units now. The 3rd bus slot stays until they send that unit number. Arrival times are saved automatically when a bus reaches school so you can look them up later."
+          : "Live GPS is separate for each school. Minnehaha Aim tracking does not show here. When this school’s bus company shares GPS units, arrivals will save on this page only."}
         {pending ? " Updating…" : ""}
       </p>
 
@@ -329,8 +336,9 @@ export function LiveGpsBoard({
               })}
             </ul>
             <p className="mt-3 px-1 text-xs italic text-muted">
-              Three Aim buses only. Add the 3rd GPS unit when Minnehaha shares
-              it.
+              {aimSchool
+                ? "Three Aim buses only. Add the 3rd GPS unit when Minnehaha shares it."
+                : "No live buses for this school yet. Roster Bus / Van lists stay on Front Desk."}
             </p>
           </div>
         </div>

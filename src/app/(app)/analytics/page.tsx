@@ -28,7 +28,8 @@ export default async function AnalyticsPage() {
   });
   const day = todayKey();
   const feed = await fetchOneStepLiveBuses(school?.name);
-  if (feed.live) {
+  const aimSchool = Boolean(school?.name && /aim/i.test(school.name));
+  if (feed.live && aimSchool) {
     await recordLiveGpsBuses({
       schoolId: session.schoolId,
       company: "Minnehaha",

@@ -48,7 +48,8 @@ export async function loadLiveGpsFeed(schoolId?: string) {
     select: { name: true },
   });
   const feed = await fetchOneStepLiveBuses(school?.name);
-  if (feed.live) {
+  const aimSchool = Boolean(school?.name && /aim/i.test(school.name));
+  if (feed.live && aimSchool) {
     await recordLiveGpsBuses({
       schoolId: access.schoolId,
       company: "Minnehaha",
@@ -64,7 +65,7 @@ export async function loadLiveGpsFeed(schoolId?: string) {
 
   return {
     ok: true as const,
-    configured: onestepGpsConfigured(),
+    configured: aimSchool ? onestepGpsConfigured() : false,
     feed,
     stamp: formatGpsStamp(),
     dayKey: day,
@@ -124,7 +125,8 @@ export async function loadGpsReportDay(input: {
     select: { name: true },
   });
   const feed = await fetchOneStepLiveBuses(school?.name);
-  if (feed.live) {
+  const aimSchool = Boolean(school?.name && /aim/i.test(school.name));
+  if (feed.live && aimSchool) {
     await recordLiveGpsBuses({
       schoolId: access.schoolId,
       company: "Minnehaha",

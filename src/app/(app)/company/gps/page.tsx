@@ -47,7 +47,8 @@ export default async function CompanyLiveGpsPage({
     fetchOneStepLiveBuses(selected.name),
   ]);
 
-  if (feed.live) {
+  const aimSchool = /aim/i.test(selected.name);
+  if (feed.live && aimSchool) {
     await recordLiveGpsBuses({
       schoolId: selected.id,
       company: "Minnehaha",
