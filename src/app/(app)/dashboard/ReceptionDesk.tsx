@@ -403,12 +403,9 @@ export function ReceptionDesk({
         ? student.parentPhone
         : "",
     );
-    setOpenInfo(
-      !student.grade ||
-        student.grade === "—" ||
-        !student.parentName ||
-        student.parentName === "—",
-    );
+    // Do not auto-open grade/parent — that blocked daycare and other changes.
+    // Staff use Add grade / parent when they are ready to fill school info.
+    setOpenInfo(false);
   }
 
   function toggleTrip(trip: Trip) {
@@ -801,7 +798,7 @@ export function ReceptionDesk({
               >
                 Back to list
               </button>
-              {!openForm && !openLeave && !openReplaceWarn && !openInfo ? (
+              {!openForm && !openLeave && !openReplaceWarn ? (
                 <>
                   <Link
                     href={`/waiting?student=${selected.id}`}
@@ -813,6 +810,7 @@ export function ReceptionDesk({
                     type="button"
                     onClick={() => {
                       setOpenLeave(false);
+                      setOpenInfo(false);
                       setError("");
                       if (hasDeskChange(selected) && !replaceChange) {
                         setOpenReplaceWarn(true);
@@ -829,17 +827,18 @@ export function ReceptionDesk({
                     onClick={() => {
                       setOpenForm(false);
                       setOpenLeave(false);
-                      setOpenInfo(true);
+                      setOpenInfo((value) => !value);
                       setError("");
                     }}
                     className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
                   >
-                    Add grade / parent
+                    {openInfo ? "Hide grade / parent" : "Add grade / parent"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setOpenForm(false);
+                      setOpenInfo(false);
                       setOpenLeave(true);
                       setConfirmLeave(false);
                       setError("");
@@ -883,8 +882,9 @@ export function ReceptionDesk({
                 Grade, parent, and family phone
               </h3>
               <p className="mt-1 text-sm text-muted">
-                Dayib route sheets do not include grade or parent name. Save them
-                here. The same phone groups siblings as one family.
+                Optional school info for Front Desk. Not required for daycare or
+                bus changes, and not shown on the driver print list. Same phone
+                groups siblings as one family.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-semibold">
