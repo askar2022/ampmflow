@@ -653,6 +653,9 @@ export function ReceptionDesk({
               <tr>
                 <th className="whitespace-nowrap px-4 py-3">First Name</th>
                 <th className="whitespace-nowrap py-3 pr-3">Last Name</th>
+                <th className="whitespace-nowrap py-3 pr-3">Grade</th>
+                <th className="whitespace-nowrap py-3 pr-3">Parent</th>
+                <th className="whitespace-nowrap py-3 pr-3">Teacher</th>
                 <th className="whitespace-nowrap py-3 pr-3">Addr Line1</th>
                 <th className="whitespace-nowrap py-3 pr-3">City/State/Zip</th>
                 <th className="whitespace-nowrap py-3 pr-3">Phone Number</th>
@@ -673,6 +676,10 @@ export function ReceptionDesk({
                   addressParts.length > 1
                     ? addressParts.slice(1).join(", ")
                     : "—";
+                const teacher =
+                  teacherLabel(student) === "No teacher"
+                    ? "Unassigned"
+                    : teacherLabel(student);
                 return (
                   <tr
                     key={student.id}
@@ -690,6 +697,13 @@ export function ReceptionDesk({
                     <td className="whitespace-nowrap py-3 pr-3 font-semibold">
                       {student.lastName}
                     </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
+                      {gradeOnly(student.grade)}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">
+                      {parentLabel(student)}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3">{teacher}</td>
                     <td className="whitespace-nowrap py-3 pr-3 text-muted">
                       {line1}
                     </td>
@@ -720,19 +734,19 @@ export function ReceptionDesk({
               })}
               {!students.length ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-3 text-muted">
+                  <td colSpan={10} className="px-4 py-3 text-muted">
                     No students on the roster yet. Load them on Roster.
                   </td>
                 </tr>
               ) : !matches.length ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-3 text-muted">
+                  <td colSpan={10} className="px-4 py-3 text-muted">
                     No student matches those filters.
                   </td>
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-4 py-2 text-xs text-muted">
+                  <td colSpan={10} className="px-4 py-2 text-xs text-muted">
                     {filtered.length > matches.length
                       ? `Showing ${matches.length} of ${filtered.length}. Type a name or use the filters to see the rest.`
                       : `${matches.length} student${matches.length === 1 ? "" : "s"}`}
