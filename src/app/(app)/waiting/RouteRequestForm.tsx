@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { requestRoute } from "@/app/actions/reception";
@@ -35,10 +36,15 @@ export function RouteRequestForm({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="font-serif text-4xl text-navy">Submit new request</h1>
+        <Link
+          href="/waiting"
+          className="text-sm font-semibold text-navy underline-offset-2 hover:underline"
+        >
+          ← All request types
+        </Link>
+        <h1 className="mt-2 font-serif text-4xl text-navy">New route request</h1>
         <p className="mt-2 max-w-2xl text-muted">
-          This form is only for students who are new to the school and need a
-          bus.
+          For students who are new to the school and need a bus or van.
         </p>
       </div>
 

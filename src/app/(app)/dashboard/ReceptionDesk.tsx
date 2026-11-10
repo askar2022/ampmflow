@@ -5,11 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   removeReceptionStudent,
-  saveReceptionChange,
   saveReceptionStudentInfo,
 } from "@/app/actions/reception";
 import { planSummary, planTone } from "@/lib/format";
-import type { Destination, DurationType, EffectiveStudent, Trip } from "@/lib/types";
+import type { EffectiveStudent } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
 function gradeRank(grade: string) {
@@ -216,19 +215,12 @@ function startingQuery(students: DeskStudent[], id: string) {
   return student ? `${student.firstName} ${student.lastName}` : "";
 }
 
-function formFromStudent(student: DeskStudent | undefined) {
+function leaveContactsFromStudent(student: DeskStudent | undefined) {
   return {
-    destination: (student?.pm.destination === "DAYCARE"
-      ? "DAYCARE"
-      : student?.pm.destination === "CUSTOM"
-        ? "CUSTOM"
-        : "HOME") as Destination,
-    busNumber: student?.pm.busNumber || student?.am.busNumber || "",
-    customAddress: student?.pm.customAddress || "",
-    daycareName: student?.daycareName || "",
-    daycareAddress: student?.daycareAddress || "",
-    daycarePhone: student?.daycarePhone || "",
-    parentPhone: student?.parentPhone && student.parentPhone !== "—" ? student.parentPhone : "",
+    parentPhone:
+      student?.parentPhone && student.parentPhone !== "—"
+        ? student.parentPhone
+        : "",
     parentPhone2: student?.parentPhone2 || "",
     parentEmail: student?.parentEmail || "",
     teacherEmail: student?.teacherEmail || "",
@@ -237,23 +229,19 @@ function formFromStudent(student: DeskStudent | undefined) {
 
 export function ReceptionDesk({
   students,
-  buses,
   vans = [],
   aimSchool = false,
   studentVanId = {},
-  canPermanent,
   canSeeEmergency,
   initialStudentId = "",
   busCompanyEmail: startingBusCompanyEmail = "",
-  coordinatorEmail: startingCoordinatorEmail = "",
-  frontDeskEmail: startingFrontDeskEmail = "",
 }: {
   students: DeskStudent[];
-  buses: string[];
+  buses?: string[];
   vans?: { id: string; name: string }[];
   aimSchool?: boolean;
   studentVanId?: Record<string, string>;
-  canPermanent: boolean;
+  canPermanent?: boolean;
   canSeeEmergency: boolean;
   initialStudentId?: string;
   busCompanyEmail?: string;
@@ -262,42 +250,21 @@ export function ReceptionDesk({
 }) {
   const router = useRouter();
   const startingStudent = students.find((row) => row.id === initialStudentId);
-  const initial = formFromStudent(startingStudent);
-  const startedWithChange = Boolean(
-    startingStudent && hasDeskChange(startingStudent),
-  );
+  const initial = leaveContactsFromStudent(startingStudent);
   const [query, setQuery] = useState(() => startingQuery(students, initialStudentId));
   const [grade, setGrade] = useState("");
   const [teacher, setTeacher] = useState("");
   const [ride, setRide] = useState("");
   const [selectedId, setSelectedId] = useState(initialStudentId);
-  const [openForm, setOpenForm] = useState(
-    Boolean(initialStudentId) && !startedWithChange,
-  );
-  const [openReplaceWarn, setOpenReplaceWarn] = useState(startedWithChange);
-  const [replaceChange, setReplaceChange] = useState(false);
   const [openLeave, setOpenLeave] = useState(false);
   const [leaveReason, setLeaveReason] = useState("Transferred to another school");
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [destination, setDestination] = useState<Destination>(initial.destination);
-  const [trips, setTrips] = useState<Trip[]>(["PM"]);
-  const [duration, setDuration] = useState<DurationType>("TODAY");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [busNumber, setBusNumber] = useState(initial.busNumber);
-  const [customAddress, setCustomAddress] = useState(initial.customAddress);
-  const [daycareName, setDaycareName] = useState(initial.daycareName);
-  const [daycareAddress, setDaycareAddress] = useState(initial.daycareAddress);
-  const [daycarePhone, setDaycarePhone] = useState(initial.daycarePhone);
   const [parentPhone, setParentPhone] = useState(initial.parentPhone);
   const [parentPhone2, setParentPhone2] = useState(initial.parentPhone2);
   const [parentEmail, setParentEmail] = useState(initial.parentEmail);
   const [teacherEmail, setTeacherEmail] = useState(initial.teacherEmail);
   const [busCompanyEmail, setBusCompanyEmail] = useState(startingBusCompanyEmail);
-  const [coordinatorEmail, setCoordinatorEmail] = useState(startingCoordinatorEmail);
-  const [frontDeskEmail, setFrontDeskEmail] = useState(startingFrontDeskEmail);
   const [note, setNote] = useState("");
-  const [confirmPermanent, setConfirmPermanent] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -367,27 +334,17 @@ export function ReceptionDesk({
   function choose(student: DeskStudent) {
     setSelectedId(student.id);
     setQuery(`${student.firstName} ${student.lastName}`);
-    setOpenForm(false);
-    setOpenReplaceWarn(false);
-    setReplaceChange(false);
     setOpenLeave(false);
     setConfirmLeave(false);
     setLeaveReason("Transferred to another school");
     setMessage("");
     setError("");
-    const next = formFromStudent(student);
-    setDestination(next.destination);
-    setBusNumber(next.busNumber);
-    setCustomAddress(next.customAddress);
-    setDaycareName(next.daycareName);
-    setDaycareAddress(next.daycareAddress);
-    setDaycarePhone(next.daycarePhone);
+    const next = leaveContactsFromStudent(student);
     setParentPhone(next.parentPhone);
     setParentPhone2(next.parentPhone2);
     setParentEmail(next.parentEmail);
     setTeacherEmail(next.teacherEmail);
     setNote("");
-    setConfirmPermanent(false);
     setInfoGrade(student.grade === "—" ? "" : student.grade);
     setInfoParentName(
       student.parentName && student.parentName !== "—" ? student.parentName : "",
@@ -406,15 +363,6 @@ export function ReceptionDesk({
     // Do not auto-open grade/parent — that blocked daycare and other changes.
     // Staff use Add grade / parent when they are ready to fill school info.
     setOpenInfo(false);
-  }
-
-  function toggleTrip(trip: Trip) {
-    setTrips((current) => {
-      if (current.includes(trip)) {
-        return current.filter((item) => item !== trip);
-      }
-      return [...current, trip];
-    });
   }
 
   function removeStudent() {
@@ -464,83 +412,6 @@ export function ReceptionDesk({
     });
   }
 
-  function save() {
-    if (!selected) return;
-    if (!parentPhone.trim()) {
-      setError("Primary 1 phone is required so we can text the change.");
-      return;
-    }
-    if (!parentEmail.trim()) {
-      setError("Parent email is required.");
-      return;
-    }
-    if (!teacherEmail.trim()) {
-      setError("Teacher email is required.");
-      return;
-    }
-    if (!busCompanyEmail.trim()) {
-      setError("Bus company email is required.");
-      return;
-    }
-    if (!coordinatorEmail.trim()) {
-      setError("Bus coordinator email is required.");
-      return;
-    }
-    if (!frontDeskEmail.trim()) {
-      setError("Front Desk email is required.");
-      return;
-    }
-    if (destination === "CUSTOM" && !customAddress.trim()) {
-      setError("New address is required.");
-      return;
-    }
-    if (destination === "DAYCARE" && !daycareName.trim()) {
-      setError("Daycare name is required.");
-      return;
-    }
-    setError("");
-    setMessage("");
-    startTransition(async () => {
-      const result = await saveReceptionChange({
-        studentId: selected.id,
-        destination,
-        trips,
-        duration,
-        startDate,
-        endDate,
-        busNumber,
-        customAddress,
-        daycareName,
-        daycareAddress,
-        daycarePhone,
-        parentPhone,
-        parentPhone2,
-        parentEmail,
-        teacherEmail,
-        busCompanyEmail,
-        coordinatorEmail,
-        frontDeskEmail,
-        note,
-        confirmPermanent,
-        confirmReplaceChange: replaceChange || !hasDeskChange(selected),
-      });
-      if (!result.ok) {
-        if ("needsConfirm" in result && result.needsConfirm) {
-          setOpenForm(false);
-          setOpenReplaceWarn(true);
-          return;
-        }
-        setError(result.error);
-        return;
-      }
-      setMessage(result.message);
-      setOpenForm(false);
-      setReplaceChange(false);
-      // Refresh roster after paint so the click feels finished first.
-      window.setTimeout(() => router.refresh(), 50);
-    });
-  }
-
   return (
     <div className="space-y-4">
       <section className="rounded-2xl border border-line bg-card p-4 shadow-sm">
@@ -555,9 +426,6 @@ export function ReceptionDesk({
               onChange={(event) => {
                 setQuery(event.target.value);
                 setSelectedId("");
-                setOpenForm(false);
-                setOpenReplaceWarn(false);
-                setReplaceChange(false);
                 setMessage("");
               }}
               placeholder="Name or student ID"
@@ -572,9 +440,6 @@ export function ReceptionDesk({
                 const value = event.target.value;
                 setGrade(value);
                 setSelectedId("");
-                setOpenForm(false);
-                setOpenReplaceWarn(false);
-                setReplaceChange(false);
                 if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
@@ -595,9 +460,6 @@ export function ReceptionDesk({
                 const value = event.target.value;
                 setTeacher(value);
                 setSelectedId("");
-                setOpenForm(false);
-                setOpenReplaceWarn(false);
-                setReplaceChange(false);
                 if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
@@ -618,9 +480,6 @@ export function ReceptionDesk({
                 const value = event.target.value;
                 setRide(value);
                 setSelectedId("");
-                setOpenForm(false);
-                setOpenReplaceWarn(false);
-                setReplaceChange(false);
                 if (!value) setQuery("");
               }}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-sm font-medium text-navy"
@@ -778,8 +637,8 @@ export function ReceptionDesk({
               {hasDeskChange(selected) ? (
                 <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950">
                   Already changed today
-                  {selected.lastUpdatedBy ? ` by ${selected.lastUpdatedBy}` : ""}.
-                  Open Change Transportation only if that was a mistake.
+                  {selected.lastUpdatedBy ? ` by ${selected.lastUpdatedBy}` : ""}
+                  . Use Submit new request if that needs another update.
                 </p>
               ) : null}
             </div>
@@ -789,19 +648,16 @@ export function ReceptionDesk({
                 onClick={() => {
                   setSelectedId("");
                   setQuery("");
-                  setOpenForm(false);
-                  setOpenReplaceWarn(false);
-                  setReplaceChange(false);
                   setOpenLeave(false);
                 }}
                 className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
               >
                 Back to list
               </button>
-              {!openForm && !openLeave && !openReplaceWarn ? (
+              {!openLeave ? (
                 <>
                   <Link
-                    href={`/waiting?student=${selected.id}`}
+                    href="/waiting"
                     className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
                   >
                     Submit new request
@@ -809,23 +665,6 @@ export function ReceptionDesk({
                   <button
                     type="button"
                     onClick={() => {
-                      setOpenLeave(false);
-                      setOpenInfo(false);
-                      setError("");
-                      if (hasDeskChange(selected) && !replaceChange) {
-                        setOpenReplaceWarn(true);
-                        return;
-                      }
-                      setOpenForm(true);
-                    }}
-                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
-                  >
-                    Change Transportation
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpenForm(false);
                       setOpenLeave(false);
                       setOpenInfo((value) => !value);
                       setError("");
@@ -837,7 +676,6 @@ export function ReceptionDesk({
                   <button
                     type="button"
                     onClick={() => {
-                      setOpenForm(false);
                       setOpenInfo(false);
                       setOpenLeave(true);
                       setConfirmLeave(false);
@@ -1059,65 +897,6 @@ export function ReceptionDesk({
             ) : null}
           </div>
 
-          {openReplaceWarn ? (
-            <div className="mt-6 space-y-4 rounded-2xl border border-gold bg-amber-50 p-4">
-              <h3 className="font-serif text-2xl">This student already has a change</h3>
-              <p className="text-sm text-navy">
-                {selected.fullName}
-                {selected.parentName && selected.parentName !== "—"
-                  ? ` · Parent ${selected.parentName}`
-                  : ""}{" "}
-                was already changed
-                {selected.lastUpdatedBy ? ` by ${selected.lastUpdatedBy}` : ""}.
-                Was that a mistake? If you make a new change, parent, teacher,
-                and the bus company get another notice.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-line bg-card p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted">
-                    Morning now
-                  </div>
-                  <p className="mt-1 font-medium">
-                    {planSummary(selected.am, "AM")}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-line bg-card p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-muted">
-                    Afternoon now
-                  </div>
-                  <p className="mt-1 font-medium">
-                    {planSummary(selected.pm, "PM")}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReplaceChange(true);
-                    setOpenReplaceWarn(false);
-                    setOpenForm(true);
-                    setError("");
-                  }}
-                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white"
-                >
-                  Yes, make a new change
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpenReplaceWarn(false);
-                    setReplaceChange(false);
-                    setError("");
-                  }}
-                  className="rounded-full border border-line bg-card px-5 py-2.5 text-sm font-semibold"
-                >
-                  Keep previous change
-                </button>
-              </div>
-            </div>
-          ) : null}
-
           {openLeave ? (
             <form
               className="mt-6 space-y-4 rounded-2xl border border-gold bg-paper p-4"
@@ -1259,316 +1038,6 @@ export function ReceptionDesk({
                     setConfirmLeave(false);
                     setError("");
                   }}
-                  className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : null}
-
-          {openForm ? (
-            <form
-              className="mt-6 space-y-4 rounded-2xl border border-gold bg-paper p-4"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (!event.currentTarget.reportValidity()) return;
-                save();
-              }}
-            >
-              <h3 className="font-serif text-2xl">Change transportation</h3>
-              <p className="text-sm text-muted">
-                Choose the new destination, trip, and when it starts. The staff
-                member signed in is recorded automatically.
-              </p>
-
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-semibold">Destination</legend>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      ["HOME", "Home bus"],
-                      ["DAYCARE", "Daycare bus"],
-                      ["CUSTOM", "New address"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => {
-                        setDestination(value);
-                        if (value === "DAYCARE" || value === "CUSTOM") {
-                          setBusNumber("");
-                        }
-                      }}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                        destination === value
-                          ? "bg-navy text-white"
-                          : "border border-line bg-card"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-semibold">Trip</legend>
-                <div className="flex flex-wrap gap-2">
-                  {(["AM", "PM"] as const).map((trip) => (
-                    <button
-                      key={trip}
-                      type="button"
-                      onClick={() => toggleTrip(trip)}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                        trips.includes(trip)
-                          ? "bg-navy text-white"
-                          : "border border-line bg-card"
-                      }`}
-                    >
-                      {trip === "AM" ? "Morning" : "Afternoon"}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-semibold">When</legend>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      ["TODAY", "Today"],
-                      ["DATE_RANGE", "Date range"],
-                      ...(canPermanent ? ([["PERMANENT", "Permanent"]] as const) : []),
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setDuration(value)}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                        duration === value
-                          ? "bg-navy text-white"
-                          : "border border-line bg-card"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                {duration === "DATE_RANGE" ? (
-                  <div className="flex flex-wrap gap-3 pt-1">
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(event) => setStartDate(event.target.value)}
-                      className="rounded-xl border border-line bg-card px-3 py-2"
-                      required
-                    />
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(event) => setEndDate(event.target.value)}
-                      className="rounded-xl border border-line bg-card px-3 py-2"
-                      required
-                    />
-                  </div>
-                ) : null}
-                {duration === "PERMANENT" ? (
-                  <label className="flex items-center gap-2 pt-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={confirmPermanent}
-                      onChange={(event) => setConfirmPermanent(event.target.checked)}
-                    />
-                    Confirm this is the new regular plan
-                  </label>
-                ) : null}
-              </fieldset>
-
-              {destination === "HOME" ? (
-                <>
-                  <label className="block text-sm font-semibold">
-                    Bus number
-                    <input
-                      list="desk-buses"
-                      value={busNumber}
-                      onChange={(event) => setBusNumber(event.target.value)}
-                      placeholder="Type 4 if the company assigned bus 4"
-                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                    />
-                  </label>
-                  <datalist id="desk-buses">
-                    {buses.map((bus) => (
-                      <option key={bus} value={bus} />
-                    ))}
-                  </datalist>
-                  {!busNumber.trim() ? (
-                    <p className="text-sm text-orange-800">
-                      No bus number yet — this student will be on Request for
-                      Route.
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                <p className="text-sm text-navy">
-                  Parent is texted now. The assigned-bus text goes out after
-                  the company number is typed on Today’s Changes.
-                </p>
-              )}
-
-              {destination === "CUSTOM" ? (
-                <label className="block text-sm font-semibold">
-                  New address (required)
-                  <input
-                    value={customAddress}
-                    onChange={(event) => setCustomAddress(event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                    required
-                    placeholder="Required"
-                  />
-                </label>
-              ) : null}
-
-              {destination === "DAYCARE" ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block text-sm font-semibold">
-                    Daycare name (required)
-                    <input
-                      value={daycareName}
-                      onChange={(event) => setDaycareName(event.target.value)}
-                      required
-                      placeholder="Required"
-                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                    />
-                  </label>
-                  <label className="block text-sm font-semibold">
-                    Daycare phone
-                    <input
-                      value={daycarePhone}
-                      onChange={(event) => setDaycarePhone(event.target.value)}
-                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                    />
-                  </label>
-                  <label className="block text-sm font-semibold sm:col-span-2">
-                    Daycare address
-                    <input
-                      value={daycareAddress}
-                      onChange={(event) => setDaycareAddress(event.target.value)}
-                      className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <label className="block text-sm font-semibold">
-                  Primary 1 phone (required)
-                  <input
-                    type="tel"
-                    required
-                    value={parentPhone}
-                    onChange={(event) => setParentPhone(event.target.value)}
-                    placeholder="Required"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Primary 2 phone (optional)
-                  <input
-                    type="tel"
-                    value={parentPhone2}
-                    onChange={(event) => setParentPhone2(event.target.value)}
-                    placeholder="Optional"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Parent email (required)
-                  <input
-                    type="email"
-                    required
-                    value={parentEmail}
-                    onChange={(event) => setParentEmail(event.target.value)}
-                    placeholder="Required"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Teacher email (required)
-                  <input
-                    type="email"
-                    required
-                    value={teacherEmail}
-                    onChange={(event) => setTeacherEmail(event.target.value)}
-                    placeholder="Required"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
-                <label className="block text-sm font-semibold sm:col-span-2 lg:col-span-1">
-                  Bus company email (required)
-                  <input
-                    type="email"
-                    required
-                    value={busCompanyEmail}
-                    onChange={(event) => setBusCompanyEmail(event.target.value)}
-                    placeholder="Required"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Bus coordinator email (required)
-                  <input
-                    type="email"
-                    required
-                    value={coordinatorEmail}
-                    onChange={(event) => setCoordinatorEmail(event.target.value)}
-                    placeholder="Required"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
-                <label className="block text-sm font-semibold">
-                  Front Desk email (required)
-                  <input
-                    type="email"
-                    required
-                    value={frontDeskEmail}
-                    onChange={(event) => setFrontDeskEmail(event.target.value)}
-                    placeholder="Required"
-                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                  />
-                </label>
-              </div>
-              <p className="text-sm font-medium text-navy">
-                All of these are required except Primary 2. The change will not
-                save if an email is missing. Coordinator and Front Desk get
-                email when the bus company assigns the bus or van.
-              </p>
-
-              <label className="block text-sm font-semibold">
-                Note (optional)
-                <textarea
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  rows={2}
-                  className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
-                />
-              </label>
-
-              {error ? <p className="text-sm text-red">{error}</p> : null}
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="submit"
-                  disabled={pending || !trips.length}
-                  className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {pending ? "Saving…" : "Save Change"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpenForm(false)}
                   className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
                 >
                   Cancel
