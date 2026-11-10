@@ -34,6 +34,8 @@ type ArrivalRow = {
 const AIM_PIN = { lat: 44.950661, lng: -93.257431 };
 /** Nia-Nur area pin for demo map (Bloomington / south metro). */
 const NIA_PIN = { lat: 44.8408, lng: -93.2983 };
+/** Sankofa Prep area pin for demo map (north Minneapolis / metro). */
+const SANKOFA_PIN = { lat: 45.0125, lng: -93.2915 };
 
 /** Minnehaha: 3 Aim buses. GPS for Bus 4 + Bus 5 now; 3rd unit # later. */
 const AIM_SAMPLE: BoardBus[] = [
@@ -92,8 +94,60 @@ const NIA_SAMPLE: BoardBus[] = [
   },
 ];
 
+/** Sankofa Prep demo: three buses. */
+const SANKOFA_SAMPLE: BoardBus[] = [
+  {
+    id: "sankofa-1",
+    label: "Bus 1",
+    etaMinutes: 8,
+    miles: 1.6,
+    status: "On route",
+    lat: SANKOFA_PIN.lat - 0.015,
+    lng: SANKOFA_PIN.lng + 0.02,
+    map: { left: "34%", top: "58%" },
+  },
+  {
+    id: "sankofa-2",
+    label: "Bus 2",
+    etaMinutes: 5,
+    miles: 1.0,
+    status: "Arriving",
+    lat: SANKOFA_PIN.lat + 0.011,
+    lng: SANKOFA_PIN.lng - 0.016,
+    map: { left: "48%", top: "42%" },
+  },
+  {
+    id: "sankofa-3",
+    label: "Bus 3",
+    etaMinutes: 12,
+    miles: 2.4,
+    status: "On route",
+    lat: SANKOFA_PIN.lat - 0.008,
+    lng: SANKOFA_PIN.lng - 0.024,
+    map: { left: "62%", top: "50%" },
+  },
+];
+
 function isNiaSchool(name: string) {
   return /nia|nur/i.test(name);
+}
+
+function isSankofaSchool(name: string) {
+  return /sankofa/i.test(name);
+}
+
+function demoSchoolPin(name: string) {
+  if (/aim/i.test(name)) return AIM_PIN;
+  if (isNiaSchool(name)) return NIA_PIN;
+  if (isSankofaSchool(name)) return SANKOFA_PIN;
+  return null;
+}
+
+function demoBusesForSchool(name: string): BoardBus[] {
+  if (/aim/i.test(name)) return AIM_SAMPLE;
+  if (isNiaSchool(name)) return NIA_SAMPLE;
+  if (isSankofaSchool(name)) return SANKOFA_SAMPLE;
+  return [];
 }
 
 function formatBusClock(iso?: string | null) {
@@ -137,18 +191,20 @@ export function LiveGpsBoard({
   const [historyDay, setHistoryDay] = useState(
     initialDayKey || initialArrivalDays[0]?.dayKey || "",
   );
-  const [error, setError] = useState(
-    // Demo layout for NIA — hide the “not connected” feed error on first paint.
-    isNiaSchool(schoolName) ? "" : initialFeed?.error || "",
-  );
-  const [pending, start] = useTransition();
   const aimSchool = /aim/i.test(schoolName);
   const niaSchool = isNiaSchool(schoolName);
+  const sankofaSchool = isSankofaSchool(schoolName);
+  const hasDemoLayout = aimSchool || niaSchool || sankofaSchool;
+  const [error, setError] = useState(
+    // Demo schools hide the “not connected” feed error on first paint.
+    hasDemoLayout && !initialFeed?.live ? "" : initialFeed?.error || "",
+  );
+  const [pending, start] = useTransition();
   const liveBuses =
     feed?.buses.filter((bus) => !bus.pending && bus.lat != null) || [];
   const live = Boolean(feed?.live && liveBuses.length);
-  const demoBuses = aimSchool ? AIM_SAMPLE : niaSchool ? NIA_SAMPLE : [];
-  // Live feed when connected; otherwise school-specific demo (Aim 4/5 or NIA 1/2).
+  const demoBuses = demoBusesForSchool(schoolName);
+  // Live feed when connected; otherwise school-specific demo.
   const buses: Array<BoardBus | LiveBusPoint> = feed?.buses?.length
     ? feed.buses
     : demoBuses;
@@ -163,9 +219,7 @@ export function LiveGpsBoard({
 
   const mapMarkers = useMemo(() => {
     const markers: MapMarker[] = [];
-    const school =
-      feed?.school ||
-      (aimSchool ? AIM_PIN : niaSchool ? NIA_PIN : null);
+    const school = feed?.school || demoSchoolPin(schoolName);
     if (school) {
       markers.push({
         id: "school",
@@ -187,7 +241,7 @@ export function LiveGpsBoard({
       });
     }
     return markers;
-  }, [aimSchool, buses, feed?.school, niaSchool]);
+  }, [buses, feed?.school, schoolName]);
 
   function refresh() {
     start(async () => {
@@ -202,7 +256,7 @@ export function LiveGpsBoard({
       setArrivalDays(result.arrivalDays);
       if (!historyDay) setHistoryDay(result.dayKey);
       setError(
-        niaSchool && !result.feed.live ? "" : result.feed.error || "",
+        hasDemoLayout && !result.feed.live ? "" : result.feed.error || "",
       );
     });
   }
@@ -236,7 +290,9 @@ export function LiveGpsBoard({
               ? `${schoolName} · Minnehaha’s 3 Aim buses`
               : niaSchool
                 ? `${schoolName} · Bus 1 and Bus 2`
-                : `${schoolName} · this school’s routes only`}
+                : sankofaSchool
+                  ? `${schoolName} · Bus 1, Bus 2, and Bus 3`
+                  : `${schoolName} · this school’s routes only`}
           </p>
           {stamp ? (
             <p className="mt-1 text-sm font-medium text-navy">{stamp}</p>
@@ -255,7 +311,9 @@ export function LiveGpsBoard({
                 : "Preview · waiting for bus company API"
               : niaSchool
                 ? "Demo · Bus 1 & Bus 2"
-                : "Not connected for this school yet"}
+                : sankofaSchool
+                  ? "Demo · Bus 1, 2 & 3"
+                  : "Not connected for this school yet"}
           </span>
         )}
       </div>
@@ -265,7 +323,9 @@ export function LiveGpsBoard({
           ? "Minnehaha operates three Aim buses. Bus 4 and Bus 5 have GPS units now. The 3rd bus slot stays until they send that unit number. Arrival times are saved automatically when a bus reaches school so you can look them up later."
           : niaSchool
             ? "Demo map for NIA: Bus 1 and Bus 2 only. Vans stay on Front Desk. When the bus company connects real GPS units, this page will show live positions for this school only — not Aim."
-            : "Live GPS is separate for each school. Minnehaha Aim tracking does not show here. When this school’s bus company shares GPS units, arrivals will save on this page only."}
+            : sankofaSchool
+              ? "Demo map for Sankofa Prep: Bus 1, Bus 2, and Bus 3. When the bus company connects real GPS units, this page will show live positions for Sankofa only."
+              : "Live GPS is separate for each school. When this school’s bus company shares GPS units, arrivals will save on this page only."}
         {pending ? " Updating…" : ""}
       </p>
 
@@ -382,7 +442,9 @@ export function LiveGpsBoard({
                 ? "Three Aim buses only. Add the 3rd GPS unit when Minnehaha shares it."
                 : niaSchool
                   ? "Demo shows Bus 1 and Bus 2 only. Real GPS will replace this when connected."
-                  : "No live buses for this school yet. Roster Bus / Van lists stay on Front Desk."}
+                  : sankofaSchool
+                    ? "Demo shows Bus 1, Bus 2, and Bus 3. Real GPS will replace this when connected."
+                    : "No live buses for this school yet. Roster Bus / Van lists stay on Front Desk."}
             </p>
           </div>
         </div>
