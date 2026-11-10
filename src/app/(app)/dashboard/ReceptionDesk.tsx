@@ -45,16 +45,11 @@ function studentRideOptions(student: EffectiveStudent) {
   if (pmVan && pmVan.toLowerCase() !== amVan.toLowerCase()) {
     options.push({ value: `ride:van:${pmVan.toLowerCase()}`, label: pmVan });
   }
-  if (student.am.busNumber) {
+  // One Bus 1 / Bus 2 choice — AM and PM times show as columns in the list.
+  for (const bus of studentBuses(student)) {
     options.push({
-      value: `ride:am:${student.am.busNumber}`,
-      label: `Bus ${student.am.busNumber} AM`,
-    });
-  }
-  if (student.pm.busNumber) {
-    options.push({
-      value: `ride:pm:${student.pm.busNumber}`,
-      label: `Bus ${student.pm.busNumber} PM`,
+      value: `ride:bus:${bus}`,
+      label: `Bus ${bus}`,
     });
   }
   return options;
@@ -91,6 +86,11 @@ function studentMatchesRide(
     const wanted = ride.slice("ride:van:".length);
     return [planVanLabel(student.am), planVanLabel(student.pm)].some(
       (label) => label.toLowerCase() === wanted,
+    );
+  }
+  if (ride.startsWith("ride:bus:")) {
+    return studentBuses(student).some((bus) =>
+      sameDeskBus(bus, ride.slice("ride:bus:".length)),
     );
   }
   if (ride.startsWith("ride:am:")) {
@@ -141,14 +141,14 @@ function deskRows(
       return hay.includes(q) || tokens.every((part) => hay.includes(part));
     })
     .sort((a, b) => {
-      const byGrade = gradeRank(a.grade) - gradeRank(b.grade);
-      if (byGrade) return byGrade;
-      const byTeacher = teacherLabel(a).localeCompare(teacherLabel(b));
-      if (byTeacher) return byTeacher;
       const busA = studentBuses(a)[0] || "";
       const busB = studentBuses(b)[0] || "";
       const byBus = busA.localeCompare(busB, undefined, { numeric: true });
       if (byBus) return byBus;
+      const timeA = a.am.pickupTime || a.pm.pickupTime || "";
+      const timeB = b.am.pickupTime || b.pm.pickupTime || "";
+      const byTime = timeA.localeCompare(timeB, undefined, { numeric: true });
+      if (byTime) return byTime;
       return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
     });
 }
@@ -318,7 +318,7 @@ export function ReceptionDesk({
     () => uniqueSorted(students.map((student) => teacherLabel(student))),
     [students],
   );
-  // Ride filter options come from the loaded roster only — Bus 1 AM / Bus 1 PM stay separate.
+  // Ride filter: Bus 1, Bus 2, Van 6 — one list each; AM/PM times are columns.
   const rideChoices = useMemo(() => {
     const byLabel = new Map<string, { value: string; label: string }>();
     for (const student of students) {
@@ -651,13 +651,13 @@ export function ReceptionDesk({
           <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-paper text-base font-bold text-navy">
               <tr>
-                <th className="whitespace-nowrap px-4 py-3">First name</th>
-                <th className="whitespace-nowrap py-3 pr-3">Last name</th>
+                <th className="whitespace-nowrap px-4 py-3">First Name</th>
+                <th className="whitespace-nowrap py-3 pr-3">Last Name</th>
                 <th className="whitespace-nowrap py-3 pr-3">Addr Line1</th>
                 <th className="whitespace-nowrap py-3 pr-3">City/State/Zip</th>
                 <th className="whitespace-nowrap py-3 pr-3">Phone Number</th>
-                <th className="whitespace-nowrap py-3 pr-3">Pickup Time</th>
-                <th className="whitespace-nowrap py-3 pr-4">Bus / Van</th>
+                <th className="whitespace-nowrap py-3 pr-3">AM Pickup</th>
+                <th className="whitespace-nowrap py-3 pr-4">PM Pickup</th>
               </tr>
             </thead>
             <tbody>
@@ -673,22 +673,6 @@ export function ReceptionDesk({
                   addressParts.length > 1
                     ? addressParts.slice(1).join(", ")
                     : "—";
-                const pickup =
-                  ride.startsWith("ride:pm:") || ride.endsWith(" PM")
-                    ? student.pm.pickupTime || "—"
-                    : ride.startsWith("ride:am:") ||
-                        ride.endsWith(" AM") ||
-                        ride.startsWith("ride:van:") ||
-                        ride.startsWith("van:")
-                      ? student.am.pickupTime ||
-                        student.pm.pickupTime ||
-                        "—"
-                      : student.am.pickupTime ||
-                        student.pm.pickupTime ||
-                        "—";
-                const rides = studentRideOptions(student)
-                  .map((option) => option.label)
-                  .join(" · ");
                 return (
                   <tr
                     key={student.id}
@@ -726,10 +710,10 @@ export function ReceptionDesk({
                       )}
                     </td>
                     <td className="whitespace-nowrap py-3 pr-3 font-semibold text-navy">
-                      {pickup}
+                      {student.am.pickupTime || "—"}
                     </td>
                     <td className="whitespace-nowrap py-3 pr-4 font-semibold text-navy">
-                      {rides || "—"}
+                      {student.pm.pickupTime || "—"}
                     </td>
                   </tr>
                 );
