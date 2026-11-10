@@ -13,22 +13,25 @@ export default async function AppLayout({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  const school = await getSchoolIdentityById(session.schoolId);
-  const headerName =
+
+  const [school, platformAdmin, companyName] = await Promise.all([
+    getSchoolIdentityById(session.schoolId),
+    isPlatformAdmin(session),
     session.role === "BUS_COMPANY"
-      ? await prisma.user
+      ? prisma.user
           .findUnique({
             where: { id: session.id },
             select: { name: true },
           })
           .then((row) => row?.name || session.name)
           .catch(() => session.name)
-      : session.name;
+      : Promise.resolve(session.name),
+  ]);
+  const headerName = companyName;
 
   // Sankofa is no longer the platform hub — hide Add schools on that desk.
   const sankofaDesk = /sankofa/i.test(school?.name || "");
-  const showPlatform =
-    !sankofaDesk && (await isPlatformAdmin(session));
+  const showPlatform = !sankofaDesk && platformAdmin;
 
   return (
     <AppShell

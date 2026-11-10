@@ -103,14 +103,26 @@ export function canManageUsers(role: Role) {
   return role === "ADMINISTRATOR";
 }
 
+let firstSchoolIdCache: Promise<string | null> | null = null;
+
+function firstSchoolId() {
+  if (!firstSchoolIdCache) {
+    firstSchoolIdCache = prisma.school
+      .findFirst({
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      })
+      .then((row) => row?.id || null)
+      .catch(() => null);
+  }
+  return firstSchoolIdCache;
+}
+
 export async function isPlatformAdmin(user: SessionUser) {
   if (user.role !== "ADMINISTRATOR") return false;
   if (isPlatformAdminEmail(user.email)) return true;
-  const first = await prisma.school.findFirst({
-    orderBy: { createdAt: "asc" },
-    select: { id: true },
-  });
-  return Boolean(first && first.id === user.schoolId);
+  const firstId = await firstSchoolId();
+  return Boolean(firstId && firstId === user.schoolId);
 }
 
 export function canViewAll(role: Role) {

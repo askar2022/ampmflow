@@ -539,7 +539,8 @@ export function ReceptionDesk({
       setMessage(result.message);
       setOpenForm(false);
       setReplaceChange(false);
-      router.refresh();
+      // Refresh roster after paint so the click feels finished first.
+      window.setTimeout(() => router.refresh(), 50);
     });
   }
 

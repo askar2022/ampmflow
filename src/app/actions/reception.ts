@@ -9,11 +9,12 @@ import { canRecordChange } from "@/lib/policy";
 import { durationLabel, planSummary } from "@/lib/format";
 import { ensureStudentContactColumns, loadStudent } from "@/lib/transportation";
 import {
-  noticeSummary,
   notifyRouteRequest,
   notifyStudentLeft,
   notifyTransportationChange,
   planLine,
+  queuedNoticeMessage,
+  scheduleChangeNotify,
 } from "@/lib/change-notify";
 import {
   defaultBusCompanyEmail,
@@ -327,34 +328,36 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
       },
     })
     .catch(() => undefined);
-  const notice = await notifyTransportationChange({
-    user,
-    student,
-    trips: input.trips,
-    previous,
-    next: planLine(student, input.trips),
-    when,
-    note,
-    waiting,
-    destination,
-    parentSms:
-      destination === "DAYCARE"
-        ? "daycare-request"
-        : destination === "CUSTOM"
-          ? "address-request"
-          : waiting
-            ? "ride-request"
-            : "assigned",
-    teacherEmail,
-    busCompanyEmail,
-  });
+  scheduleChangeNotify(
+    notifyTransportationChange({
+      user,
+      student,
+      trips: input.trips,
+      previous,
+      next: planLine(student, input.trips),
+      when,
+      note,
+      waiting,
+      destination,
+      parentSms:
+        destination === "DAYCARE"
+          ? "daycare-request"
+          : destination === "CUSTOM"
+            ? "address-request"
+            : waiting
+              ? "ride-request"
+              : "assigned",
+      teacherEmail,
+      busCompanyEmail,
+    }),
+  );
 
   return {
     ok: true as const,
     waiting,
-    message: noticeSummary(notice),
-    sent: notice.sent,
-    skipped: notice.skipped,
+    message: queuedNoticeMessage(waiting),
+    sent: [] as string[],
+    skipped: [] as string[],
   };
 }
 
@@ -580,15 +583,17 @@ export async function removeReceptionStudent(input: {
     })
     .catch(() => undefined);
 
-  const notice = await notifyStudentLeft({
-    user,
-    student,
-    previous,
-    reason,
-    note,
-    teacherEmail,
-    busCompanyEmail,
-  });
+  scheduleChangeNotify(
+    notifyStudentLeft({
+      user,
+      student,
+      previous,
+      reason,
+      note,
+      teacherEmail,
+      busCompanyEmail,
+    }),
+  );
 
   revalidatePath("/dashboard");
   revalidatePath("/buses");
@@ -598,8 +603,8 @@ export async function removeReceptionStudent(input: {
 
   return {
     ok: true as const,
-    message: noticeSummary(
-      notice,
+    message: queuedNoticeMessage(
+      false,
       `${student.fullName} is off Front Desk and Reports. Put them back from Roster Archive if this was a mistake.`,
     ),
   };
@@ -866,32 +871,30 @@ export async function requestRoute(input: RouteRequestInput) {
   revalidatePath("/changes");
   revalidatePath("/company");
 
-  const notice = await notifyRouteRequest({
-    user,
-    studentName: `${firstName} ${lastName}`,
-    studentId: loaded?.effective.studentId,
-    grade,
-    teacherName,
-    parentPhone,
-    parentEmail,
-    busCompanyEmail,
-    address,
-    emergency,
-  });
+  scheduleChangeNotify(
+    notifyRouteRequest({
+      user,
+      studentName: `${firstName} ${lastName}`,
+      studentId: loaded?.effective.studentId,
+      grade,
+      teacherName,
+      parentPhone,
+      parentEmail,
+      busCompanyEmail,
+      address,
+      emergency,
+    }),
+  );
 
   return {
     ok: true as const,
     waiting: true,
-    message: [
-      "Request sent.",
-      notice.sent.length ? `Emailed ${notice.sent.join(", ")}.` : "",
-      notice.skipped.length ? `Could not email ${notice.skipped.join(", ")}.` : "",
+    message: queuedNoticeMessage(
+      true,
       "The student stays here until the bus company assigns a bus or van.",
-    ]
-      .filter(Boolean)
-      .join(" "),
-    sent: notice.sent,
-    skipped: notice.skipped,
+    ),
+    sent: [] as string[],
+    skipped: [] as string[],
   };
 }
 
@@ -1060,32 +1063,34 @@ export async function assignRequestedBus(input: {
   const after = await loadStudent(studentId);
   const student = after?.effective ?? loaded.effective;
   const busCompanyEmail = await defaultBusCompanyEmail(schoolId);
-  const notice = await notifyTransportationChange({
-    user,
-    student,
-    trips,
-    previous,
-    next:
-      vehicle === "van"
-        ? `${assignedLabel} · ${planLine(student, trips)}`
-        : planLine(student, trips),
-    when: vehicle === "van" ? "Assigned van" : "Assigned bus",
-    note: [
-      `Bus company assigned ${assignedLabel}.`,
-      trips.includes("AM") && amPickup ? `AM pickup ${amPickup}.` : "",
-      trips.includes("PM") && pmPickup ? `PM pickup ${pmPickup}.` : "",
-    ]
-      .filter(Boolean)
-      .join(" "),
-    waiting: false,
-    amPickup: trips.includes("AM") ? amPickup : "",
-    pmPickup: trips.includes("PM") ? pmPickup : "",
-    parentSms: "assigned",
-    teacherEmail: student.teacherEmail,
-    busCompanyEmail,
-    notifySchool: user.role === "BUS_COMPANY",
-    schoolId,
-  });
+  scheduleChangeNotify(
+    notifyTransportationChange({
+      user,
+      student,
+      trips,
+      previous,
+      next:
+        vehicle === "van"
+          ? `${assignedLabel} · ${planLine(student, trips)}`
+          : planLine(student, trips),
+      when: vehicle === "van" ? "Assigned van" : "Assigned bus",
+      note: [
+        `Bus company assigned ${assignedLabel}.`,
+        trips.includes("AM") && amPickup ? `AM pickup ${amPickup}.` : "",
+        trips.includes("PM") && pmPickup ? `PM pickup ${pmPickup}.` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      waiting: false,
+      amPickup: trips.includes("AM") ? amPickup : "",
+      pmPickup: trips.includes("PM") ? pmPickup : "",
+      parentSms: "assigned",
+      teacherEmail: student.teacherEmail,
+      busCompanyEmail,
+      notifySchool: user.role === "BUS_COMPANY",
+      schoolId,
+    }),
+  );
 
   revalidatePath("/waiting");
   revalidatePath("/dashboard");
@@ -1096,13 +1101,16 @@ export async function assignRequestedBus(input: {
   return {
     ok: true as const,
     assigned: assignedLabel,
-    sent: notice.sent,
-    skipped: notice.skipped,
+    sent: [] as string[],
+    skipped: [] as string[],
     parentEmail: student.parentEmail,
     parentPhone: student.parentPhone,
     parentPhone2: student.parentPhone2,
     teacherEmail: student.teacherEmail,
     busCompanyEmail,
-    message: `${assignedLabel} is now assigned to ${student.fullName}.`,
+    message: queuedNoticeMessage(
+      false,
+      `${assignedLabel} is now assigned to ${student.fullName}.`,
+    ),
   };
 }

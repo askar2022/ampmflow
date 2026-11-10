@@ -25,13 +25,15 @@ export default async function DashboardPage({
   if (!session) return null;
   const { student: selectedId = "" } = await searchParams;
 
-  const school = await prisma.school.findUnique({
-    where: { id: session.schoolId },
-    select: { name: true },
-  });
+  const [school, students] = await Promise.all([
+    prisma.school.findUnique({
+      where: { id: session.schoolId },
+      select: { name: true },
+    }),
+    loadStudents(session.schoolId),
+  ]);
   const aim = isAimSchool(school?.name);
 
-  const students = await loadStudents(session.schoolId);
   const [routes, vehicles, vanRows, busCompanyEmail, deskEmails] =
     await Promise.all([
       prisma.busRoute.findMany({

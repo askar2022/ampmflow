@@ -274,11 +274,17 @@ export function LiveGpsBoard({
   }
 
   useEffect(() => {
-    refresh();
-    const timer = window.setInterval(refresh, 30000);
-    return () => window.clearInterval(timer);
+    // Demo layouts do not need constant OneStep polling.
+    if (!aimSchool) return;
+    // Server already painted initialFeed — refresh in background, then every minute.
+    const first = window.setTimeout(refresh, 2500);
+    const timer = window.setInterval(refresh, 60000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolId]);
+  }, [schoolId, aimSchool]);
 
   return (
     <div className="space-y-4">

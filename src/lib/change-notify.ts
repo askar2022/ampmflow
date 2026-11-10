@@ -1,5 +1,6 @@
 import { writeAudit } from "./audit";
 import { schoolStaffEmails } from "./company-access";
+import { after } from "next/server";
 import { sendMail, smtpConfigured } from "./email";
 import { planSummary } from "./format";
 import { usableOpsEmail } from "./ops-change-emails";
@@ -967,6 +968,23 @@ export function noticeSummary(notice: ChangeNotice, extra?: string) {
     parts.push(`Could not send ${notice.skipped.join(", ")}.`);
   }
   parts.push(extra || "Same-day changes also go out again in the 2:30 p.m. reminder.");
+  return parts.join(" ");
+}
+
+/** Do not block the UI on SMTP/Twilio — send after the action returns. */
+export function scheduleChangeNotify(job: Promise<unknown>) {
+  // after() keeps the Vercel worker alive so mail/SMS still go out.
+  after(() => job.then(() => undefined, () => undefined));
+}
+
+export function queuedNoticeMessage(waiting: boolean, extra?: string) {
+  const parts: string[] = [];
+  if (waiting) {
+    parts.push("Marked Waiting for Route until the bus company confirms it.");
+  }
+  parts.push("Saved. Emails and parent texts are sending in the background.");
+  if (extra) parts.push(extra);
+  else parts.push("Same-day changes also go out again in the 2:30 p.m. reminder.");
   return parts.join(" ");
 }
 
