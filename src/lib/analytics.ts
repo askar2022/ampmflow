@@ -68,11 +68,7 @@ function sortCounts(rows: VehicleRiderCount[]) {
 }
 
 async function loadVehicleCounts(schoolId: string, vans: Array<{ id: string; name: string }>) {
-  const [routes, assignments, vanStudents] = await Promise.all([
-    prisma.busRoute.findMany({
-      where: { schoolId },
-      select: { number: true },
-    }),
+  const [assignments, vanStudents] = await Promise.all([
     prisma.transportationAssignment.findMany({
       where: {
         waitingForAssignment: false,
@@ -104,14 +100,11 @@ async function loadVehicleCounts(schoolId: string, vans: Array<{ id: string; nam
     set.add(row.studentId);
     ridersByBus.set(number, set);
   }
-  const busNames = new Set([
-    ...routes.map((route) => route.number.trim()).filter(Boolean),
-    ...ridersByBus.keys(),
-  ]);
+  // Only buses that actually have riders — drop empty leftover Bus 3/4/5 routes.
   const busCounts = sortCounts(
-    [...busNames].map((name) => ({
+    [...ridersByBus.entries()].map(([name, riders]) => ({
       name,
-      riders: ridersByBus.get(name)?.size || 0,
+      riders: riders.size,
     })),
   );
 
@@ -257,7 +250,8 @@ export async function loadCoordinatorAnalytics(
 
   const buses = aimSchool
     ? AIM_FLEET_LABELS.length
-    : new Set(routes.map((route) => route.number.trim()).filter(Boolean)).size;
+    : busCounts.filter((row) => row.riders > 0).length ||
+      new Set(routes.map((route) => route.number.trim()).filter(Boolean)).size;
 
   return {
     students,

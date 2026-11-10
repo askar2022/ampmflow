@@ -1,6 +1,23 @@
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
-import { AIM_FLEET_LABELS } from "./aim-fleet";
+import { AIM_FLEET_LABELS, isAimSchool } from "./aim-fleet";
+
+/** Empty GPS report slots — school-specific demo fleet, never mix Aim into NIA. */
+function gpsReportFleet(schoolName?: string | null) {
+  if (isAimSchool(schoolName)) {
+    return {
+      company: "Minnehaha",
+      labels: [...AIM_FLEET_LABELS] as string[],
+    };
+  }
+  if (schoolName && /nia|nur/i.test(schoolName)) {
+    return { company: "NIA", labels: ["Bus 1", "Bus 2"] };
+  }
+  if (schoolName && /sankofa/i.test(schoolName)) {
+    return { company: "Sankofa", labels: ["Bus 1", "Bus 2", "Bus 3"] };
+  }
+  return { company: "School", labels: [] as string[] };
+}
 import {
   formatLongDate,
   formatTime,
@@ -593,6 +610,13 @@ export async function loadGpsTripReport(args: {
   const day = args.dayKey || todayKey();
   await scrubFalseGpsTripStamps(args.schoolId, day);
 
+  const school = await prisma.school.findUnique({
+    where: { id: args.schoolId },
+    select: { name: true },
+  });
+  const fleet = gpsReportFleet(school?.name);
+  const aimSchool = isAimSchool(school?.name);
+
   type EventRow = {
     busLabel: string;
     company: string;
@@ -616,6 +640,16 @@ export async function loadGpsTripReport(args: {
     rows = [];
   }
 
+  // Non-Aim schools must never show Minnehaha Aim Bus 4/5/3rd rows.
+  if (!aimSchool) {
+    rows = rows.filter(
+      (row) =>
+        !/minnehaha/i.test(row.company || "") &&
+        !/^bus\s*[45]$/i.test(row.busLabel.trim()) &&
+        !/3rd\s*bus/i.test(row.busLabel),
+    );
+  }
+
   const map = new Map<string, GpsTripReportRow>();
   function slot(busLabel: string, company: string, trip: string) {
     const key = `${busLabel}::${trip}`;
@@ -636,9 +670,9 @@ export async function loadGpsTripReport(args: {
     return row;
   }
 
-  for (const label of AIM_FLEET_LABELS) {
-    slot(label, "Minnehaha", "AM");
-    slot(label, "Minnehaha", "PM");
+  for (const label of fleet.labels) {
+    slot(label, fleet.company, "AM");
+    slot(label, fleet.company, "PM");
   }
 
   const firstMeta = new Map<

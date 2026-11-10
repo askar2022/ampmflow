@@ -58,12 +58,14 @@ export function GpsReportBoard({
 
   useEffect(() => {
     loadDay(dayKey || initialDayKey);
+    // Aim live GPS benefits from polling; other schools use sample slots only.
+    if (!/aim/i.test(schoolName)) return;
     const timer = window.setInterval(() => {
       loadDay(dayKey || initialDayKey);
-    }, 30000);
+    }, 60000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolId]);
+  }, [schoolId, schoolName]);
 
   return (
     <div id="gps-report" className="space-y-5 scroll-mt-24">
@@ -77,7 +79,11 @@ export function GpsReportBoard({
           <p className="mt-1 text-muted">
             {/aim/i.test(schoolName)
               ? `${schoolName} · Minnehaha’s 3 Aim buses only (Bus 4, Bus 5, 3rd bus)`
-              : `${schoolName} · GPS history for this school only`}
+              : /nia|nur/i.test(schoolName)
+                ? `${schoolName} · Bus 1 and Bus 2 (sample until live GPS)`
+                : /sankofa/i.test(schoolName)
+                  ? `${schoolName} · Bus 1, Bus 2, and Bus 3 (sample until live GPS)`
+                  : `${schoolName} · GPS history for this school only`}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -108,10 +114,9 @@ export function GpsReportBoard({
       </div>
 
       <p className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-        Each bus is timed on its own. A bus parked at headquarters does not
-        count as a pickup. When a bus reaches school (like Bus 5 drop-off),
-        Arrived school fills in. First pickup and last stop only after the bus
-        really moves on the route.
+        {/aim/i.test(schoolName)
+          ? "Each bus is timed on its own. A bus parked at headquarters does not count as a pickup. When a bus reaches school (like Bus 5 drop-off), Arrived school fills in. First pickup and last stop only after the bus really moves on the route."
+          : "Each bus is timed for this school only. Sample rows stay empty until this school’s bus company connects live GPS — Aim / Minnehaha buses never appear here."}
         {pending ? " Updating…" : ""}
       </p>
 
