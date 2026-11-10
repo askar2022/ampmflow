@@ -25,13 +25,18 @@ export default async function AppLayout({
           .catch(() => session.name)
       : session.name;
 
+  // Sankofa is no longer the platform hub — hide Add schools on that desk.
+  const sankofaDesk = /sankofa/i.test(school?.name || "");
+  const showPlatform =
+    !sankofaDesk && (await isPlatformAdmin(session));
+
   return (
     <AppShell
       user={session}
       schoolName={school?.name ?? null}
       schoolLogoUrl={school?.logoUrl ?? null}
       headerName={headerName}
-      showPlatform={await isPlatformAdmin(session)}
+      showPlatform={showPlatform}
     >
       {children}
     </AppShell>
