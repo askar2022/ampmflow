@@ -46,6 +46,7 @@ export type DriverRider = {
   parentName: string;
   parentPhone: string;
   parentPhone2: string;
+  homeAddress: string;
   buses: string[];
   vanId: string | null;
 };
@@ -231,6 +232,10 @@ export async function loadDriverLists(schoolId: string) {
     parentName: student.parentName,
     parentPhone: student.parentPhone,
     parentPhone2: student.parentPhone2,
+    homeAddress:
+      student.homeAddress && student.homeAddress !== "—"
+        ? student.homeAddress
+        : "",
     buses: studentBusNumbers(student),
     vanId: vanByStudent.get(student.id) || null,
   }));
@@ -270,10 +275,10 @@ export function oneVehicleText(args: {
     `${rows.length} student${rows.length === 1 ? "" : "s"}`,
     "Parent pickup is not on this list.",
     "",
-    "Student name  |  Parent name  |  Primary 1 / 2 phone  |  Teacher  |  Grade",
+    "Student name  |  Parent name  |  Primary 1 / 2 phone  |  Address",
     ...rows.map(
       (rider) =>
-        `  ${rider.name}  |  ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  |  ${[rider.parentPhone, rider.parentPhone2].filter(Boolean).join(" / ") || "—"}  |  ${rider.teacherName || "—"}  |  ${String(rider.grade).replace(/^grade\s+/i, "")}`,
+        `  ${rider.name}  |  ${rider.parentName && rider.parentName !== "—" ? rider.parentName : "—"}  |  ${[rider.parentPhone, rider.parentPhone2].filter(Boolean).join(" / ") || "—"}  |  ${rider.homeAddress || "—"}`,
     ),
   ];
   if (!rows.length) lines.push("No students on this vehicle.");

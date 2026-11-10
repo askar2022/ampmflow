@@ -27,10 +27,6 @@ function hasParentPhone(value: string) {
   return Boolean(phoneHref(value));
 }
 
-function gradeOnly(value: string) {
-  return value.replace(/^grade\s+/i, "").trim() || value;
-}
-
 function BusIcon() {
   return (
     <svg
@@ -254,19 +250,17 @@ export function DriverLists({
           <div className="mt-5 overflow-x-auto rounded-[12px] border border-line">
             <table className="w-full min-w-[40rem] table-fixed text-left text-sm">
               <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[22%]" />
                 <col className="w-[20%]" />
-                <col className="w-[24%]" />
-                <col className="w-[12%]" />
+                <col className="w-[18%]" />
+                <col className="w-[20%]" />
+                <col className="w-[42%]" />
               </colgroup>
               <thead>
                 <tr className="border-b border-line bg-paper text-base font-bold text-navy">
                   <th className="px-4 py-3">Student name</th>
                   <th className="py-3 pr-3">Parent name</th>
                   <th className="py-3 pr-3">Primary 1 / 2 phone</th>
-                  <th className="py-3 pr-3">Teacher</th>
-                  <th className="py-3 pr-4">Grade</th>
+                  <th className="py-3 pr-4">Address</th>
                 </tr>
               </thead>
               <tbody>
@@ -302,8 +296,9 @@ export function DriverLists({
                           </span>
                         ) : null}
                       </td>
-                      <td className="py-3 pr-3">{rider.teacherName || "—"}</td>
-                      <td className="py-3 pr-4">{gradeOnly(rider.grade)}</td>
+                      <td className="py-3 pr-4 text-muted">
+                        {rider.homeAddress || "—"}
+                      </td>
                     </tr>
                   );
                 })}
