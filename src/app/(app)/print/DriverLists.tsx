@@ -206,9 +206,6 @@ export function DriverLists({
               <p className="mt-1 text-sm text-muted">
                 Driver {driverName || "not on file"}
               </p>
-              <p className="mt-1 text-sm font-semibold text-navy">
-                {rows.length} student{rows.length === 1 ? "" : "s"}
-              </p>
             </div>
             <div className="no-print flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
               <label className="text-sm font-semibold text-navy">
