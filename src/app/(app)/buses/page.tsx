@@ -48,20 +48,12 @@ export default async function RosterPage() {
         <div>
           <h2 className="font-serif text-2xl">Upload students</h2>
           <p className="mt-1 text-sm text-muted">
-            Upload one Excel per ride: Bus_1_AM.xlsx, BUS 1PM.xlsx, VAN_6.xlsx.
-            Headers must be First Name, Last Name, Addr Line1, City/State/Zip,
-            Phone Number, Pickup Time. Load Bus 1 AM then Bus 1 PM with Update
-            existing checked. Stay on this page until you see Finished.
+            Upload one Excel file per bus or van ride. Check Update existing when
+            you load the next file. Stay on this page until you see Finished.
           </p>
           <div className="mt-4">
             <ImportForm />
           </div>
-          <a
-            href="/sample-import.csv"
-            className="mt-3 inline-block text-sm font-semibold text-navy"
-          >
-            Download sample CSV
-          </a>
           <div className="mt-6 space-y-4">
             <ClearGhostVans />
             <ClearRoster

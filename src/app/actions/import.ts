@@ -1057,7 +1057,7 @@ export async function importStudents(formData: FormData) {
     return {
       ok: false,
       error:
-        "No student rows found. Name the file like VAN_6.xlsx or Bus_1_AM.xlsx, with First Name, Last Name, address, phone, and Pickup Time columns.",
+        "No student rows found. Use one Excel file per bus or van ride (for example Bus_1_AM.xlsx), then try again.",
     };
   }
 
