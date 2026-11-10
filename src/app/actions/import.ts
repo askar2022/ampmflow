@@ -909,7 +909,8 @@ async function applyStudentPlans(args: {
         busRouteId: type === "BUS" ? route?.id : null,
         daycareId: dest === "DAYCARE" ? args.daycareId : null,
         waitingForAssignment: type === "BUS" && !route,
-        notes: type === "VAN" ? args.vanName || "Van" : "",
+        // Van rides are handled above; bus/parent must not keep old van notes.
+        notes: "",
         pickupTime,
         updatedById: args.userId,
       },
@@ -920,8 +921,7 @@ async function applyStudentPlans(args: {
         busRouteId: type === "BUS" ? route?.id : null,
         daycareId: dest === "DAYCARE" ? args.daycareId : null,
         waitingForAssignment: type === "BUS" && !route,
-        // Clear leftover "Van 2" notes when this trip is a bus.
-        notes: type === "VAN" ? args.vanName || "Van" : "",
+        notes: "",
         pickupTime,
         updatedById: args.userId,
       },
