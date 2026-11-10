@@ -314,10 +314,13 @@ function looksLikePersonName(value: string) {
 }
 
 function parseSheetRide(sheetName: string) {
-  // VAN_6.xlsx, Bus_1_AM, "NIA Academy Van 6 (AM)", etc.
+  // VAN_6.xlsx, Bus_1_AM, BUS 1PM.xlsx, "NIA Academy Van 6 (AM)", etc.
   const name = cleanSheetName(sheetName)
     .replace(/\.(xlsx|xls|csv)$/i, "")
-    .replace(/[_-]+/g, " ");
+    .replace(/[_-]+/g, " ")
+    // BUS 1PM / Bus1AM → Bus 1 PM / Bus 1 AM
+    .replace(/\b(bus|van)\s*#?\s*([0-9]+)\s*(am|pm)\b/gi, "$1 $2 $3")
+    .replace(/\b(bus|van)\s*#?\s*([0-9]+)(am|pm)\b/gi, "$1 $2 $3");
   const trip = /\bPM\b/i.test(name) ? "PM" : /\bAM\b/i.test(name) ? "AM" : null;
   const van = name.match(/\bvan\s*#?\s*([0-9]+)\b/i);
   if (van) {

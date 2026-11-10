@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { restoreSchoolRoster, restoreStudent } from "@/app/actions/roster";
+import {
+  deleteArchivedStudents,
+  restoreSchoolRoster,
+  restoreStudent,
+} from "@/app/actions/roster";
 
 type ArchivedStudent = {
   id: string;
@@ -14,10 +18,34 @@ type ArchivedStudent = {
 export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [warnDelete, setWarnDelete] = useState(false);
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
 
-  if (!students.length) return null;
+  if (!students.length && !message) return null;
+
+  function closeWarn() {
+    if (!pending) setWarnDelete(false);
+  }
+
+  function deleteAll() {
+    start(async () => {
+      const result = await deleteArchivedStudents();
+      if (!result.ok) {
+        setMessage(result.error);
+        setWarnDelete(false);
+        return;
+      }
+      setMessage(
+        result.deleted
+          ? `Permanently deleted ${result.deleted} archived student${result.deleted === 1 ? "" : "s"}.`
+          : "Archive was already empty.",
+      );
+      setWarnDelete(false);
+      setOpen(false);
+      router.refresh();
+    });
+  }
 
   return (
     <section className="rounded-2xl border border-line bg-card">
@@ -39,12 +67,12 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
         <div className="border-t border-line px-5 pb-5">
           <p className="mt-3 text-muted">
             These students are hidden from Front Desk and Reports. Put back
-            restores them.
+            restores them. Delete all removes them permanently.
           </p>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={pending}
+              disabled={pending || !students.length}
               onClick={() =>
                 start(async () => {
                   const result = await restoreSchoolRoster();
@@ -56,9 +84,17 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
                   router.refresh();
                 })
               }
-              className="rounded-xl border border-line px-4 py-2 text-sm font-semibold"
+              className="rounded-xl border border-line px-4 py-2 text-sm font-semibold disabled:opacity-50"
             >
               {pending ? "Working…" : "Put all back"}
+            </button>
+            <button
+              type="button"
+              disabled={pending || !students.length}
+              onClick={() => setWarnDelete(true)}
+              className="rounded-xl border border-red px-4 py-2 text-sm font-semibold text-red disabled:opacity-50"
+            >
+              Delete all permanently
             </button>
           </div>
           {message ? <p className="mt-3 text-sm text-muted">{message}</p> : null}
@@ -98,6 +134,48 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
               </li>
             ))}
           </ul>
+        </div>
+      ) : null}
+
+      {warnDelete ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-navy/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-archive-title"
+          onClick={closeWarn}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-card p-5 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="delete-archive-title" className="font-serif text-2xl text-navy">
+              Delete archive?
+            </h3>
+            <p className="mt-2 text-sm text-navy">
+              This permanently deletes {students.length} archived student
+              {students.length === 1 ? "" : "s"} and their bus plans. You cannot
+              undo this. Press Cancel if this is a mistake.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={closeWarn}
+                className="rounded-xl border border-line px-4 py-2 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={deleteAll}
+                className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {pending ? "Deleting…" : "Yes, delete permanently"}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </section>

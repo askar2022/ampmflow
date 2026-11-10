@@ -65,3 +65,50 @@ export async function restoreSchoolRoster() {
   refreshRoster();
   return { ok: true as const, restored: result.count };
 }
+
+export async function deleteArchivedStudents() {
+  const user = await getSession();
+  if (!user || (user.role !== "ADMINISTRATOR" && user.role !== "COORDINATOR")) {
+    return { ok: false as const, error: "Only an admin can delete the archive." };
+  }
+  await ensureStudentContactColumns().catch(() => undefined);
+
+  const archived = await prisma.student.findMany({
+    where: { schoolId: user.schoolId, active: false },
+    select: { id: true },
+  });
+  const ids = archived.map((row) => row.id);
+  if (!ids.length) {
+    return { ok: true as const, deleted: 0 };
+  }
+
+  const changeEvents = await prisma.changeEvent.findMany({
+    where: { studentId: { in: ids } },
+    select: { id: true },
+  });
+  const changeEventIds = changeEvents.map((row) => row.id);
+
+  await prisma.$transaction(async (tx) => {
+    if (changeEventIds.length) {
+      await tx.teacherAcknowledgment.deleteMany({
+        where: { changeEventId: { in: changeEventIds } },
+      });
+    }
+    await tx.gateStatusHistory.deleteMany({ where: { studentId: { in: ids } } });
+    await tx.gateDayStatus.deleteMany({ where: { studentId: { in: ids } } });
+    await tx.busCheckIn.deleteMany({ where: { studentId: { in: ids } } });
+    await tx.changeEvent.deleteMany({ where: { studentId: { in: ids } } });
+    await tx.auditLog.deleteMany({ where: { studentId: { in: ids } } });
+    await tx.changeRequest.deleteMany({ where: { studentId: { in: ids } } });
+    await tx.temporaryChange.deleteMany({ where: { studentId: { in: ids } } });
+    await tx.transportationAssignment.deleteMany({
+      where: { studentId: { in: ids } },
+    });
+    await tx.student.deleteMany({
+      where: { schoolId: user.schoolId, id: { in: ids }, active: false },
+    });
+  });
+
+  refreshRoster();
+  return { ok: true as const, deleted: ids.length };
+}
