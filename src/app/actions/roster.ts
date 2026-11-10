@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/auth";
+import { getSession, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureStudentContactColumns } from "@/lib/transportation";
 
@@ -12,11 +12,36 @@ function refreshRoster() {
   revalidatePath("/changes");
 }
 
-export async function archiveSchoolRoster() {
+async function confirmSignedInPassword(password: string) {
   const user = await getSession();
   if (!user || (user.role !== "ADMINISTRATOR" && user.role !== "COORDINATOR")) {
-    return { ok: false as const, error: "Only an admin can archive the roster." };
+    return {
+      ok: false as const,
+      error: "Only an admin or coordinator can do this.",
+    };
   }
+  const entered = String(password || "");
+  if (!entered.trim()) {
+    return { ok: false as const, error: "Enter your sign-in password to continue." };
+  }
+  const row = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { passwordHash: true, schoolId: true, active: true },
+  });
+  if (!row?.active || row.schoolId !== user.schoolId) {
+    return { ok: false as const, error: "Could not confirm your account." };
+  }
+  const ok = await verifyPassword(entered, row.passwordHash);
+  if (!ok) {
+    return { ok: false as const, error: "Incorrect password. Try again." };
+  }
+  return { ok: true as const, user };
+}
+
+export async function archiveSchoolRoster(password: string) {
+  const access = await confirmSignedInPassword(password);
+  if (!access.ok) return access;
+  const user = access.user;
   await ensureStudentContactColumns().catch(() => undefined);
 
   const result = await prisma.student.updateMany({
@@ -66,72 +91,10 @@ export async function restoreSchoolRoster() {
   return { ok: true as const, restored: result.count };
 }
 
-/** Remove mistaken van links before loading real van Excel files. */
-export async function clearGhostVanAssignments() {
-  const user = await getSession();
-  if (!user || (user.role !== "ADMINISTRATOR" && user.role !== "COORDINATOR")) {
-    return { ok: false as const, error: "Only an admin can clear van mistakes." };
-  }
-  await ensureStudentContactColumns().catch(() => undefined);
-
-  const schoolStudents = await prisma.student.findMany({
-    where: { schoolId: user.schoolId },
-    select: { id: true },
-  });
-  const ids = schoolStudents.map((row) => row.id);
-  if (!ids.length) {
-    return { ok: true as const, cleared: 0, removedVehicles: 0 };
-  }
-
-  const vanAssignments = await prisma.transportationAssignment.findMany({
-    where: {
-      studentId: { in: ids },
-      OR: [
-        { notes: { contains: "Van", mode: "insensitive" } },
-        { notes: { contains: "van" } },
-      ],
-    },
-    select: { id: true, studentId: true, busRouteId: true },
-  });
-
-  let cleared = 0;
-  for (const row of vanAssignments) {
-    if (row.busRouteId) {
-      await prisma.transportationAssignment.update({
-        where: { id: row.id },
-        data: { notes: "" },
-      });
-    } else {
-      await prisma.transportationAssignment.delete({ where: { id: row.id } });
-    }
-    cleared += 1;
-  }
-
-  await prisma.$executeRaw`
-    UPDATE "Student"
-    SET "vehicleId" = NULL, "updatedAt" = CURRENT_TIMESTAMP
-    WHERE "schoolId" = ${user.schoolId} AND "vehicleId" IS NOT NULL
-  `;
-
-  const removed = await prisma.$executeRaw`
-    DELETE FROM "TransportVehicle"
-    WHERE "schoolId" = ${user.schoolId}
-      AND (upper("vehicleType") = 'VAN' OR lower("name") LIKE 'van%')
-  `;
-
-  refreshRoster();
-  return {
-    ok: true as const,
-    cleared,
-    removedVehicles: typeof removed === "number" ? removed : 0,
-  };
-}
-
-export async function deleteArchivedStudents() {
-  const user = await getSession();
-  if (!user || (user.role !== "ADMINISTRATOR" && user.role !== "COORDINATOR")) {
-    return { ok: false as const, error: "Only an admin can delete the archive." };
-  }
+export async function deleteArchivedStudents(password: string) {
+  const access = await confirmSignedInPassword(password);
+  if (!access.ok) return access;
+  const user = access.user;
   await ensureStudentContactColumns().catch(() => undefined);
 
   const archived = await prisma.student.findMany({

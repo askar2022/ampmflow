@@ -19,21 +19,24 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [warnDelete, setWarnDelete] = useState(false);
+  const [password, setPassword] = useState("");
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
 
   if (!students.length && !message) return null;
 
   function closeWarn() {
-    if (!pending) setWarnDelete(false);
+    if (!pending) {
+      setWarnDelete(false);
+      setPassword("");
+    }
   }
 
   function deleteAll() {
     start(async () => {
-      const result = await deleteArchivedStudents();
+      const result = await deleteArchivedStudents(password);
       if (!result.ok) {
         setMessage(result.error);
-        setWarnDelete(false);
         return;
       }
       setMessage(
@@ -42,6 +45,7 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
           : "Archive was already empty.",
       );
       setWarnDelete(false);
+      setPassword("");
       setOpen(false);
       router.refresh();
     });
@@ -67,7 +71,7 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
         <div className="border-t border-line px-5 pb-5">
           <p className="mt-3 text-muted">
             These students are hidden from Front Desk and Reports. Put back
-            restores them. Delete all removes them permanently.
+            restores them. Delete all requires your sign-in password.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -91,7 +95,11 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
             <button
               type="button"
               disabled={pending || !students.length}
-              onClick={() => setWarnDelete(true)}
+              onClick={() => {
+                setPassword("");
+                setMessage("");
+                setWarnDelete(true);
+              }}
               className="rounded-xl border border-red px-4 py-2 text-sm font-semibold text-red disabled:opacity-50"
             >
               Delete all permanently
@@ -150,13 +158,24 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
             onClick={(event) => event.stopPropagation()}
           >
             <h3 id="delete-archive-title" className="font-serif text-2xl text-navy">
-              Delete archive?
+              Confirm with password
             </h3>
             <p className="mt-2 text-sm text-navy">
               This permanently deletes {students.length} archived student
-              {students.length === 1 ? "" : "s"} and their bus plans. You cannot
-              undo this. Press Cancel if this is a mistake.
+              {students.length === 1 ? "" : "s"} and their bus plans. Enter your
+              sign-in password to continue.
             </p>
+            <label className="mt-4 block text-sm font-semibold text-navy">
+              Your password
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 font-normal"
+                placeholder="Sign-in password"
+              />
+            </label>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
@@ -168,7 +187,7 @@ export function StudentArchive({ students }: { students: ArchivedStudent[] }) {
               </button>
               <button
                 type="button"
-                disabled={pending}
+                disabled={pending || !password.trim()}
                 onClick={deleteAll}
                 className="rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
