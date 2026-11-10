@@ -304,6 +304,7 @@ export function ReceptionDesk({
   const [infoGrade, setInfoGrade] = useState("");
   const [infoParentName, setInfoParentName] = useState("");
   const [infoTeacherName, setInfoTeacherName] = useState("");
+  const [infoTeacherEmail, setInfoTeacherEmail] = useState("");
   const [infoParentPhone, setInfoParentPhone] = useState("");
   const [openInfo, setOpenInfo] = useState(false);
 
@@ -396,6 +397,7 @@ export function ReceptionDesk({
         ? student.teacherName
         : "",
     );
+    setInfoTeacherEmail(student.teacherEmail || "");
     setInfoParentPhone(
       student.parentPhone && student.parentPhone !== "—"
         ? student.parentPhone
@@ -656,6 +658,7 @@ export function ReceptionDesk({
                 <th className="whitespace-nowrap py-3 pr-3">Grade</th>
                 <th className="whitespace-nowrap py-3 pr-3">Parent</th>
                 <th className="whitespace-nowrap py-3 pr-3">Teacher</th>
+                <th className="whitespace-nowrap py-3 pr-3">Teacher email</th>
                 <th className="whitespace-nowrap py-3 pr-3">Addr Line1</th>
                 <th className="whitespace-nowrap py-3 pr-3">City/State/Zip</th>
                 <th className="whitespace-nowrap py-3 pr-3">Phone Number</th>
@@ -705,6 +708,9 @@ export function ReceptionDesk({
                     </td>
                     <td className="whitespace-nowrap py-3 pr-3">{teacher}</td>
                     <td className="whitespace-nowrap py-3 pr-3 text-muted">
+                      {student.teacherEmail || "—"}
+                    </td>
+                    <td className="whitespace-nowrap py-3 pr-3 text-muted">
                       {line1}
                     </td>
                     <td className="whitespace-nowrap py-3 pr-3 text-muted">
@@ -734,19 +740,19 @@ export function ReceptionDesk({
               })}
               {!students.length ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-3 text-muted">
+                  <td colSpan={11} className="px-4 py-3 text-muted">
                     No students on the roster yet. Load them on Roster.
                   </td>
                 </tr>
               ) : !matches.length ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-3 text-muted">
+                  <td colSpan={11} className="px-4 py-3 text-muted">
                     No student matches those filters.
                   </td>
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={10} className="px-4 py-2 text-xs text-muted">
+                  <td colSpan={11} className="px-4 py-2 text-xs text-muted">
                     {filtered.length > matches.length
                       ? `Showing ${matches.length} of ${filtered.length}. Type a name or use the filters to see the rest.`
                       : `${matches.length} student${matches.length === 1 ? "" : "s"}`}
@@ -859,6 +865,7 @@ export function ReceptionDesk({
                     grade: infoGrade,
                     parentName: infoParentName,
                     teacherName: infoTeacherName,
+                    teacherEmail: infoTeacherEmail,
                     parentPhone: infoParentPhone,
                   });
                   if (!result.ok) {
@@ -903,6 +910,16 @@ export function ReceptionDesk({
                     value={infoTeacherName}
                     onChange={(event) => setInfoTeacherName(event.target.value)}
                     placeholder="Teacher name"
+                    className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-semibold">
+                  Teacher email
+                  <input
+                    type="email"
+                    value={infoTeacherEmail}
+                    onChange={(event) => setInfoTeacherEmail(event.target.value)}
+                    placeholder="teacher@school.org"
                     className="mt-1 w-full rounded-xl border border-line bg-card px-3 py-2 font-normal"
                   />
                 </label>

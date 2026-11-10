@@ -364,6 +364,7 @@ export async function saveReceptionStudentInfo(input: {
   grade?: string;
   parentName?: string;
   teacherName?: string;
+  teacherEmail?: string;
   parentPhone?: string;
 }) {
   const user = await getSession();
@@ -382,6 +383,10 @@ export async function saveReceptionStudentInfo(input: {
     (input.parentName || "").trim() || loaded.record.parentName || "—";
   const teacherName =
     (input.teacherName || "").trim() || loaded.effective.teacherName || "Unassigned";
+  const teacherEmail =
+    usableTeacherEmail(input.teacherEmail || "") ||
+    usableTeacherEmail(loaded.effective.teacherEmail || "") ||
+    "";
   const parentPhone =
     (input.parentPhone || "").trim() || loaded.record.parentPhone || "—";
 
@@ -412,7 +417,7 @@ export async function saveReceptionStudentInfo(input: {
   }
   const teacher = await prisma.teacher.findFirst({
     where: { classroomId: classroom.id },
-    select: { id: true },
+    select: { id: true, email: true },
   });
   if (!teacher) {
     await prisma.teacher.create({
@@ -420,13 +425,21 @@ export async function saveReceptionStudentInfo(input: {
         schoolId: user.schoolId,
         classroomId: classroom.id,
         name: teacherName,
-        email: "",
+        email: teacherEmail,
       },
     });
-  } else if (teacherName !== "Unassigned") {
-    await prisma.teacher
-      .update({ where: { id: teacher.id }, data: { name: teacherName } })
-      .catch(() => undefined);
+  } else {
+    const patch: { name?: string; email?: string } = {};
+    if (teacherName !== "Unassigned") patch.name = teacherName;
+    if (teacherEmail) patch.email = teacherEmail;
+    else if (input.teacherEmail !== undefined && !String(input.teacherEmail || "").trim()) {
+      patch.email = "";
+    }
+    if (Object.keys(patch).length) {
+      await prisma.teacher
+        .update({ where: { id: teacher.id }, data: patch })
+        .catch(() => undefined);
+    }
   }
   await prisma.student.update({
     where: { id: loaded.record.id },
