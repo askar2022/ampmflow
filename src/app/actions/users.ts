@@ -7,9 +7,17 @@ import { prisma } from "@/lib/prisma";
 import { canManageUsers, getSession, hashPassword, isPlatformAdmin } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { markInquirySetup } from "@/lib/inquiries";
-import { emailSchoolApproved } from "@/lib/school-request-email";
+import { roleLabel } from "@/lib/format";
+import {
+  emailSchoolApproved,
+  emailStaffAccountCreated,
+} from "@/lib/school-request-email";
 import { assignCompanySchools } from "@/lib/company-access";
-import { assignUniqueSlug, schoolLoginUrl } from "@/lib/school-slug";
+import {
+  assignUniqueSlug,
+  schoolLoginUrl,
+  schoolSlugForId,
+} from "@/lib/school-slug";
 import { PENDING_ROLE, ROLES, type Role } from "@/lib/types";
 
 function companyFail(reason: string, detail?: string): never {
@@ -67,6 +75,25 @@ export async function createUser(formData: FormData): Promise<void> {
     action: "CREATE_USER",
     newPlan: { name, email, role },
   });
+
+  const school = await prisma.school.findUnique({
+    where: { id: session.schoolId },
+    select: { name: true },
+  });
+  const slug = await schoolSlugForId(session.schoolId).catch(() => "");
+  const loginUrl = slug
+    ? schoolLoginUrl(slug)
+    : "https://www.ampmflow.com/login";
+  await emailStaffAccountCreated({
+    schoolName: school?.name || "your school",
+    name,
+    email,
+    roleLabel: roleLabel(role),
+    temporaryPassword: password,
+    loginUrl,
+    addedByName: session.name,
+    addedByEmail: session.email,
+  }).catch(() => undefined);
 
   revalidatePath("/admin/users");
 }

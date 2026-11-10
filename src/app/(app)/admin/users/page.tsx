@@ -157,9 +157,10 @@ export default async function UsersPage() {
         <h2 className="font-serif text-2xl">Add staff</h2>
         <p className="mt-1 text-sm text-muted">
           Create a local admin or staff account for this school only. They
-          cannot open a new school. Write down the temporary password and give
-          it to that person — AMPM Flow does not send it. Only a Teacher login
-          needs a class.
+          cannot open a new school. AMPM Flow emails the new person their
+          school sign-in link and temporary password, and sends AMPM a security
+          notice that the account was added. Only a Teacher login needs a
+          class.
         </p>
         <div className="mt-4 space-y-3">
           <input name="name" required placeholder="Name" className="w-full rounded-xl border border-line px-3 py-2" />
