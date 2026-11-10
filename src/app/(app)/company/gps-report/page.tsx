@@ -38,7 +38,8 @@ export default async function CompanyGpsReportPage({
 
   const day = todayKey();
   const feed = await fetchOneStepLiveBuses(selected.name);
-  if (feed.live) {
+  const aimSchool = /aim/i.test(selected.name);
+  if (feed.live && aimSchool) {
     await recordLiveGpsBuses({
       schoolId: selected.id,
       company: "Minnehaha",
