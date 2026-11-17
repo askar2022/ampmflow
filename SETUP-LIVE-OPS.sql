@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS "BusCheckIn" (
   UNIQUE ("studentId", "trip", "date")
 );
 
+-- Prefer the full lockdown for every table:
+--   supabase/enable-rls-lockdown.sql
 ALTER TABLE "SchoolSettings" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "ChangeEvent" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "TeacherAcknowledgment" ENABLE ROW LEVEL SECURITY;
