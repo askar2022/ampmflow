@@ -57,6 +57,26 @@ export function roleLabel(role: string) {
   }
 }
 
+/** True when a "teacher" value is really a grade (e.g. "2", "Grade 2", "K"). */
+export function looksLikeGradeLabel(value: string) {
+  const v = value.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!v) return false;
+  if (/^\d{1,2}$/.test(v)) return true;
+  if (/^(k|kg|kinder(garten)?|prek|pre-k|pk)$/.test(v)) return true;
+  if (/^grade\s*\d{1,2}$/.test(v)) return true;
+  if (/^\d{1,2}(st|nd|rd|th)$/.test(v)) return true;
+  return false;
+}
+
+/** Show a real teacher name; hide grade leftovers from bad imports. */
+export function displayTeacherName(name?: string | null) {
+  const value = String(name || "").trim();
+  if (!value || /^unassigned$/i.test(value) || looksLikeGradeLabel(value)) {
+    return "Unassigned";
+  }
+  return value;
+}
+
 export function formatAddress(
   parts?: {
     line1?: string | null;

@@ -7,7 +7,7 @@ import {
   removeReceptionStudent,
   saveReceptionStudentInfo,
 } from "@/app/actions/reception";
-import { planSummary, planTone } from "@/lib/format";
+import { displayTeacherName, planSummary, planTone } from "@/lib/format";
 import type { EffectiveStudent } from "@/lib/types";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -19,7 +19,8 @@ function gradeRank(grade: string) {
 }
 
 function teacherLabel(student: EffectiveStudent) {
-  return student.teacherName || "No teacher";
+  const name = displayTeacherName(student.teacherName);
+  return name === "Unassigned" ? "Unassigned" : name;
 }
 
 function planVanLabel(plan: EffectiveStudent["am"]) {
@@ -536,10 +537,7 @@ export function ReceptionDesk({
                   addressParts.length > 1
                     ? addressParts.slice(1).join(", ")
                     : "—";
-                const teacher =
-                  teacherLabel(student) === "No teacher"
-                    ? "Unassigned"
-                    : teacherLabel(student);
+                const teacher = teacherLabel(student);
                 return (
                   <tr
                     key={student.id}

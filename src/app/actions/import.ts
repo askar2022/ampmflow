@@ -14,6 +14,7 @@ import {
   saveImportSummary,
   usablePhone,
 } from "@/lib/gate";
+import { displayTeacherName } from "@/lib/format";
 import { ensureStudentContactColumns, parentNameFromEmail } from "@/lib/transportation";
 
 type Row = Record<string, string>;
@@ -950,7 +951,7 @@ async function placeWithTeacher(args: {
   grade: string;
   teacherName: string;
 }) {
-  const name = args.teacherName.trim() || "Unassigned";
+  const name = displayTeacherName(args.teacherName) || "Unassigned";
   const classroomName = name === "Unassigned" ? `${args.grade} classroom` : name;
   let classroom = await prisma.classroom.findFirst({
     where: { schoolId: args.schoolId, name: classroomName },
@@ -1151,7 +1152,7 @@ export async function importStudents(formData: FormData) {
     const rowSource = parseEnrollment(enrollmentRaw, enrollmentSource);
     const grade = normalizeGrade(cell(row, "grade") || "—");
     const room = cell(row, "classroom", "room", "teacher/class");
-    const teacherName =
+    const teacherName = displayTeacherName(
       cell(
         row,
         "advisor",
@@ -1161,7 +1162,8 @@ export async function importStudents(formData: FormData) {
         "teacher",
         "homeroom teacher",
         "classroom teacher",
-      ) || "Unassigned";
+      ),
+    );
     const classroomName = room
       ? /^\d+$/.test(room)
         ? `Room ${room}`
@@ -1710,8 +1712,9 @@ async function rowsFromUpload(
       firstName,
       lastName,
       grade: normalizeGrade(cell(row, "grade") || "—"),
-      teacherName:
-        cell(row, "advisor", "advisor name", "teacher") || "Unassigned",
+      teacherName: displayTeacherName(
+        cell(row, "advisor", "advisor name", "teacher"),
+      ),
       parentName: parentNameFromRow(row, parentEmail),
       parentPhone: parentPhonesFromRow(row).phone1 || "—",
       parentEmail,

@@ -1,7 +1,7 @@
 import { ensureGateTables } from "./gate";
 import { prisma } from "./prisma";
 import { dateInRange, schoolLocalTime, todayKey } from "./dates";
-import { formatAddress, locationFor } from "./format";
+import { displayTeacherName, formatAddress, locationFor } from "./format";
 import type {
   Destination,
   EffectiveStudent,
@@ -231,7 +231,7 @@ export function toEffective(
       : null,
     classroomId: student.classroomId,
     classroomName: student.classroom?.name || "Unassigned",
-    teacherName: teacher?.name ?? "Unassigned",
+    teacherName: displayTeacherName(teacher?.name),
     teacherEmail: extraText(teacher ?? {}, "email"),
     notes: student.notes || "",
     enrollmentSource: student.enrollmentSource || "RETURNING",

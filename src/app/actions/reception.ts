@@ -6,7 +6,12 @@ import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
 import { updateTransportation } from "@/app/actions/transportation";
 import { canRecordChange } from "@/lib/policy";
-import { durationLabel, planSummary } from "@/lib/format";
+import {
+  displayTeacherName,
+  durationLabel,
+  looksLikeGradeLabel,
+  planSummary,
+} from "@/lib/format";
 import { ensureStudentContactColumns, loadStudent } from "@/lib/transportation";
 import {
   notifyRouteRequest,
@@ -384,8 +389,17 @@ export async function saveReceptionStudentInfo(input: {
   const grade = (input.grade || "").trim() || loaded.record.grade || "—";
   const parentName =
     (input.parentName || "").trim() || loaded.record.parentName || "—";
+  const rawTeacher = (input.teacherName || "").trim();
+  if (rawTeacher && looksLikeGradeLabel(rawTeacher)) {
+    return {
+      ok: false as const,
+      error:
+        "Teacher name looks like a grade. Enter the teacher’s name (for example Ms. Azzam).",
+    };
+  }
   const teacherName =
-    (input.teacherName || "").trim() || loaded.effective.teacherName || "Unassigned";
+    displayTeacherName(rawTeacher || loaded.effective.teacherName) ||
+    "Unassigned";
   const teacherEmail =
     usableTeacherEmail(input.teacherEmail || "") ||
     usableTeacherEmail(loaded.effective.teacherEmail || "") ||
