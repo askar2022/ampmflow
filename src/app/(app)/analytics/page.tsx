@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadCoordinatorAnalytics } from "@/lib/analytics";
@@ -22,26 +23,33 @@ export default async function AnalyticsPage() {
     redirect("/dashboard");
   }
 
-  const school = await prisma.school.findUnique({
-    where: { id: session.schoolId },
-    select: { name: true },
-  });
   const day = todayKey();
-  const feed = await fetchOneStepLiveBuses(school?.name);
-  const aimSchool = Boolean(school?.name && /aim/i.test(school.name));
-  if (feed.live && aimSchool) {
-    await recordLiveGpsBuses({
-      schoolId: session.schoolId,
-      company: "Minnehaha",
-      buses: feed.buses,
-    });
-  }
-
-  const [data, gpsRows, gpsDays] = await Promise.all([
+  const [school, data, gpsRows, gpsDays] = await Promise.all([
+    prisma.school.findUnique({
+      where: { id: session.schoolId },
+      select: { name: true },
+    }),
     loadCoordinatorAnalytics(session.schoolId),
     loadGpsTripReport({ schoolId: session.schoolId, dayKey: day }),
     loadGpsArrivalDays(session.schoolId),
   ]);
+
+  const aimSchool = Boolean(school?.name && /aim/i.test(school.name));
+  // GPS snapshot is optional for Analytics — never block the page on OneStep.
+  if (aimSchool) {
+    after(() =>
+      fetchOneStepLiveBuses(school?.name)
+        .then((feed) => {
+          if (!feed.live) return;
+          return recordLiveGpsBuses({
+            schoolId: session.schoolId,
+            company: "Minnehaha",
+            buses: feed.buses,
+          });
+        })
+        .catch(() => undefined),
+    );
+  }
 
   return (
     <AnalyticsBoard

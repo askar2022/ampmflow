@@ -500,13 +500,22 @@ type FamilyRow = {
 };
 
 export async function loadVehicles(schoolId: string): Promise<VehicleRow[]> {
-  await ensureGateTables();
-  return prisma.$queryRaw<VehicleRow[]>`
-    SELECT "id", "name", "vehicleType", "driverName", "driverPhone"
-    FROM "TransportVehicle"
-    WHERE "schoolId" = ${schoolId}
-    ORDER BY "name"
-  `;
+  try {
+    return await prisma.$queryRaw<VehicleRow[]>`
+      SELECT "id", "name", "vehicleType", "driverName", "driverPhone"
+      FROM "TransportVehicle"
+      WHERE "schoolId" = ${schoolId}
+      ORDER BY "name"
+    `;
+  } catch {
+    await ensureGateTables();
+    return prisma.$queryRaw<VehicleRow[]>`
+      SELECT "id", "name", "vehicleType", "driverName", "driverPhone"
+      FROM "TransportVehicle"
+      WHERE "schoolId" = ${schoolId}
+      ORDER BY "name"
+    `;
+  }
 }
 
 export async function loadGateRoster(

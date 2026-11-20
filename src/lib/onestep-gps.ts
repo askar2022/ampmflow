@@ -415,6 +415,7 @@ async function requestDevices(key: string) {
   for (const attempt of attempts) {
     const response = await fetch(attempt.url, {
       cache: "no-store",
+      signal: AbortSignal.timeout(4_000),
       headers: {
         Accept: "application/json",
         ...(attempt.headers || {}),

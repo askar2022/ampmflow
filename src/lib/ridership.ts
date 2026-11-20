@@ -1,4 +1,4 @@
-import { ensureAimFleetVehicles, isAimSchool } from "./aim-fleet";
+import { isAimSchool } from "./aim-fleet";
 import { formatLongDate, schoolNow } from "./dates";
 import { planSummary } from "./format";
 import { loadVehicles } from "./gate";
@@ -188,9 +188,8 @@ export async function loadDriverLists(schoolId: string) {
       select: { id: true, vehicleId: true },
     }),
   ]);
-  const vehicles = aim
-    ? await ensureAimFleetVehicles(schoolId).catch(() => loadedVehicles)
-    : loadedVehicles;
+  // Read-only on Print open — fleet rewrite belongs in a one-time migration, not nav.
+  const vehicles = loadedVehicles;
 
   const vanByStudent = new Map(
     vanRows.map((row) => [row.id, row.vehicleId] as const),

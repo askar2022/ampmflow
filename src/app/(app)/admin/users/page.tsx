@@ -22,16 +22,22 @@ import { UserRemoveButton } from "./UserRemoveButton";
 export default async function UsersPage() {
   const session = await getSession();
   if (!session || !canManageUsers(session.role)) redirect("/dashboard");
-  const users = await prisma.user.findMany({
-    where: { schoolId: session.schoolId },
-    include: { teacher: true },
-    orderBy: { name: "asc" },
-  });
-  const teachers = await prisma.teacher.findMany({
-    where: { schoolId: session.schoolId },
-    include: { classroom: true },
-    orderBy: { name: "asc" },
-  });
+  const [users, teachers, reminderEmails, leadershipEmails, lastEmail] =
+    await Promise.all([
+      prisma.user.findMany({
+        where: { schoolId: session.schoolId },
+        include: { teacher: true },
+        orderBy: { name: "asc" },
+      }),
+      prisma.teacher.findMany({
+        where: { schoolId: session.schoolId },
+        include: { classroom: true },
+        orderBy: { name: "asc" },
+      }),
+      loadSavedOpsEmails(session.schoolId),
+      loadLeadershipEmails(session.schoolId),
+      lastOpsChangeEmail(session.schoolId),
+    ]);
   const pending = users.filter((user) => user.role === PENDING_ROLE);
   const schoolUsers = users.filter(
     (user) =>
@@ -39,11 +45,6 @@ export default async function UsersPage() {
   );
   const staff = schoolUsers.filter((user) => user.active);
   const takenOff = schoolUsers.filter((user) => !user.active);
-  const [reminderEmails, leadershipEmails, lastEmail] = await Promise.all([
-    loadSavedOpsEmails(session.schoolId),
-    loadLeadershipEmails(session.schoolId),
-    lastOpsChangeEmail(session.schoolId),
-  ]);
 
   return (
     <div className="space-y-6">

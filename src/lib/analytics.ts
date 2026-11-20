@@ -1,9 +1,5 @@
 import { addDays, format, parseISO, startOfWeek, subWeeks } from "date-fns";
-import {
-  AIM_FLEET_LABELS,
-  ensureAimFleetVehicles,
-  isAimSchool,
-} from "./aim-fleet";
+import { AIM_FLEET_LABELS, isAimSchool } from "./aim-fleet";
 import { schoolDayBounds, todayKey } from "./dates";
 import { loadVehicles } from "./gate";
 import { prisma } from "./prisma";
@@ -153,9 +149,7 @@ export async function loadCoordinatorAnalytics(
     select: { name: true },
   });
   const aimSchool = isAimSchool(school?.name);
-  if (aimSchool) {
-    await ensureAimFleetVehicles(schoolId).catch(() => undefined);
-  }
+  // Do not rewrite Aim fleet on every Analytics open — labels come from AIM_FLEET_LABELS.
 
   const [
     students,

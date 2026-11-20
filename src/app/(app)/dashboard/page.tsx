@@ -1,17 +1,11 @@
 import { getSession } from "@/lib/auth";
-import {
-  AIM_FLEET_LABELS,
-  ensureAimFleetVehicles,
-  isAimSchool,
-} from "@/lib/aim-fleet";
+import { AIM_FLEET_LABELS, isAimSchool } from "@/lib/aim-fleet";
 import { prisma } from "@/lib/prisma";
-import { loadVehicles } from "@/lib/gate";
-import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { loadStudents } from "@/lib/transportation";
 import { ReceptionDesk } from "./ReceptionDesk";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 export default async function DashboardPage({
   searchParams,
@@ -22,35 +16,44 @@ export default async function DashboardPage({
   if (!session) return null;
   const { student: selectedId = "" } = await searchParams;
 
-  const [school, students] = await Promise.all([
-    prisma.school.findUnique({
-      where: { id: session.schoolId },
-      select: { name: true },
-    }),
-    loadStudents(session.schoolId),
-  ]);
-  const aim = isAimSchool(school?.name);
+  // One parallel round-trip — no fleet rewrite or settings DDL on open.
+  const [school, students, routes, vanRows, vehicleRows, settings] =
+    await Promise.all([
+      prisma.school.findUnique({
+        where: { id: session.schoolId },
+        select: { name: true },
+      }),
+      loadStudents(session.schoolId),
+      prisma.busRoute.findMany({
+        where: { schoolId: session.schoolId },
+        select: { number: true },
+        orderBy: { number: "asc" },
+      }),
+      prisma.student.findMany({
+        where: {
+          schoolId: session.schoolId,
+          active: true,
+          vehicleId: { not: null },
+        },
+        select: { id: true, vehicleId: true },
+      }),
+      prisma.$queryRaw<
+        Array<{ id: string; name: string; vehicleType: string }>
+      >`
+        SELECT "id", "name", "vehicleType"
+        FROM "TransportVehicle"
+        WHERE "schoolId" = ${session.schoolId}
+        ORDER BY "name"
+      `.catch(() => []),
+      prisma.$queryRaw<Array<{ busCompanyEmail: string }>>`
+        SELECT "busCompanyEmail"
+        FROM "SchoolSettings"
+        WHERE "schoolId" = ${session.schoolId}
+        LIMIT 1
+      `.catch(() => []),
+    ]);
 
-  const [routes, vehicles, vanRows, busCompanyEmail] = await Promise.all([
-    prisma.busRoute.findMany({
-      where: { schoolId: session.schoolId },
-      select: { number: true },
-      orderBy: { number: "asc" },
-    }),
-    (aim
-      ? ensureAimFleetVehicles(session.schoolId)
-      : loadVehicles(session.schoolId)
-    ).catch(() => []),
-    prisma.student.findMany({
-      where: {
-        schoolId: session.schoolId,
-        active: true,
-        vehicleId: { not: null },
-      },
-      select: { id: true, vehicleId: true },
-    }),
-    defaultBusCompanyEmail(session.schoolId),
-  ]);
+  const aim = isAimSchool(school?.name);
 
   const buses = aim
     ? AIM_FLEET_LABELS.map((label) =>
@@ -60,7 +63,7 @@ export default async function DashboardPage({
 
   const vans = aim
     ? []
-    : vehicles
+    : vehicleRows
         .filter(
           (vehicle) =>
             vehicle.vehicleType.toUpperCase() === "VAN" ||
@@ -82,7 +85,7 @@ export default async function DashboardPage({
         vans={vans}
         aimSchool={aim}
         studentVanId={studentVanId}
-        busCompanyEmail={busCompanyEmail}
+        busCompanyEmail={settings[0]?.busCompanyEmail || ""}
         initialStudentId={selectedId}
         canPermanent={
           session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"

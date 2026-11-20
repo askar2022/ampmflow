@@ -99,6 +99,50 @@ const studentInclude = {
   },
 } as const;
 
+/** Front Desk / lists — skip expired temp changes so roster queries stay small. */
+function deskStudentInclude(day: string) {
+  return {
+    classroom: {
+      include: {
+        teachers: { select: { id: true, name: true, email: true }, take: 1 },
+      },
+    },
+    homeAddress: {
+      select: { line1: true, city: true, state: true, zip: true },
+    },
+    daycare: {
+      select: {
+        name: true,
+        phone: true,
+        address: { select: { line1: true, city: true, state: true, zip: true } },
+      },
+    },
+    assignments: {
+      include: {
+        busRoute: { select: { number: true, loadingLocation: true } },
+        daycare: { select: { name: true } },
+        customAddress: {
+          select: { line1: true, city: true, state: true, zip: true },
+        },
+      },
+    },
+    tempChanges: {
+      where: {
+        undone: false,
+        status: "APPROVED",
+        endDate: { gte: day },
+      },
+      include: {
+        busRoute: { select: { number: true, loadingLocation: true } },
+        daycare: { select: { name: true } },
+        customAddress: {
+          select: { line1: true, city: true, state: true, zip: true },
+        },
+      },
+    },
+  } as const;
+}
+
 export type StudentRecord = Awaited<
   ReturnType<typeof prisma.student.findFirst<{ include: typeof studentInclude }>>
 >;
@@ -320,15 +364,16 @@ function changeListCompat(students: EffectiveStudent[]) {
 
 export async function loadStudents(schoolId: string, day = todayKey()) {
   // Schema is already migrated in production — do not DDL on every Front Desk open.
+  // Only keep temp changes that still cover today (big win on large schools).
   const rows = await prisma.student.findMany({
     where: { schoolId, active: true },
-    include: studentInclude,
+    include: deskStudentInclude(day),
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
   });
   const students: EffectiveStudent[] = [];
   for (const row of rows) {
     try {
-      students.push(toEffective(row, day));
+      students.push(toEffective(row as unknown as NonNullable<StudentRecord>, day));
     } catch {
       // Skip a bad roster row so one broken import cannot crash Front Desk.
     }
