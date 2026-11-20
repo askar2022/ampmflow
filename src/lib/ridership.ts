@@ -1,10 +1,11 @@
 import { isAimSchool } from "./aim-fleet";
-import { formatLongDate, schoolNow } from "./dates";
-import { planSummary } from "./format";
+import { dateInRange, formatLongDate, schoolNow, todayKey } from "./dates";
+import { formatAddress, planSummary } from "./format";
 import { loadVehicles } from "./gate";
 import { loadSavedOpsEmails, usableOpsEmail } from "./ops-change-emails";
 import { prisma } from "./prisma";
 import { groupByBus, stamp } from "./reports";
+import { companyFleetForSchool } from "./school-fleet";
 import { loadStudents } from "./transportation";
 import type { EffectiveStudent } from "./types";
 
@@ -173,76 +174,167 @@ export function ridershipText(list: Ridership) {
   return lines.join("\n");
 }
 
-export async function loadDriverLists(schoolId: string) {
+/**
+ * Lean Print list loader — one slim query, no full toEffective roster pass.
+ */
+export async function loadPrintDriverLists(schoolId: string) {
+  const day = todayKey();
   const school = await prisma.school.findUnique({
     where: { id: schoolId },
     select: { name: true },
   });
   const aim = isAimSchool(school?.name);
+  const locked = companyFleetForSchool(school?.name);
 
-  const [students, loadedVehicles, vanRows] = await Promise.all([
-    loadStudents(schoolId),
-    loadVehicles(schoolId).catch(() => []),
+  const [rows, vehicles] = await Promise.all([
     prisma.student.findMany({
-      where: { schoolId, active: true, vehicleId: { not: null } },
-      select: { id: true, vehicleId: true },
+      where: { schoolId, active: true },
+      select: {
+        id: true,
+        studentId: true,
+        firstName: true,
+        lastName: true,
+        grade: true,
+        parentName: true,
+        parentPhone: true,
+        parentPhone2: true,
+        vehicleId: true,
+        homeAddress: {
+          select: { line1: true, city: true, state: true, zip: true },
+        },
+        classroom: {
+          select: {
+            teachers: { select: { name: true }, take: 1 },
+          },
+        },
+        assignments: {
+          select: {
+            trip: true,
+            waitingForAssignment: true,
+            notes: true,
+            busRoute: { select: { number: true } },
+          },
+        },
+        tempChanges: {
+          where: {
+            undone: false,
+            status: "APPROVED",
+            endDate: { gte: day },
+          },
+          select: {
+            trip: true,
+            startDate: true,
+            endDate: true,
+            waitingForAssignment: true,
+            notes: true,
+            busRoute: { select: { number: true } },
+          },
+        },
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
+    locked?.locked
+      ? Promise.resolve([] as Awaited<ReturnType<typeof loadVehicles>>)
+      : loadVehicles(schoolId).catch(() => []),
   ]);
-  // Read-only on Print open — fleet rewrite belongs in a one-time migration, not nav.
-  const vehicles = loadedVehicles;
 
-  const vanByStudent = new Map(
-    vanRows.map((row) => [row.id, row.vehicleId] as const),
-  );
+  const riders: DriverRider[] = rows.map((row) => {
+    const buses = new Set<string>();
+    for (const trip of ["AM", "PM"] as const) {
+      const temps = row.tempChanges.filter(
+        (change) =>
+          change.trip === trip &&
+          !change.waitingForAssignment &&
+          dateInRange(day, change.startDate, change.endDate) &&
+          change.busRoute?.number,
+      );
+      if (temps[0]?.busRoute?.number) {
+        buses.add(temps[0].busRoute.number);
+        continue;
+      }
+      const assignment = row.assignments.find(
+        (item) =>
+          item.trip === trip &&
+          !item.waitingForAssignment &&
+          item.busRoute?.number,
+      );
+      if (assignment?.busRoute?.number) {
+        buses.add(assignment.busRoute.number);
+      }
+    }
+    return {
+      id: row.id,
+      name: `${row.firstName} ${row.lastName}`.trim(),
+      studentId: row.studentId,
+      grade: row.grade || "—",
+      teacherName: row.classroom.teachers[0]?.name || "—",
+      parentName: row.parentName || "—",
+      parentPhone: row.parentPhone || "",
+      parentPhone2: row.parentPhone2 || "",
+      homeAddress: formatAddress(row.homeAddress),
+      buses: [...buses],
+      vanId: row.vehicleId || null,
+    };
+  });
 
-  // Aim has no vans — Minnehaha fleet is Bus 4, Bus 5, and 3rd bus.
-  // Other schools keep vehicleId rows that are true vans.
-  const fleetVehicles: DriverFleetVehicle[] = vehicles
-    .filter((vehicle) => (aim ? !isVanVehicle(vehicle) : isVanVehicle(vehicle)))
+  const routeBuses = [
+    ...new Set(riders.flatMap((rider) => rider.buses)),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+  const busDrivers: Record<string, string> = {};
+  const dbVans = vehicles
+    .filter((vehicle) => isVanVehicle(vehicle))
     .map((vehicle) => ({
       id: vehicle.id,
       name: vehicle.name,
       driverName: vehicle.driverName || "",
-      kind: isVanVehicle(vehicle) ? ("van" as const) : ("bus" as const),
     }));
-
-  // Keep `vans` for older callers; Aim fills this with the three buses.
-  const vans = fleetVehicles.map(({ id, name, driverName }) => ({
-    id,
-    name,
-    driverName,
-  }));
-
-  const busDrivers: Record<string, string> = {};
   for (const vehicle of vehicles) {
     if (isVanVehicle(vehicle)) continue;
-    if (vehicle.vehicleType.toUpperCase() !== "BUS" && !/^bus\b/i.test(vehicle.name)) {
+    if (
+      vehicle.vehicleType.toUpperCase() !== "BUS" &&
+      !/^bus\b/i.test(vehicle.name)
+    ) {
       continue;
     }
     const number = vehicle.name.replace(/^Bus\s+/i, "").trim();
     if (number) busDrivers[number] = vehicle.driverName || "";
   }
-  const riders: DriverRider[] = students.map((student) => ({
-    id: student.id,
-    name: student.fullName,
-    studentId: student.studentId,
-    grade: student.grade,
-    teacherName: student.teacherName,
-    parentName: student.parentName,
-    parentPhone: student.parentPhone,
-    parentPhone2: student.parentPhone2,
-    homeAddress:
-      student.homeAddress && student.homeAddress !== "—"
-        ? student.homeAddress
-        : "",
-    buses: studentBusNumbers(student),
-    vanId: vanByStudent.get(student.id) || null,
-  }));
-  const routeBuses = [
-    ...new Set(riders.flatMap((rider) => rider.buses)),
-  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  // Aim Reports uses the Minnehaha fleet rows (Bus 4 / Bus 5 / 3rd bus), not van slots.
-  const buses = aim ? [] : routeBuses;
+
+  const vansByName = new Map(
+    dbVans.map((van) => [van.name.trim().toLowerCase(), van]),
+  );
+  const vans: DriverVan[] = locked?.locked
+    ? locked.vans.map(
+        (slot) =>
+          vansByName.get(slot.name.trim().toLowerCase()) || {
+            id: slot.id,
+            name: slot.name,
+            driverName: "",
+          },
+      )
+    : aim
+      ? []
+      : dbVans;
+
+  const buses = locked?.locked
+    ? [...new Set([...locked.buses, ...routeBuses])].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true }),
+      )
+    : aim
+      ? []
+      : routeBuses;
+
+  const fleetVehicles: DriverFleetVehicle[] = [
+    ...buses.map((number) => ({
+      id: number,
+      name: /^3rd/i.test(number) ? "3rd bus" : `Bus ${number}`,
+      driverName: busDrivers[number] || "",
+      kind: "bus" as const,
+    })),
+    ...vans.map((van) => ({ ...van, kind: "van" as const })),
+  ];
+
   return {
     riders,
     buses,
@@ -250,7 +342,13 @@ export async function loadDriverLists(schoolId: string) {
     fleetVehicles,
     busDrivers,
     aimSchool: aim,
+    schoolName: school?.name || "",
   };
+}
+
+/** @deprecated Prefer loadPrintDriverLists for Print pages. */
+export async function loadDriverLists(schoolId: string) {
+  return loadPrintDriverLists(schoolId);
 }
 
 export function oneVehicleText(args: {

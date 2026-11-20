@@ -1,11 +1,26 @@
+import { Suspense } from "react";
 import { getSession } from "@/lib/auth";
-import { loadDriverLists } from "@/lib/ridership";
+import { loadPrintDriverLists } from "@/lib/ridership";
 import { DriverLists } from "./DriverLists";
+
+export const dynamic = "force-dynamic";
+
+async function SchoolPrintLists({ schoolId }: { schoolId: string }) {
+  const lists = await loadPrintDriverLists(schoolId);
+  return (
+    <DriverLists
+      riders={lists.riders}
+      buses={lists.buses}
+      vans={lists.vans}
+      busDrivers={lists.busDrivers}
+      aimSchool={lists.aimSchool}
+    />
+  );
+}
 
 export default async function PrintPage() {
   const session = await getSession();
   if (!session) return null;
-  const lists = await loadDriverLists(session.schoolId);
 
   return (
     <div className="space-y-6">
@@ -17,13 +32,13 @@ export default async function PrintPage() {
         </p>
       </div>
 
-      <DriverLists
-        riders={lists.riders}
-        buses={lists.buses}
-        vans={lists.vans}
-        busDrivers={lists.busDrivers}
-        aimSchool={lists.aimSchool}
-      />
+      <Suspense
+        fallback={
+          <div className="h-64 animate-pulse rounded-2xl border border-line bg-card" />
+        }
+      >
+        <SchoolPrintLists schoolId={session.schoolId} />
+      </Suspense>
     </div>
   );
 }
