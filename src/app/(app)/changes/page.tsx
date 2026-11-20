@@ -29,8 +29,9 @@ export default async function ChangesPage() {
         <div>
           <h1 className="font-serif text-4xl text-navy">Open requests</h1>
           <p className="mt-2 max-w-2xl text-muted">
-            This table shows every request sent to the bus company — daycare,
-            new address, and new route.
+            Every request sent to the bus company stays here permanently —
+            daycare, new address, and new route. Newest on top. Yellow still
+            needs a company update; green already has one.
           </p>
         </div>
         {rows.length ? (

@@ -24,7 +24,7 @@ export function RequestRecordTable({
   showTeacher = false,
   showParent = false,
   showDate = false,
-  empty = "No open requests yet.",
+  empty = "No requests yet.",
 }: {
   rows: RequestRecordRow[];
   showTeacher?: boolean;
