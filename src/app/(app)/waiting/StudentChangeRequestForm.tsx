@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveReceptionChange } from "@/app/actions/reception";
 import type { DurationType, Trip } from "@/lib/types";
@@ -123,6 +123,22 @@ export function StudentChangeRequestForm({
     setConfirmReplace(false);
   }
 
+  // One clear match → select them so Submit is not stuck disabled.
+  useEffect(() => {
+    if (selectedId) return;
+    if (matches.length !== 1) return;
+    const only = matches[0];
+    const q = query.trim().toLowerCase();
+    if (!q || q.length < 2) return;
+    if (
+      only.fullName.toLowerCase().includes(q) ||
+      only.parentPhone.replace(/\D/g, "").includes(q.replace(/\D/g, ""))
+    ) {
+      choose(only);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- choose is stable enough for this auto-pick
+  }, [matches, query, selectedId]);
+
   function toggleTrip(trip: Trip) {
     setTrips((current) => {
       if (current.includes(trip)) {
@@ -136,8 +152,8 @@ export function StudentChangeRequestForm({
     kind === "daycare" ? "Daycare add or change" : "New address";
   const blurb =
     kind === "daycare"
-      ? "Find the student, enter daycare details, and send the request."
-      : "Find the student, enter the new drop-off address, and send the request.";
+      ? "Tap a student in the list, enter daycare details, then submit."
+      : "Tap a student in the list, enter the new drop-off address, then submit.";
 
   return (
     <div className="space-y-4">
@@ -153,15 +169,56 @@ export function StudentChangeRequestForm({
       </div>
 
       <form
+        noValidate
         className="space-y-4 rounded-2xl border border-line bg-card p-5"
         onSubmit={(event) => {
           event.preventDefault();
           if (!selected) {
-            setError("Choose a student from the list.");
+            setError("Tap a student name in the list first.");
             return;
           }
           if (!trips.length) {
             setError("Choose morning, afternoon, or both.");
+            return;
+          }
+          if (kind === "address" && !customAddress.trim()) {
+            setError("Enter the new drop-off address.");
+            return;
+          }
+          if (kind === "daycare" && !daycareName.trim()) {
+            setError("Enter the daycare name.");
+            return;
+          }
+          if (!parentPhone.trim()) {
+            setError("Primary 1 phone is required.");
+            return;
+          }
+          if (!parentEmail.trim()) {
+            setError("Parent email is required.");
+            return;
+          }
+          if (!teacherEmail.trim()) {
+            setError("Teacher email is required.");
+            return;
+          }
+          if (!companyEmail.trim()) {
+            setError("Bus company email is required.");
+            return;
+          }
+          if (!coordEmail.trim()) {
+            setError("Coordinator email is required.");
+            return;
+          }
+          if (!deskEmail.trim()) {
+            setError("Front Desk email is required.");
+            return;
+          }
+          if (duration === "DATE_RANGE" && (!startDate || !endDate)) {
+            setError("Choose a start and end date.");
+            return;
+          }
+          if (duration === "PERMANENT" && !confirmPermanent) {
+            setError("Check the box to confirm a permanent change.");
             return;
           }
           setError("");
@@ -211,6 +268,7 @@ export function StudentChangeRequestForm({
             onChange={(event) => {
               setQuery(event.target.value);
               setSelectedId("");
+              setError("");
             }}
             placeholder="Name or phone"
             className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -218,32 +276,43 @@ export function StudentChangeRequestForm({
         </label>
 
         {!selectedId ? (
-          <ul className="max-h-56 overflow-auto rounded-xl border border-line">
-            {matches.map((student) => (
-              <li key={student.id}>
-                <button
-                  type="button"
-                  onClick={() => choose(student)}
-                  className="flex w-full flex-col items-start border-b border-line px-4 py-3 text-left last:border-0 hover:bg-paper"
-                >
-                  <span className="font-semibold text-navy">
-                    {student.fullName}
-                  </span>
-                  <span className="text-sm text-muted">
-                    {student.parentPhone || "No phone"} ·{" "}
-                    {student.homeAddress || "No address"}
-                  </span>
-                </button>
-              </li>
-            ))}
-            {!matches.length ? (
-              <li className="px-4 py-3 text-sm text-muted">
-                No student matches. Check Front Desk roster.
-              </li>
-            ) : null}
-          </ul>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-amber-900">
+              Tap a student below to select them — Submit stays off until you
+              do.
+            </p>
+            <ul className="max-h-56 overflow-auto rounded-xl border border-line">
+              {matches.map((student) => (
+                <li key={student.id}>
+                  <button
+                    type="button"
+                    onClick={() => choose(student)}
+                    className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left last:border-0 hover:bg-paper"
+                  >
+                    <span>
+                      <span className="block font-semibold text-navy">
+                        {student.fullName}
+                      </span>
+                      <span className="text-sm text-muted">
+                        {student.parentPhone || "No phone"} ·{" "}
+                        {student.homeAddress || "No address"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold text-navy">
+                      Select →
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {!matches.length ? (
+                <li className="px-4 py-3 text-sm text-muted">
+                  No student matches. Check Front Desk roster.
+                </li>
+              ) : null}
+            </ul>
+          </div>
         ) : (
-          <p className="rounded-xl bg-paper px-4 py-3 text-sm font-semibold text-navy">
+          <p className="rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-900">
             Selected · {selected?.fullName}
             <button
               type="button"
@@ -311,14 +380,12 @@ export function StudentChangeRequestForm({
                 value={startDate}
                 onChange={(event) => setStartDate(event.target.value)}
                 className="rounded-xl border border-line bg-paper px-3 py-2"
-                required
               />
               <input
                 type="date"
                 value={endDate}
                 onChange={(event) => setEndDate(event.target.value)}
                 className="rounded-xl border border-line bg-paper px-3 py-2"
-                required
               />
             </div>
           ) : null}
@@ -339,7 +406,6 @@ export function StudentChangeRequestForm({
             <label className="block text-sm font-semibold">
               Daycare name
               <input
-                required
                 value={daycareName}
                 onChange={(event) => setDaycareName(event.target.value)}
                 className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -366,7 +432,6 @@ export function StudentChangeRequestForm({
           <label className="block text-sm font-semibold">
             New address
             <input
-              required
               value={customAddress}
               onChange={(event) => setCustomAddress(event.target.value)}
               placeholder="Street, city, state, zip"
@@ -379,7 +444,6 @@ export function StudentChangeRequestForm({
           <label className="block text-sm font-semibold">
             Primary 1 phone
             <input
-              required
               value={parentPhone}
               onChange={(event) => setParentPhone(event.target.value)}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -389,7 +453,6 @@ export function StudentChangeRequestForm({
             Parent email
             <input
               type="email"
-              required
               value={parentEmail}
               onChange={(event) => setParentEmail(event.target.value)}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -399,7 +462,6 @@ export function StudentChangeRequestForm({
             Teacher email
             <input
               type="email"
-              required
               value={teacherEmail}
               onChange={(event) => setTeacherEmail(event.target.value)}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -409,7 +471,6 @@ export function StudentChangeRequestForm({
             Bus company email
             <input
               type="email"
-              required
               value={companyEmail}
               onChange={(event) => setCompanyEmail(event.target.value)}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -419,7 +480,6 @@ export function StudentChangeRequestForm({
             Coordinator email
             <input
               type="email"
-              required
               value={coordEmail}
               onChange={(event) => setCoordEmail(event.target.value)}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -429,7 +489,6 @@ export function StudentChangeRequestForm({
             Front Desk email
             <input
               type="email"
-              required
               value={deskEmail}
               onChange={(event) => setDeskEmail(event.target.value)}
               className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
@@ -462,7 +521,7 @@ export function StudentChangeRequestForm({
 
         <button
           type="submit"
-          disabled={pending || !selectedId}
+          disabled={pending}
           className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
         >
           {pending
@@ -471,6 +530,12 @@ export function StudentChangeRequestForm({
               ? "Yes, replace change"
               : "Submit request"}
         </button>
+        {!selectedId ? (
+          <p className="text-sm text-muted">
+            Tip: tap <span className="font-semibold">Select →</span> next to the
+            student name first.
+          </p>
+        ) : null}
       </form>
     </div>
   );
