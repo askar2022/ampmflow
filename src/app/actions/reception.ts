@@ -13,7 +13,7 @@ import {
   looksLikeGradeLabel,
   planSummary,
 } from "@/lib/format";
-import { ensureStudentContactColumns, loadStudent } from "@/lib/transportation";
+import { loadStudent } from "@/lib/transportation";
 import {
   notifyRouteRequest,
   notifyStudentLeft,
@@ -405,7 +405,7 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
       },
     })
     .catch(() => undefined);
-  scheduleChangeNotify(
+  scheduleChangeNotify(() =>
     notifyTransportationChange({
       user,
       student,
@@ -669,7 +669,7 @@ export async function removeReceptionStudent(input: {
     })
     .catch(() => undefined);
 
-  scheduleChangeNotify(
+  scheduleChangeNotify(() =>
     notifyStudentLeft({
       user,
       student,
@@ -961,7 +961,7 @@ export async function requestRoute(input: RouteRequestInput) {
   revalidatePath("/changes");
   revalidatePath("/company");
 
-  scheduleChangeNotify(
+  scheduleChangeNotify(() =>
     notifyRouteRequest({
       user,
       studentName: `${firstName} ${lastName}`,
@@ -1063,8 +1063,8 @@ export async function assignRequestedBus(input: {
       return { ok: false as const, error: "Type the PM pickup time." };
     }
   }
-  await ensureStudentContactColumns().catch(() => undefined);
   const previous = planLine(loaded.effective, trips);
+  const student = loaded.effective;
 
   let assignedLabel = "";
   if (vehicle === "van") {
@@ -1081,30 +1081,32 @@ export async function assignRequestedBus(input: {
       SET "vehicleId" = ${van.id}, "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${studentId}
     `;
-    for (const trip of trips) {
-      const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;
-      await prisma.transportationAssignment.upsert({
-        where: { studentId_trip: { studentId, trip } },
-        create: {
-          studentId,
-          trip,
-          type: "BUS",
-          destination: current.destination || "HOME",
-          busRouteId: null,
-          waitingForAssignment: false,
-          notes: `${van.name} assigned by ${user.name}.`,
-          effectiveStart: new Date(),
-          updatedById: user.id,
-        },
-        update: {
-          type: "BUS",
-          busRouteId: null,
-          waitingForAssignment: false,
-          notes: `${van.name} assigned by ${user.name}.`,
-          updatedById: user.id,
-        },
-      });
-    }
+    await Promise.all(
+      trips.map(async (trip) => {
+        const current = trip === "AM" ? student.am : student.pm;
+        await prisma.transportationAssignment.upsert({
+          where: { studentId_trip: { studentId, trip } },
+          create: {
+            studentId,
+            trip,
+            type: "BUS",
+            destination: current.destination || "HOME",
+            busRouteId: null,
+            waitingForAssignment: false,
+            notes: `${van.name} assigned by ${user.name}.`,
+            effectiveStart: new Date(),
+            updatedById: user.id,
+          },
+          update: {
+            type: "BUS",
+            busRouteId: null,
+            waitingForAssignment: false,
+            notes: `${van.name} assigned by ${user.name}.`,
+            updatedById: user.id,
+          },
+        });
+      }),
+    );
   } else {
     const busNumber = normalizeBusNumber(rideName);
     if (!busNumber || busNumber === "0") {
@@ -1120,93 +1122,93 @@ export async function assignRequestedBus(input: {
       SET "vehicleId" = NULL, "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${studentId}
     `.catch(() => undefined);
-    for (const trip of trips) {
-      const busRouteId = await routeId(schoolId, busNumber, trip);
-      const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;
-      await prisma.transportationAssignment.upsert({
-        where: { studentId_trip: { studentId, trip } },
-        create: {
-          studentId,
-          trip,
-          type: "BUS",
-          destination: current.destination || "HOME",
-          busRouteId,
-          waitingForAssignment: false,
-          notes: `Bus ${busNumber} assigned by ${user.name}.`,
-          effectiveStart: new Date(),
-          updatedById: user.id,
-        },
-        update: {
-          type: "BUS",
-          busRouteId,
-          waitingForAssignment: false,
-          notes: `Bus ${busNumber} assigned by ${user.name}.`,
-          updatedById: user.id,
-        },
-      });
-    }
+    await Promise.all(
+      trips.map(async (trip) => {
+        const busRouteId = await routeId(schoolId, busNumber, trip);
+        const current = trip === "AM" ? student.am : student.pm;
+        await prisma.transportationAssignment.upsert({
+          where: { studentId_trip: { studentId, trip } },
+          create: {
+            studentId,
+            trip,
+            type: "BUS",
+            destination: current.destination || "HOME",
+            busRouteId,
+            waitingForAssignment: false,
+            notes: `Bus ${busNumber} assigned by ${user.name}.`,
+            effectiveStart: new Date(),
+            updatedById: user.id,
+          },
+          update: {
+            type: "BUS",
+            busRouteId,
+            waitingForAssignment: false,
+            notes: `Bus ${busNumber} assigned by ${user.name}.`,
+            updatedById: user.id,
+          },
+        });
+      }),
+    );
   }
 
-  for (const trip of trips) {
-    const time = trip === "AM" ? amPickup : pmPickup;
-    if (!time) continue;
-    await prisma.$executeRaw`
-      UPDATE "TransportationAssignment"
-      SET "pickupTime" = ${time}
-      WHERE "studentId" = ${studentId} AND "trip" = ${trip}
-    `.catch(() => undefined);
-  }
+  await Promise.all([
+    ...trips.map((trip) => {
+      const time = trip === "AM" ? amPickup : pmPickup;
+      if (!time) return Promise.resolve();
+      return prisma.$executeRaw`
+        UPDATE "TransportationAssignment"
+        SET "pickupTime" = ${time}
+        WHERE "studentId" = ${studentId} AND "trip" = ${trip}
+      `.catch(() => undefined);
+    }),
+    prisma.changeRequest.updateMany({
+      where: {
+        schoolId,
+        status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
+        OR: [{ id: request?.id || "" }, { studentId }],
+      },
+      data: {
+        status: "COMPLETED",
+        busNumber: assignedLabel,
+        reviewedById: user.id,
+        reviewedAt: new Date(),
+      },
+    }),
+  ]);
 
-  await prisma.changeRequest.updateMany({
-    where: {
-      schoolId,
-      status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
-      OR: [{ id: request?.id || "" }, { studentId }],
-    },
-    data: {
-      status: "COMPLETED",
-      busNumber: assignedLabel,
-      reviewedById: user.id,
-      reviewedAt: new Date(),
-    },
-  });
+  const nextLabel =
+    vehicle === "van"
+      ? `${assignedLabel} · ${planLine(student, trips)}`
+      : planLine(student, trips);
+  const note = [
+    `Bus company assigned ${assignedLabel}.`,
+    trips.includes("AM") && amPickup ? `AM pickup ${amPickup}.` : "",
+    trips.includes("PM") && pmPickup ? `PM pickup ${pmPickup}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  const after = await loadStudent(studentId);
-  const student = after?.effective ?? loaded.effective;
-  const busCompanyEmail = await defaultBusCompanyEmail(schoolId);
-  scheduleChangeNotify(
+  // Emails/SMS in the background — never hold the Assign button.
+  scheduleChangeNotify(() =>
     notifyTransportationChange({
       user,
       student,
       trips,
       previous,
-      next:
-        vehicle === "van"
-          ? `${assignedLabel} · ${planLine(student, trips)}`
-          : planLine(student, trips),
+      next: nextLabel,
       when: vehicle === "van" ? "Assigned van" : "Assigned bus",
-      note: [
-        `Bus company assigned ${assignedLabel}.`,
-        trips.includes("AM") && amPickup ? `AM pickup ${amPickup}.` : "",
-        trips.includes("PM") && pmPickup ? `PM pickup ${pmPickup}.` : "",
-      ]
-        .filter(Boolean)
-        .join(" "),
+      note,
       waiting: false,
       amPickup: trips.includes("AM") ? amPickup : "",
       pmPickup: trips.includes("PM") ? pmPickup : "",
       parentSms: "assigned",
       teacherEmail: student.teacherEmail,
-      busCompanyEmail,
-      notifySchool: user.role === "BUS_COMPANY",
+      busCompanyEmail: user.email,
+      notifySchool: true,
       schoolId,
     }),
   );
 
-  revalidatePath("/waiting");
-  revalidatePath("/dashboard");
-  revalidatePath("/changes");
-  revalidatePath("/buses");
   revalidatePath("/company");
 
   return {
@@ -1218,7 +1220,7 @@ export async function assignRequestedBus(input: {
     parentPhone: student.parentPhone,
     parentPhone2: student.parentPhone2,
     teacherEmail: student.teacherEmail,
-    busCompanyEmail,
+    busCompanyEmail: user.email,
     message: queuedNoticeMessage(
       false,
       `${assignedLabel} is now assigned to ${student.fullName}.`,

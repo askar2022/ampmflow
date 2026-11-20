@@ -971,10 +971,11 @@ export function noticeSummary(notice: ChangeNotice, extra?: string) {
   return parts.join(" ");
 }
 
-/** Do not block the UI on SMTP/Twilio — send after the action returns. */
-export function scheduleChangeNotify(job: Promise<unknown>) {
-  // after() keeps the Vercel worker alive so mail/SMS still go out.
-  after(() => job.then(() => undefined, () => undefined));
+/** Do not block the UI on SMTP/Twilio — start only after the action returns. */
+export function scheduleChangeNotify(start: () => Promise<unknown>) {
+  // Factory form is required: passing an already-running Promise still blocks
+  // the request until the first await inside that Promise.
+  after(() => start().then(() => undefined, () => undefined));
 }
 
 export function queuedNoticeMessage(waiting: boolean, extra?: string) {

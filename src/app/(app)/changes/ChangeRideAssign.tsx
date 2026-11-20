@@ -218,7 +218,8 @@ export function ChangeRideAssign({
       setPmPickup("");
       setDone(true);
       setReview(true);
-      router.refresh();
+      // Refresh after the button unlocks — do not keep "Saving…" open.
+      queue Promise.resolve().then(() => router.refresh());
     });
   }
 
