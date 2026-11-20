@@ -228,15 +228,22 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   if (!frontDeskEmail) {
     return { ok: false as const, error: "Front Desk email is required." };
   }
-  // Save contact prefs in parallel — do not stall Submit on one after another.
-  await Promise.all([
-    saveSchoolBusCompanyEmail(user.schoolId, busCompanyEmail).catch(
+  // Desk email prefs can wait — keep Submit on the student change only.
+  after(() =>
+    Promise.all([
+      saveSchoolBusCompanyEmail(user.schoolId, busCompanyEmail).catch(
+        () => undefined,
+      ),
+      saveSchoolDeskNotifyEmails(user.schoolId, {
+        coordinatorEmail,
+        frontDeskEmail,
+      }).catch(() => undefined),
+    ]).then(
+      () => undefined,
       () => undefined,
     ),
-    saveSchoolDeskNotifyEmails(user.schoolId, {
-      coordinatorEmail,
-      frontDeskEmail,
-    }).catch(() => undefined),
+  );
+  await Promise.all([
     prisma.$executeRaw`
       UPDATE "Student"
       SET "parentEmail" = ${parentEmail},

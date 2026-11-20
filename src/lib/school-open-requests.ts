@@ -1,7 +1,7 @@
-import { formatDateTime, schoolLocalTime } from "./dates";
+import { formatDateTime } from "./dates";
 import { companyAssignmentLabel, isWaitingRide } from "./format";
 import { prisma } from "./prisma";
-import { loadStudent, loadStudents } from "./transportation";
+import { toEffective } from "./transportation";
 import type { EffectiveStudent } from "./types";
 
 export type SchoolOpenRequestKind =
@@ -108,12 +108,12 @@ function detailFromChangeRequest(row: {
 
 /**
  * One school list for every unfinished request: new route, address, daycare.
+ * Loads only students tied to open work — not the whole roster.
  */
 export async function loadSchoolOpenRequests(
   schoolId: string,
 ): Promise<SchoolOpenRequestRow[]> {
-  const [students, openRequests] = await Promise.all([
-    loadStudents(schoolId),
+  const [openRequests, recentTemps] = await Promise.all([
     prisma.changeRequest.findMany({
       where: {
         schoolId,
@@ -130,7 +130,89 @@ export async function loadSchoolOpenRequests(
       },
       orderBy: { createdAt: "asc" },
     }),
+    prisma.temporaryChange.findMany({
+      where: {
+        undone: false,
+        status: "APPROVED",
+        waitingForAssignment: true,
+        student: { schoolId, active: true },
+      },
+      select: {
+        studentId: true,
+        createdAt: true,
+        destination: true,
+        customAddress: {
+          select: { line1: true, city: true, state: true, zip: true },
+        },
+        daycare: { select: { name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
   ]);
+
+  const linkedIds = [
+    ...new Set(
+      [
+        ...openRequests.map((row) => row.studentId).filter(Boolean),
+        ...recentTemps.map((row) => row.studentId),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  // One query for every student that could appear — no N+1 loadStudent calls.
+  const rows = await prisma.student.findMany({
+    where: {
+      schoolId,
+      active: true,
+      OR: [
+        ...(linkedIds.length ? [{ id: { in: linkedIds } }] : []),
+        { enrollmentSource: { in: ["ROUTE_REQUEST", "NEW_APPLICATION"] } },
+        { assignments: { some: { waitingForAssignment: true } } },
+        {
+          tempChanges: {
+            some: {
+              undone: false,
+              status: "APPROVED",
+              waitingForAssignment: true,
+            },
+          },
+        },
+      ],
+    },
+    include: {
+      classroom: {
+        include: {
+          teachers: { select: { id: true, name: true, email: true } },
+        },
+      },
+      homeAddress: true,
+      daycare: { include: { address: true } },
+      assignments: {
+        include: {
+          busRoute: { select: { number: true, loadingLocation: true } },
+          daycare: { select: { name: true } },
+          customAddress: true,
+        },
+      },
+      tempChanges: {
+        where: { undone: false, status: "APPROVED" },
+        include: {
+          busRoute: { select: { number: true, loadingLocation: true } },
+          daycare: { select: { name: true } },
+          customAddress: true,
+        },
+      },
+    },
+  });
+
+  const byStudentId = new Map<string, EffectiveStudent>();
+  for (const row of rows) {
+    try {
+      byStudentId.set(row.id, toEffective(row));
+    } catch {
+      // Skip a bad roster row.
+    }
+  }
 
   const byId = new Map<
     string,
@@ -158,52 +240,21 @@ export async function loadSchoolOpenRequests(
   }
 
   for (const row of openRequests) {
-    let studentId = row.studentId;
-    if (!studentId) {
-      const full = row.title.replace(/^Request for route\s*[—\-]\s*/i, "").trim();
-      const parts = full.split(/\s+/).filter(Boolean);
-      if (parts.length >= 2) {
-        const match = await prisma.student.findFirst({
-          where: {
-            schoolId,
-            active: true,
-            firstName: { equals: parts[0], mode: "insensitive" },
-            lastName: { equals: parts.slice(1).join(" "), mode: "insensitive" },
-          },
-          select: { id: true },
-        });
-        if (match) {
-          studentId = match.id;
-          await prisma.changeRequest
-            .update({
-              where: { id: row.id },
-              data: { studentId: match.id },
-            })
-            .catch(() => undefined);
-        }
-      }
-    }
+    const studentId = row.studentId;
     if (!studentId) continue;
-    const loaded = await loadStudent(studentId);
-    if (!loaded?.effective) continue;
+    const student = byStudentId.get(studentId);
+    if (!student) continue;
     remember(
-      loaded.effective,
+      student,
       row.createdAt,
       kindFromChangeRequest(row),
-      detailFromChangeRequest(row) || detailForStudent(loaded.effective),
+      detailFromChangeRequest(row) || detailForStudent(student),
     );
   }
 
-  for (const student of students) {
-    const daycareOrAddressWaiting =
-      isWaitingRide(student) &&
-      (student.am.destination === "DAYCARE" ||
-        student.pm.destination === "DAYCARE" ||
-        student.am.destination === "CUSTOM" ||
-        student.pm.destination === "CUSTOM");
+  for (const student of byStudentId.values()) {
     const needsCompany =
       isWaitingRide(student) ||
-      daycareOrAddressWaiting ||
       student.enrollmentSource === "ROUTE_REQUEST" ||
       student.enrollmentSource === "NEW_APPLICATION";
     if (!needsCompany) continue;
@@ -218,28 +269,9 @@ export async function loadSchoolOpenRequests(
     );
   }
 
-  // Recent approved temp changes still waiting for a bus number.
-  const recentTemps = await prisma.temporaryChange.findMany({
-    where: {
-      undone: false,
-      status: "APPROVED",
-      waitingForAssignment: true,
-      student: { schoolId, active: true },
-    },
-    select: {
-      studentId: true,
-      createdAt: true,
-      destination: true,
-      customAddress: {
-        select: { line1: true, city: true, state: true, zip: true },
-      },
-      daycare: { select: { name: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
   for (const temp of recentTemps) {
-    const loaded = await loadStudent(temp.studentId);
-    if (!loaded?.effective) continue;
+    const student = byStudentId.get(temp.studentId);
+    if (!student) continue;
     const kind: SchoolOpenRequestKind =
       temp.destination === "DAYCARE"
         ? "New daycare change"
@@ -251,8 +283,8 @@ export async function loadSchoolOpenRequests(
         ? temp.daycare?.name || "Daycare"
         : temp.destination === "CUSTOM" && temp.customAddress
           ? `${temp.customAddress.line1}, ${temp.customAddress.city}`
-          : detailForStudent(loaded.effective);
-    remember(loaded.effective, temp.createdAt, kind, detail);
+          : detailForStudent(student);
+    remember(student, temp.createdAt, kind, detail);
   }
 
   return [...byId.values()]
