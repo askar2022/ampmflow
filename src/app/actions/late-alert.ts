@@ -81,11 +81,15 @@ export async function lateAlertPreview(input: {
     staffCount: staffPhones.length,
     studentCount: recipients.length,
     preview: lateAlertSms({ rideLabel: ride.label, minutes }),
-    smsReady: smsConfigured(),
+    smsReady: LATE_BUS_SMS_SENDING_ENABLED && smsConfigured(),
+    sendingEnabled: LATE_BUS_SMS_SENDING_ENABLED,
     estimatedCents,
     estimatedCostLabel: formatSmsMoney(estimatedCents),
   };
 }
+
+/** Off until the bus company confirms they will pay for SMS. */
+export const LATE_BUS_SMS_SENDING_ENABLED = false;
 
 export async function sendLateBusAlert(input: {
   schoolId: string;
@@ -96,6 +100,13 @@ export async function sendLateBusAlert(input: {
   const user = await getSession();
   if (!user || user.role !== "BUS_COMPANY") {
     return { ok: false as const, error: "Only the bus company can send this alert." };
+  }
+  if (!LATE_BUS_SMS_SENDING_ENABLED) {
+    return {
+      ok: false as const,
+      error:
+        "Late Bus SMS is paused. Preview only — no texts send until the bus company agrees to pay for SMS.",
+    };
   }
   if (!(await canCompanyAccessSchool(user, input.schoolId))) {
     return { ok: false as const, error: "That school is not on your list." };

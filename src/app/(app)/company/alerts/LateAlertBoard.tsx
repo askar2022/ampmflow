@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   lateAlertPreview,
   saveCompanyLateAlertStaff,
-  sendLateBusAlert,
 } from "@/app/actions/late-alert";
 import type { CompanySchool } from "@/lib/company-access";
 import {
@@ -24,6 +23,7 @@ type Preview = {
   studentCount: number;
   preview: string;
   smsReady: boolean;
+  sendingEnabled?: boolean;
   estimatedCents: number;
   estimatedCostLabel: string;
 };
@@ -54,13 +54,12 @@ export function LateAlertBoard({
   const [trip, setTrip] = useState<"PM" | "AM" | "BOTH">("PM");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
   const [staffSaved, setStaffSaved] = useState("");
   const [phone1, setPhone1] = useState(staffPhone1);
   const [phone2, setPhone2] = useState(staffPhone2);
-  const [costRefresh, setCostRefresh] = useState(0);
   const [staffVersion, setStaffVersion] = useState(0);
-  const [pending, start] = useTransition();
+  const [previewPending, startPreview] = useTransition();
+  const [staffPending, startStaff] = useTransition();
 
   const trips: Trip[] = useMemo(
     () => (trip === "BOTH" ? ["AM", "PM"] : [trip]),
@@ -74,7 +73,7 @@ export function LateAlertBoard({
     }
     let cancelled = false;
     setError("");
-    start(async () => {
+    startPreview(async () => {
       const result = await lateAlertPreview({
         schoolId: selectedSchool,
         rideKey,
@@ -99,35 +98,10 @@ export function LateAlertBoard({
     window.location.assign(`/company/alerts?school=${id}`);
   }
 
-  function send() {
-    if (!rideKey) {
-      setError("Choose a bus.");
-      return;
-    }
-    setError("");
-    setMessage("");
-    setStaffSaved("");
-    start(async () => {
-      const result = await sendLateBusAlert({
-        schoolId: selectedSchool,
-        rideKey,
-        minutes,
-        trips,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setMessage(result.message);
-      setCostRefresh((value) => value + 1);
-    });
-  }
-
   function saveStaffPhones() {
     setError("");
-    setMessage("");
     setStaffSaved("");
-    start(async () => {
+    startStaff(async () => {
       const result = await saveCompanyLateAlertStaff({
         schoolId: selectedSchool,
         phone1,
@@ -139,7 +113,9 @@ export function LateAlertBoard({
       }
       setPhone1(result.phones.phone1);
       setPhone2(result.phones.phone2);
-      setStaffSaved("School staff phones saved. They get the same late-bus text.");
+      setStaffSaved(
+        "School staff phones saved. They will get the same late-bus text when sending is turned on.",
+      );
       setStaffVersion((value) => value + 1);
     });
   }
@@ -155,10 +131,7 @@ export function LateAlertBoard({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <SmsCostButton
-              schoolId={selectedSchool}
-              refreshKey={costRefresh}
-            />
+            <SmsCostButton schoolId={selectedSchool} refreshKey={0} />
             <Link
               href={`/company?school=${selectedSchool}`}
               className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
@@ -168,10 +141,16 @@ export function LateAlertBoard({
           </div>
         </div>
         <p className="mt-2 max-w-2xl text-muted">
-          Text parents when a bus is running late. Aim uses Bus 4, Bus 5, and
-          the 3rd bus only. Each text is 8¢ — open SMS cost for this week and
-          month by bus.
+          Preview late-bus texts here. Sending to parents is turned off until
+          the bus company agrees to pay for SMS (8¢ each).
         </p>
+        <div
+          className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950"
+          role="status"
+        >
+          SMS send is disabled. Choosing a bus only updates the preview — it
+          never texts parents.
+        </div>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
           <select
@@ -193,8 +172,8 @@ export function LateAlertBoard({
           School staff texts (optional)
         </h2>
         <p className="mt-1 text-sm text-muted">
-          Up to two phones also get every late-bus text for {schoolName}, so
-          school staff know when parents are notified.
+          Up to two phones can also get every late-bus text for {schoolName}
+          once sending is turned on.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="block text-sm font-semibold text-navy">
@@ -220,11 +199,11 @@ export function LateAlertBoard({
         </div>
         <button
           type="button"
-          disabled={pending}
+          disabled={staffPending}
           onClick={saveStaffPhones}
           className="mt-3 rounded-full border border-line px-4 py-2 text-sm font-semibold disabled:opacity-60"
         >
-          {pending ? "Saving…" : "Save staff phones"}
+          {staffPending ? "Saving…" : "Save staff phones"}
         </button>
         {staffSaved ? (
           <p className="mt-2 text-sm text-green-900">{staffSaved}</p>
@@ -241,7 +220,10 @@ export function LateAlertBoard({
                 <button
                   key={ride.key}
                   type="button"
-                  onClick={() => setRideKey(ride.key)}
+                  onClick={() => {
+                    setError("");
+                    setRideKey(ride.key);
+                  }}
                   className={`rounded-xl border px-4 py-3 text-sm font-semibold ${
                     active
                       ? "border-navy bg-navy text-white"
@@ -255,7 +237,7 @@ export function LateAlertBoard({
           </div>
         ) : (
           <p className="mt-3 text-sm text-muted">
-            No Aim buses are on file yet for {schoolName}.
+            No buses or vans are on file yet for {schoolName}.
           </p>
         )}
 
@@ -300,6 +282,10 @@ export function LateAlertBoard({
           ))}
         </div>
 
+        {previewPending && !preview ? (
+          <p className="mt-6 text-sm text-muted">Loading preview…</p>
+        ) : null}
+
         {preview ? (
           <div className="mt-6 space-y-3">
             <div className="rounded-xl border border-navy/20 bg-navy/5 px-4 py-3 text-sm text-navy">
@@ -308,7 +294,7 @@ export function LateAlertBoard({
               {preview.staffCount
                 ? ` + ${preview.staffCount} school staff`
                 : ""}{" "}
-              will receive a text for {preview.rideLabel}
+              would receive a text for {preview.rideLabel}
               {preview.studentCount
                 ? ` (${preview.studentCount} student${
                     preview.studentCount === 1 ? "" : "s"
@@ -318,7 +304,7 @@ export function LateAlertBoard({
               <span className="font-extrabold">
                 {preview.estimatedCostLabel}
               </span>{" "}
-              SMS cost.
+              SMS cost (not sent).
             </div>
             <div className="rounded-xl border border-line bg-paper px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">
@@ -328,29 +314,24 @@ export function LateAlertBoard({
                 {preview.preview}
               </pre>
             </div>
-            {!preview.smsReady ? (
-              <p className="text-sm text-red">
-                Texting is not set up yet, so the alert cannot send.
-              </p>
-            ) : null}
           </div>
         ) : null}
 
         {error ? <p className="mt-4 text-sm text-red">{error}</p> : null}
-        {message ? (
-          <p className="mt-4 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
-            {message}
-          </p>
-        ) : null}
 
         <button
           type="button"
-          disabled={pending || !rideKey || !preview?.familyCount}
-          onClick={send}
-          className="mt-6 rounded-full bg-navy px-6 py-3 text-sm font-semibold text-white disabled:opacity-60"
+          disabled
+          aria-disabled="true"
+          title="SMS sending is paused"
+          className="mt-6 cursor-not-allowed rounded-full bg-navy/40 px-6 py-3 text-sm font-semibold text-white"
         >
-          {pending ? "Sending…" : "Send SMS Alert"}
+          Send SMS Alert (disabled)
         </button>
+        <p className="mt-2 text-sm text-muted">
+          Tell us when the bus company agrees to pay for SMS and we will turn
+          sending back on.
+        </p>
       </section>
     </div>
   );

@@ -133,15 +133,19 @@ export async function loadLateRides(schoolId: string): Promise<LateRide[]> {
           fill: number,
         };
       }),
-      ...locked.vans.map((van) => {
-        const label = vanLabel(van.name);
-        return {
-          key: `van:${label.toLowerCase()}`,
-          label,
-          kind: "van" as const,
-          fill: label.replace(/^Van\s+/i, ""),
-        };
-      }),
+      ...locked.vans
+        .map((van) => {
+          const label = vanLabel(van.name);
+          const fill = label.replace(/^Van\s+/i, "");
+          if (!fill || fill === "0") return null;
+          return {
+            key: `van:${label.toLowerCase()}`,
+            label,
+            kind: "van" as const,
+            fill,
+          };
+        })
+        .filter((ride): ride is LateRide => Boolean(ride)),
     ];
     return rides.sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === "bus" ? -1 : 1;
