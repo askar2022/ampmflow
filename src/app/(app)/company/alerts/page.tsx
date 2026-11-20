@@ -3,7 +3,6 @@ import { getSession } from "@/lib/auth";
 import { loadCompanySchools } from "@/lib/company-access";
 import { loadLateRides } from "@/lib/late-alert";
 import { loadLateAlertStaffPhones } from "@/lib/late-alert-staff";
-import { prisma } from "@/lib/prisma";
 import { LateAlertBoard } from "./LateAlertBoard";
 
 export default async function CompanyLateAlertPage({
@@ -15,19 +14,12 @@ export default async function CompanyLateAlertPage({
   if (!session) return null;
   if (session.role !== "BUS_COMPANY") redirect("/changes");
 
-  const liveName = await prisma.user
-    .findUnique({
-      where: { id: session.id },
-      select: { name: true },
-    })
-    .then((row) => row?.name || session.name || "Bus company")
-    .catch(() => session.name || "Bus company");
-
   const { school: wanted } = await searchParams;
   const schools = await loadCompanySchools(session);
   const selected =
     schools.find((school) => school.id === wanted || school.slug === wanted) ||
     schools[0];
+  const liveName = session.name || "Bus company";
 
   if (!selected) {
     return (

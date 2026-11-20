@@ -131,27 +131,32 @@ function companyEmail(student: EffectiveStudent, trips: Trip[]) {
 
 async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
   const aim = isAimSchool(school.name);
+  const locked = companyFleetForSchool(school.name);
   const schoolIds = await companySchoolGroupIds(school);
-  // Read-only on open — no fleet rewrite or settings write during login.
+
+  // Locked fleets (NIA / Aim) skip vehicle + route scans on every Open requests click.
   const [openRows, vehicleLists, routeLists] = await Promise.all([
     loadCompanyOpenRequests(schoolIds),
-    Promise.all(
-      schoolIds.map((schoolId) => loadVehicles(schoolId).catch(() => [])),
-    ),
-    Promise.all(
-      schoolIds.map((schoolId) =>
-        prisma.busRoute.findMany({
-          where: { schoolId },
-          select: { number: true },
-          orderBy: { number: "asc" },
-        }),
-      ),
-    ),
+    locked
+      ? Promise.resolve([[]] as Awaited<ReturnType<typeof loadVehicles>>[])
+      : Promise.all(
+          schoolIds.map((schoolId) => loadVehicles(schoolId).catch(() => [])),
+        ),
+    locked
+      ? Promise.resolve([[]] as Array<Array<{ number: string }>>)
+      : Promise.all(
+          schoolIds.map((schoolId) =>
+            prisma.busRoute.findMany({
+              where: { schoolId },
+              select: { number: true },
+              orderBy: { number: "asc" },
+            }),
+          ),
+        ),
   ]);
   const vehicles = vehicleLists.flat();
   const routes = routeLists.flat();
 
-  const locked = companyFleetForSchool(school.name);
   const vans = locked
     ? locked.vans
     : aim

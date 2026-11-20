@@ -135,6 +135,8 @@ export async function loadCompanyOpenRequests(
       busNumber: true,
     },
     orderBy: { createdAt: "desc" },
+    // Keep the desk snappy; newest permanent rows still show first.
+    take: 250,
   })) as OpenRequestRow[];
 
   const unresolved = openRequests.filter((row) => !row.studentId);

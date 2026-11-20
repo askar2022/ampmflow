@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadCompanySchools } from "@/lib/company-access";
@@ -37,20 +38,28 @@ export default async function CompanyGpsReportPage({
   }
 
   const day = todayKey();
-  const feed = await fetchOneStepLiveBuses(selected.name);
   const aimSchool = /aim/i.test(selected.name);
-  if (feed.live && aimSchool) {
-    await recordLiveGpsBuses({
-      schoolId: selected.id,
-      company: "Minnehaha",
-      buses: feed.buses,
-    });
-  }
 
+  // Report table first — never block the page on OneStep.
   const [rows, days] = await Promise.all([
     loadGpsTripReport({ schoolId: selected.id, dayKey: day }),
     loadGpsArrivalDays(selected.id),
   ]);
+
+  if (aimSchool) {
+    after(() =>
+      fetchOneStepLiveBuses(selected.name)
+        .then((feed) => {
+          if (!feed.live) return;
+          return recordLiveGpsBuses({
+            schoolId: selected.id,
+            company: "Minnehaha",
+            buses: feed.buses,
+          });
+        })
+        .catch(() => undefined),
+    );
+  }
 
   return (
     <GpsReportBoard

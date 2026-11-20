@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { loadCompanySchools } from "@/lib/company-access";
@@ -10,6 +11,7 @@ import {
   recordLiveGpsBuses,
 } from "@/lib/gps-log";
 import { fetchOneStepLiveBuses } from "@/lib/onestep-gps";
+import { companyFleetForSchool } from "@/lib/school-fleet";
 import { prisma } from "@/lib/prisma";
 
 export default async function CompanyLiveGpsPage({
@@ -38,29 +40,38 @@ export default async function CompanyLiveGpsPage({
     );
   }
 
-  const [routes, feed] = await Promise.all([
-    prisma.busRoute.findMany({
-      where: { schoolId: selected.id },
-      select: { number: true },
-      orderBy: { number: "asc" },
-    }),
-    fetchOneStepLiveBuses(selected.name),
+  const day = todayKey();
+  const fleet = companyFleetForSchool(selected.name);
+  const [routes, feed, arrivals, arrivalDays] = await Promise.all([
+    fleet?.locked
+      ? Promise.resolve(fleet.buses.map((number) => ({ number })))
+      : prisma.busRoute.findMany({
+          where: { schoolId: selected.id },
+          select: { number: true },
+          orderBy: { number: "asc" },
+        }),
+    fetchOneStepLiveBuses(selected.name).catch(() => ({
+      configured: false,
+      live: false,
+      school: null,
+      buses: [] as Awaited<ReturnType<typeof fetchOneStepLiveBuses>>["buses"],
+      fetchedAt: new Date().toISOString(),
+      error: "Live GPS unavailable right now.",
+    })),
+    loadGpsArrivals({ schoolId: selected.id, dayKey: day }),
+    loadGpsArrivalDays(selected.id),
   ]);
 
   const aimSchool = /aim/i.test(selected.name);
   if (feed.live && aimSchool) {
-    await recordLiveGpsBuses({
-      schoolId: selected.id,
-      company: "Minnehaha",
-      buses: feed.buses,
-    });
+    after(() =>
+      recordLiveGpsBuses({
+        schoolId: selected.id,
+        company: "Minnehaha",
+        buses: feed.buses,
+      }).catch(() => undefined),
+    );
   }
-
-  const day = todayKey();
-  const [arrivals, arrivalDays] = await Promise.all([
-    loadGpsArrivals({ schoolId: selected.id, dayKey: day }),
-    loadGpsArrivalDays(selected.id),
-  ]);
 
   return (
     <LiveGpsBoard

@@ -105,10 +105,11 @@ export async function assignCompanySchools(email: string, schoolIds: string[]) {
 }
 
 export async function loadCompanySchools(user: SessionUser) {
-  const [emailMatches, pendingMatches] = await Promise.all([
-    loadSchoolsByCompanyEmail(user.email),
-    loadSchoolsByPendingRequestEmail(user.email),
-  ]);
+  // Prefer linked schools first — skip the heavy pending-request scan when linked.
+  const emailMatches = await loadSchoolsByCompanyEmail(user.email);
+  const pendingMatches = emailMatches.length
+    ? []
+    : await loadSchoolsByPendingRequestEmail(user.email);
 
   const byId = new Map<string, CompanySchool>();
   for (const school of [...emailMatches, ...pendingMatches]) {

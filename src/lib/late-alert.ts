@@ -1,10 +1,7 @@
-import {
-  AIM_FLEET_LABELS,
-  ensureAimFleetVehicles,
-  isAimSchool,
-} from "./aim-fleet";
+import { AIM_FLEET_LABELS, isAimSchool } from "./aim-fleet";
 import { loadVehicles } from "./gate";
 import { prisma } from "./prisma";
+import { companyFleetForSchool } from "./school-fleet";
 import { parentSmsNumbers } from "./sms";
 import { loadStudents } from "./transportation";
 import type { PlanSnapshot, Trip } from "./types";
@@ -120,14 +117,39 @@ export async function loadLateRides(schoolId: string): Promise<LateRide[]> {
     select: { name: true },
   });
 
-  // Aim / Minnehaha: only Bus 4, Bus 5, and 3rd bus — never Bus 1–3 or vans.
+  // Known fleets — no full roster scan on Late Bus Alert open.
   if (isAimSchool(school?.name)) {
-    await ensureAimFleetVehicles(schoolId).catch(() => undefined);
     return aimLateRidesOnly();
   }
+  const locked = companyFleetForSchool(school?.name);
+  if (locked?.locked) {
+    const rides: LateRide[] = [
+      ...locked.buses.map((number) => {
+        const label = /^3rd/i.test(number) ? "3rd bus" : busLabel(number);
+        return {
+          key: `bus:${label.toLowerCase()}`,
+          label,
+          kind: "bus" as const,
+          fill: number,
+        };
+      }),
+      ...locked.vans.map((van) => {
+        const label = vanLabel(van.name);
+        return {
+          key: `van:${label.toLowerCase()}`,
+          label,
+          kind: "van" as const,
+          fill: label.replace(/^Van\s+/i, ""),
+        };
+      }),
+    ];
+    return rides.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "bus" ? -1 : 1;
+      return a.label.localeCompare(b.label, undefined, { numeric: true });
+    });
+  }
 
-  const [students, vehicles, routes] = await Promise.all([
-    loadStudents(schoolId),
+  const [vehicles, routes] = await Promise.all([
     loadVehicles(schoolId).catch(() => []),
     prisma.busRoute.findMany({
       where: { schoolId },
@@ -135,15 +157,6 @@ export async function loadLateRides(schoolId: string): Promise<LateRide[]> {
       orderBy: { number: "asc" },
     }),
   ]);
-
-  const vehicleName = new Map(
-    (
-      await prisma.student.findMany({
-        where: { schoolId, active: true, vehicleId: { not: null } },
-        select: { id: true, vehicle: { select: { name: true } } },
-      })
-    ).map((row) => [row.id, row.vehicle?.name || ""]),
-  );
 
   const rides = new Map<string, LateRide>();
   for (const route of routes) {
@@ -174,13 +187,6 @@ export async function loadLateRides(schoolId: string): Promise<LateRide[]> {
     ) {
       const ride = aimFleetRide(vehicle.name);
       rides.set(ride.key, ride);
-    }
-  }
-  for (const student of students) {
-    for (const trip of ["AM", "PM"] as Trip[]) {
-      const plan = trip === "AM" ? student.am : student.pm;
-      const ride = rideFromPlan(plan, vehicleName.get(student.id));
-      if (ride) rides.set(ride.key, ride);
     }
   }
 
