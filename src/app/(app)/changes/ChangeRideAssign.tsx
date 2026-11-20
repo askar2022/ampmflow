@@ -169,8 +169,14 @@ export function ChangeRideAssign({
       setError(
         hideVan
           ? "Choose Bus 4, Bus 5, or the 3rd bus."
-          : "Type the bus number.",
+          : buses.length || vans.length
+            ? "Choose a bus or a van — not both."
+            : "Type the bus or van number.",
       );
+      return;
+    }
+    if (van && (/^0$|^van\s*0$/i.test(van) || van.replace(/^van\s+/i, "") === "0")) {
+      setError("Van 0 is not valid. Choose Van 1–Van 7.");
       return;
     }
     const trips: Trip[] = trip === "BOTH" ? ["AM", "PM"] : [trip];
@@ -413,6 +419,37 @@ export function ChangeRideAssign({
                     </div>
                   </div>
                 ) : null}
+                {!hideVan && vans.length ? (
+                  <div className="mt-3">
+                    <div className="text-sm font-semibold">Vans</div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {vans.map((van) => {
+                        const on =
+                          vanNumber.trim().toLowerCase() ===
+                            van.name.toLowerCase() ||
+                          vanNumber.trim() ===
+                            van.name.replace(/^Van\s+/i, "");
+                        return (
+                          <button
+                            key={van.id}
+                            type="button"
+                            onClick={() => {
+                              setVanNumber(van.name);
+                              setBusNumber("");
+                            }}
+                            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${
+                              on
+                                ? "bg-navy text-white"
+                                : "border border-line bg-paper"
+                            }`}
+                          >
+                            {van.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
                 <div
                   className={`mt-3 grid gap-2 ${hideVan ? "" : "sm:grid-cols-2"}`}
                 >
@@ -432,7 +469,13 @@ export function ChangeRideAssign({
                           assign();
                         }
                       }}
-                      placeholder={hideVan ? "4, 5, or 3rd bus" : "4"}
+                      placeholder={
+                        hideVan
+                          ? "4, 5, or 3rd bus"
+                          : buses.length
+                            ? buses.join(" or ")
+                            : "1"
+                      }
                       className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                     />
                   </label>
@@ -452,7 +495,11 @@ export function ChangeRideAssign({
                             assign();
                           }
                         }}
-                        placeholder="2"
+                        placeholder={
+                          vans.length
+                            ? vans[0]?.name.replace(/^Van\s+/i, "") || "1"
+                            : "1"
+                        }
                         className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                       />
                     </label>

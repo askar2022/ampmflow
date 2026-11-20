@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { AIM_FLEET_LABELS, isAimSchool } from "@/lib/aim-fleet";
+import { isAimSchool } from "@/lib/aim-fleet";
 import { loadVehicles } from "@/lib/gate";
 import { formatDateTime, schoolLocalTime } from "@/lib/dates";
+import { companyFleetForSchool } from "@/lib/school-fleet";
 import {
   companySchoolGroupIds,
   loadCompanySchools,
@@ -150,35 +151,36 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
   const vehicles = vehicleLists.flat();
   const routes = routeLists.flat();
 
-  const vans = aim
-    ? []
-    : vehicles
-        .filter(
-          (vehicle) =>
-            vehicle.vehicleType.toUpperCase() === "VAN" ||
-            /van/i.test(vehicle.name),
-        )
-        .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
+  const locked = companyFleetForSchool(school.name);
+  const vans = locked
+    ? locked.vans
+    : aim
+      ? []
+      : vehicles
+          .filter(
+            (vehicle) =>
+              vehicle.vehicleType.toUpperCase() === "VAN" ||
+              /van/i.test(vehicle.name),
+          )
+          .map((vehicle) => ({ id: vehicle.id, name: vehicle.name }));
 
-  const fleetBusNumbers = aim
-    ? AIM_FLEET_LABELS.map(
-        (label) => label.replace(/^Bus\s+/i, "").trim() || label,
-      )
-    : vehicles
-        .filter(
-          (vehicle) =>
-            vehicle.vehicleType.toUpperCase() === "BUS" &&
-            !/van/i.test(vehicle.name),
-        )
-        .map((vehicle) => vehicle.name.replace(/^Bus\s+/i, "").trim())
-        .filter(Boolean);
-
-  const buses = [
-    ...new Set([
-      ...routes.map((route) => route.number),
-      ...fleetBusNumbers,
-    ]),
-  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const buses = locked
+    ? locked.buses
+    : [
+        ...new Set([
+          ...routes.map((route) => route.number),
+          ...vehicles
+            .filter(
+              (vehicle) =>
+                vehicle.vehicleType.toUpperCase() === "BUS" &&
+                !/van/i.test(vehicle.name),
+            )
+            .map((vehicle) =>
+              vehicle.name.replace(/^Bus\s+/i, "").trim(),
+            )
+            .filter(Boolean),
+        ]),
+      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const rows: CompanyRequest[] = openRows.map((row) => {
     const { student, requestedAt, status, busNumber } = row;
@@ -220,6 +222,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     buses,
     vans,
     aimSchool: aim,
+    hideVan: locked?.hideVan ?? aim,
     rows,
   };
 }

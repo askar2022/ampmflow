@@ -97,6 +97,7 @@ export type CompanyDesk = {
   buses: string[];
   vans: { id: string; name: string }[];
   aimSchool?: boolean;
+  hideVan?: boolean;
   rows: CompanyRequest[];
 };
 
@@ -209,7 +210,7 @@ export function CompanyBoard({
                           effectiveDate={row.effectiveDate}
                           buses={desk.buses}
                           vans={desk.vans}
-                          hideVan={desk.aimSchool}
+                          hideVan={desk.hideVan ?? desk.aimSchool}
                           companyAssigned={row.changed}
                           defaultTrips={row.trips}
                           nearbyEnabled

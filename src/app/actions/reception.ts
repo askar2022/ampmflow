@@ -30,6 +30,10 @@ import {
 } from "@/lib/ops-change-emails";
 import { canCompanyAccessSchool } from "@/lib/company-access";
 import { ensureAddressGeoColumns, geocodeAndSaveAddress } from "@/lib/geocode";
+import {
+  normalizeBusNumber,
+  normalizeVanLabel,
+} from "@/lib/school-fleet";
 import { parentSmsNumbers } from "@/lib/sms";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
@@ -121,8 +125,9 @@ async function attachDaycare(
 }
 
 async function ensureVan(schoolId: string, name: string) {
-  const label = name.replace(/^Van\s+/i, "").trim();
-  const vanName = /^van\b/i.test(name.trim()) ? name.trim() : `Van ${label}`;
+  const vanName = normalizeVanLabel(name);
+  if (!vanName) return null;
+  const label = vanName.replace(/^Van\s+/i, "").trim();
   const existing = await prisma.$queryRaw<Array<{ id: string; name: string }>>`
     SELECT "id", "name" FROM "TransportVehicle"
     WHERE "schoolId" = ${schoolId}
@@ -1064,6 +1069,12 @@ export async function assignRequestedBus(input: {
   let assignedLabel = "";
   if (vehicle === "van") {
     const van = await ensureVan(schoolId, rideName);
+    if (!van) {
+      return {
+        ok: false as const,
+        error: "Type a real van number (Van 1–Van 7). Van 0 is not valid.",
+      };
+    }
     assignedLabel = van.name;
     await prisma.$executeRaw`
       UPDATE "Student"
@@ -1079,12 +1090,15 @@ export async function assignRequestedBus(input: {
           trip,
           type: "BUS",
           destination: current.destination || "HOME",
+          busRouteId: null,
           waitingForAssignment: false,
           notes: `${van.name} assigned by ${user.name}.`,
           effectiveStart: new Date(),
           updatedById: user.id,
         },
         update: {
+          type: "BUS",
+          busRouteId: null,
           waitingForAssignment: false,
           notes: `${van.name} assigned by ${user.name}.`,
           updatedById: user.id,
@@ -1092,8 +1106,20 @@ export async function assignRequestedBus(input: {
       });
     }
   } else {
-    const busNumber = rideName.replace(/^Bus\s+/i, "").trim();
+    const busNumber = normalizeBusNumber(rideName);
+    if (!busNumber || busNumber === "0") {
+      return {
+        ok: false as const,
+        error: "Type a real bus number (Bus 1 or Bus 2 for NIA).",
+      };
+    }
     assignedLabel = `Bus ${busNumber}`;
+    // Bus assignment must not keep an old van link (that showed as Van 0 / wrong van).
+    await prisma.$executeRaw`
+      UPDATE "Student"
+      SET "vehicleId" = NULL, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${studentId}
+    `.catch(() => undefined);
     for (const trip of trips) {
       const busRouteId = await routeId(schoolId, busNumber, trip);
       const current = trip === "AM" ? loaded.effective.am : loaded.effective.pm;

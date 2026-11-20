@@ -137,12 +137,10 @@ export function companyAssignmentLabel(student: EffectiveStudent) {
   const parts: string[] = [];
   for (const plan of [student.am, student.pm]) {
     if (isPlanWaiting(plan)) continue;
-    const van = vanFromPlan(plan);
-    const ride = van
-      ? van.replace(/^van/i, "Van")
-      : plan.busNumber
-        ? `Bus ${plan.busNumber}`
-        : "";
+    // Prefer a real bus route over leftover "Van …" text in notes.
+    const ride = plan.busNumber
+      ? `Bus ${plan.busNumber}`
+      : vanFromPlan(plan).replace(/^van/i, "Van");
     if (!ride) continue;
     const time = plan.pickupTime?.trim();
     parts.push(time ? `${plan.trip} ${ride} · ${time}` : `${plan.trip} ${ride}`);
@@ -182,10 +180,10 @@ export function planSummary(plan: PlanSnapshot, trip: Trip = plan.trip) {
   if (isPlanWaiting(plan)) {
     return `Bus pending${dest}`;
   }
+  if (plan.busNumber) return `Bus ${plan.busNumber}${dest}`;
   const van = vanFromPlan(plan);
   if (van) return `${van.replace(/^van/i, "Van")}${dest}`;
-  if (!plan.busNumber) return `Bus pending${dest}`;
-  return `Bus ${plan.busNumber}${dest}`;
+  return `Bus pending${dest}`;
 }
 
 export function locationFor(plan: PlanSnapshot) {
