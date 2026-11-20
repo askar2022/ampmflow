@@ -111,11 +111,22 @@ export function DriverLists({
             ? { kind: "van", id: namedStudents[0].vanId }
             : null);
 
+  const activeVan = active?.kind === "van"
+    ? vans.find((van) => van.id === active.id)
+    : null;
+  const activeVanKey = activeVan
+    ? norm(activeVan.name)
+    : "";
   const rows = active
     ? riders.filter((rider) =>
         active.kind === "bus"
           ? rider.buses.includes(active.id)
-          : rider.vanId === active.id,
+          : rider.vanId === active.id ||
+            Boolean(
+              activeVanKey &&
+                rider.vanKey &&
+                norm(rider.vanKey) === activeVanKey,
+            ),
       )
     : [];
   const title = active ? vehicleLabel(active.kind, active.id, vans) : "";

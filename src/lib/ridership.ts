@@ -50,6 +50,8 @@ export type DriverRider = {
   homeAddress: string;
   buses: string[];
   vanId: string | null;
+  /** Normalized van label (e.g. "van 8") for print matching when ids differ. */
+  vanKey?: string | null;
 };
 
 export type DriverVan = {
@@ -232,10 +234,20 @@ export async function loadPrintDriverLists(schoolId: string) {
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
-    locked?.locked
-      ? Promise.resolve([] as Awaited<ReturnType<typeof loadVehicles>>)
-      : loadVehicles(schoolId).catch(() => []),
+    // Always load vehicles — locked fleet buttons need real TransportVehicle ids
+    // so student.vehicleId matches Van 1–9 (otherwise every van roster looks empty).
+    loadVehicles(schoolId).catch(() => []),
   ]);
+
+  const vehicleById = new Map(
+    vehicles.map((vehicle) => [vehicle.id, vehicle] as const),
+  );
+  const vanNameKey = (name: string) =>
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/^van\s+/i, "van ")
+      .replace(/\s+/g, " ");
 
   const riders: DriverRider[] = rows.map((row) => {
     const buses = new Set<string>();
@@ -261,6 +273,9 @@ export async function loadPrintDriverLists(schoolId: string) {
         buses.add(assignment.busRoute.number);
       }
     }
+    const vehicle = row.vehicleId ? vehicleById.get(row.vehicleId) : null;
+    const vanKey =
+      vehicle && isVanVehicle(vehicle) ? vanNameKey(vehicle.name) : null;
     return {
       id: row.id,
       name: `${row.firstName} ${row.lastName}`.trim(),
@@ -273,6 +288,7 @@ export async function loadPrintDriverLists(schoolId: string) {
       homeAddress: formatAddress(row.homeAddress),
       buses: [...buses],
       vanId: row.vehicleId || null,
+      vanKey,
     };
   });
 
@@ -285,7 +301,9 @@ export async function loadPrintDriverLists(schoolId: string) {
     .filter((vehicle) => isVanVehicle(vehicle))
     .map((vehicle) => ({
       id: vehicle.id,
-      name: vehicle.name,
+      name: /^van\s+/i.test(vehicle.name.trim())
+        ? `Van ${vehicle.name.replace(/^van\s+/i, "").trim()}`
+        : vehicle.name.trim(),
       driverName: vehicle.driverName || "",
     }));
   for (const vehicle of vehicles) {
@@ -300,21 +318,33 @@ export async function loadPrintDriverLists(schoolId: string) {
     if (number) busDrivers[number] = vehicle.driverName || "";
   }
 
-  const vansByName = new Map(
-    dbVans.map((van) => [van.name.trim().toLowerCase(), van]),
-  );
+  const vansByName = new Map<string, DriverVan>();
+  for (const van of dbVans) {
+    vansByName.set(vanNameKey(van.name), van);
+    const num = van.name.replace(/^van\s+/i, "").trim();
+    if (num) vansByName.set(vanNameKey(`Van ${num}`), van);
+  }
   const vans: DriverVan[] = locked?.locked
-    ? locked.vans.map(
-        (slot) =>
-          vansByName.get(slot.name.trim().toLowerCase()) || {
-            id: slot.id,
-            name: slot.name,
-            driverName: "",
-          },
-      )
+    ? locked.vans.map((slot) => {
+        const matched = vansByName.get(vanNameKey(slot.name));
+        if (matched) return { ...matched, name: slot.name };
+        return {
+          id: slot.id,
+          name: slot.name,
+          driverName: "",
+        };
+      })
     : aim
       ? []
       : dbVans;
+
+  // Point riders at the same van id the Print buttons use.
+  for (const rider of riders) {
+    if (!rider.vanKey) continue;
+    const matched = vansByName.get(rider.vanKey) ||
+      vans.find((van) => vanNameKey(van.name) === rider.vanKey);
+    if (matched) rider.vanId = matched.id;
+  }
 
   const buses = locked?.locked
     ? [...new Set([...locked.buses, ...routeBuses])].sort((a, b) =>

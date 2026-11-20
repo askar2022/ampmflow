@@ -42,39 +42,14 @@ function PrintShell({
   );
 }
 
-async function CompanyPrintLists({
-  schoolId,
-  schoolName,
-}: {
-  schoolId: string;
-  schoolName: string;
-}) {
+async function CompanyPrintLists({ schoolId }: { schoolId: string }) {
   const lists = await loadPrintDriverLists(schoolId);
-  const fleet = companyFleetForSchool(schoolName);
-  const buses = fleet?.locked
-    ? [
-        ...new Set([...fleet.buses, ...lists.buses]),
-      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-    : lists.buses;
-  const vansByName = new Map(
-    lists.vans.map((van) => [van.name.trim().toLowerCase(), van]),
-  );
-  const vans = fleet?.locked
-    ? fleet.vans.map(
-        (slot) =>
-          vansByName.get(slot.name.trim().toLowerCase()) || {
-            id: slot.id,
-            name: slot.name,
-            driverName: "",
-          },
-      )
-    : lists.vans;
 
   return (
     <DriverLists
       riders={lists.riders}
-      buses={buses}
-      vans={vans}
+      buses={lists.buses}
+      vans={lists.vans}
       busDrivers={lists.busDrivers}
       aimSchool={lists.aimSchool}
       viewOnly
@@ -137,10 +112,7 @@ export default async function CompanyPrintPage({
           />
         }
       >
-        <CompanyPrintLists
-          schoolId={selected.id}
-          schoolName={selected.name}
-        />
+        <CompanyPrintLists schoolId={selected.id} />
       </Suspense>
     </PrintShell>
   );
