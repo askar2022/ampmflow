@@ -5,7 +5,6 @@ import {
 } from "@/lib/ops-change-emails";
 import { formatAddress } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { ensureStudentContactColumns } from "@/lib/transportation";
 import { RequestHub } from "./RequestHub";
 import { RouteRequestForm } from "./RouteRequestForm";
 import {
@@ -24,6 +23,11 @@ export default async function WaitingPage({
   if (!session) return null;
   const { kind = "", student: startStudentId = "" } = await searchParams;
 
+  // Hub only — no roster or settings queries so the nav click feels instant.
+  if (!kind) {
+    return <RequestHub />;
+  }
+
   const [busCompanyEmail, deskEmails] = await Promise.all([
     defaultBusCompanyEmail(session.schoolId),
     loadSchoolDeskNotifyEmails(session.schoolId),
@@ -34,7 +38,6 @@ export default async function WaitingPage({
   }
 
   if (kind === "daycare" || kind === "address") {
-    await ensureStudentContactColumns().catch(() => undefined);
     const rows = await prisma.student.findMany({
       where: { schoolId: session.schoolId, active: true },
       select: {
@@ -51,7 +54,9 @@ export default async function WaitingPage({
           select: {
             name: true,
             phone: true,
-            address: { select: { line1: true, city: true, state: true, zip: true } },
+            address: {
+              select: { line1: true, city: true, state: true, zip: true },
+            },
           },
         },
         classroom: {

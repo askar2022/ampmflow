@@ -11,16 +11,24 @@ let geoColumnsReady: Promise<void> | null = null;
 
 export async function ensureAddressGeoColumns() {
   if (!geoColumnsReady) {
-    geoColumnsReady = Promise.all([
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION`,
-      ),
-    ])
-      .then(() => undefined)
-      .catch(() => undefined);
+    geoColumnsReady = (async () => {
+      try {
+        await prisma.$queryRawUnsafe(
+          `SELECT "latitude", "longitude" FROM "Address" LIMIT 0`,
+        );
+        return;
+      } catch {
+        // Fall through and add missing columns once.
+      }
+      await Promise.all([
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "latitude" DOUBLE PRECISION`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Address" ADD COLUMN IF NOT EXISTS "longitude" DOUBLE PRECISION`,
+        ),
+      ]).catch(() => undefined);
+    })();
   }
   await geoColumnsReady;
 }

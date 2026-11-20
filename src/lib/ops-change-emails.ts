@@ -51,25 +51,35 @@ let opsColumnsReady: Promise<void> | null = null;
 
 async function ensureOpsEmailColumn() {
   if (!opsColumnsReady) {
-    opsColumnsReady = Promise.all([
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "leadershipEmails" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "coordinatorEmail" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "frontDeskEmail" TEXT NOT NULL DEFAULT ''`,
-      ),
-    ])
-      .then(() => undefined)
-      .catch(() => undefined);
+    opsColumnsReady = (async () => {
+      try {
+        await prisma.$queryRawUnsafe(
+          `SELECT "opsChangeEmails", "leadershipEmails", "busCompanyEmail",
+                  "coordinatorEmail", "frontDeskEmail"
+           FROM "SchoolSettings" LIMIT 0`,
+        );
+        return;
+      } catch {
+        // Fall through and add missing columns once.
+      }
+      await Promise.all([
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "opsChangeEmails" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "leadershipEmails" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "coordinatorEmail" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "frontDeskEmail" TEXT NOT NULL DEFAULT ''`,
+        ),
+      ]).catch(() => undefined);
+    })();
   }
   await opsColumnsReady;
 }

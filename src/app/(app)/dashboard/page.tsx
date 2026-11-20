@@ -6,10 +6,7 @@ import {
 } from "@/lib/aim-fleet";
 import { prisma } from "@/lib/prisma";
 import { loadVehicles } from "@/lib/gate";
-import {
-  defaultBusCompanyEmail,
-  loadSchoolDeskNotifyEmails,
-} from "@/lib/ops-change-emails";
+import { defaultBusCompanyEmail } from "@/lib/ops-change-emails";
 import { loadStudents } from "@/lib/transportation";
 import { ReceptionDesk } from "./ReceptionDesk";
 
@@ -34,28 +31,26 @@ export default async function DashboardPage({
   ]);
   const aim = isAimSchool(school?.name);
 
-  const [routes, vehicles, vanRows, busCompanyEmail, deskEmails] =
-    await Promise.all([
-      prisma.busRoute.findMany({
-        where: { schoolId: session.schoolId },
-        select: { number: true },
-        orderBy: { number: "asc" },
-      }),
-      (aim
-        ? ensureAimFleetVehicles(session.schoolId)
-        : loadVehicles(session.schoolId)
-      ).catch(() => []),
-      prisma.student.findMany({
-        where: {
-          schoolId: session.schoolId,
-          active: true,
-          vehicleId: { not: null },
-        },
-        select: { id: true, vehicleId: true },
-      }),
-      defaultBusCompanyEmail(session.schoolId),
-      loadSchoolDeskNotifyEmails(session.schoolId),
-    ]);
+  const [routes, vehicles, vanRows, busCompanyEmail] = await Promise.all([
+    prisma.busRoute.findMany({
+      where: { schoolId: session.schoolId },
+      select: { number: true },
+      orderBy: { number: "asc" },
+    }),
+    (aim
+      ? ensureAimFleetVehicles(session.schoolId)
+      : loadVehicles(session.schoolId)
+    ).catch(() => []),
+    prisma.student.findMany({
+      where: {
+        schoolId: session.schoolId,
+        active: true,
+        vehicleId: { not: null },
+      },
+      select: { id: true, vehicleId: true },
+    }),
+    defaultBusCompanyEmail(session.schoolId),
+  ]);
 
   const buses = aim
     ? AIM_FLEET_LABELS.map((label) =>
@@ -88,8 +83,6 @@ export default async function DashboardPage({
         aimSchool={aim}
         studentVanId={studentVanId}
         busCompanyEmail={busCompanyEmail}
-        coordinatorEmail={deskEmails.coordinatorEmail}
-        frontDeskEmail={deskEmails.frontDeskEmail}
         initialStudentId={selectedId}
         canPermanent={
           session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"

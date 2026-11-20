@@ -217,6 +217,17 @@ let gateReady: Promise<void> | null = null;
 export async function ensureGateTables() {
   if (!gateReady) {
     gateReady = (async () => {
+      // Fast path when tables already exist — skip DDL on every page click.
+      try {
+        await prisma.$queryRawUnsafe(
+          `SELECT "vehicleId", "familyId", "enrollmentSource" FROM "Student" LIMIT 0`,
+        );
+        await prisma.$queryRawUnsafe(`SELECT 1 FROM "GateDayStatus" LIMIT 0`);
+        await prisma.$queryRawUnsafe(`SELECT 1 FROM "TransportVehicle" LIMIT 0`);
+        return;
+      } catch {
+        // Fall through and create missing tables/columns once.
+      }
       const statements = [
         `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "familyId" TEXT`,
         `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "enrollmentSource" TEXT NOT NULL DEFAULT 'RETURNING'`,

@@ -1,4 +1,3 @@
-import { ensureGateTables } from "./gate";
 import { prisma } from "./prisma";
 import { dateInRange, schoolLocalTime, todayKey } from "./dates";
 import { displayTeacherName, formatAddress, locationFor } from "./format";
@@ -34,31 +33,45 @@ let contactReady: Promise<void> | null = null;
 
 export async function ensureStudentContactColumns() {
   if (!contactReady) {
-    contactReady = Promise.all([
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentEmail" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyName" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyPhone" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Daycare" ADD COLUMN IF NOT EXISTS "phone" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "active" BOOLEAN NOT NULL DEFAULT true`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentPhone2" TEXT NOT NULL DEFAULT ''`,
-      ),
-      prisma.$executeRawUnsafe(
-        `ALTER TABLE "TransportationAssignment" ADD COLUMN IF NOT EXISTS "pickupTime" TEXT NOT NULL DEFAULT ''`,
-      ),
-    ])
-      .then(() => undefined)
-      .catch(() => undefined);
+    contactReady = (async () => {
+      // Fast path: columns already exist (normal production). Avoid ALTER on every click.
+      try {
+        await prisma.$queryRawUnsafe(
+          `SELECT "parentEmail", "parentPhone2", "active", "emergencyName", "emergencyPhone"
+           FROM "Student" LIMIT 0`,
+        );
+        await prisma.$queryRawUnsafe(`SELECT "phone" FROM "Daycare" LIMIT 0`);
+        await prisma.$queryRawUnsafe(
+          `SELECT "pickupTime" FROM "TransportationAssignment" LIMIT 0`,
+        );
+        return;
+      } catch {
+        // Fall through and add missing columns once.
+      }
+      await Promise.all([
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentEmail" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyName" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "emergencyPhone" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Daycare" ADD COLUMN IF NOT EXISTS "phone" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "active" BOOLEAN NOT NULL DEFAULT true`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "Student" ADD COLUMN IF NOT EXISTS "parentPhone2" TEXT NOT NULL DEFAULT ''`,
+        ),
+        prisma.$executeRawUnsafe(
+          `ALTER TABLE "TransportationAssignment" ADD COLUMN IF NOT EXISTS "pickupTime" TEXT NOT NULL DEFAULT ''`,
+        ),
+      ]).catch(() => undefined);
+    })();
   }
   await contactReady;
 }
@@ -306,8 +319,7 @@ function changeListCompat(students: EffectiveStudent[]) {
 }
 
 export async function loadStudents(schoolId: string, day = todayKey()) {
-  await ensureGateTables();
-  await ensureStudentContactColumns().catch(() => undefined);
+  // Schema is already migrated in production — do not DDL on every Front Desk open.
   const rows = await prisma.student.findMany({
     where: { schoolId, active: true },
     include: studentInclude,
@@ -325,8 +337,6 @@ export async function loadStudents(schoolId: string, day = todayKey()) {
 }
 
 export async function loadStudent(id: string, day = todayKey()) {
-  await ensureGateTables();
-  await ensureStudentContactColumns().catch(() => undefined);
   const row = await prisma.student.findUnique({
     where: { id },
     include: studentInclude,

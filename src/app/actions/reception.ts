@@ -1,6 +1,7 @@
 "use server";
 
 import { randomUUID } from "crypto";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -102,13 +103,20 @@ async function attachDaycare(
     where: { id: studentId },
     data: { daycareId: daycare.id },
   });
-  await ensureAddressGeoColumns();
-  await prisma.$executeRaw`
-    UPDATE "Address"
-    SET "latitude" = NULL, "longitude" = NULL
-    WHERE "id" = ${daycare.addressId}
-  `.catch(() => undefined);
-  await geocodeAndSaveAddress(daycare.addressId).catch(() => undefined);
+  // Geocode in the background so Submit does not wait on the census API.
+  const addressId = daycare.addressId;
+  after(() =>
+    ensureAddressGeoColumns()
+      .then(() =>
+        prisma.$executeRaw`
+          UPDATE "Address"
+          SET "latitude" = NULL, "longitude" = NULL
+          WHERE "id" = ${addressId}
+        `.catch(() => undefined),
+      )
+      .then(() => geocodeAndSaveAddress(addressId))
+      .catch(() => undefined),
+  );
   return daycare.id;
 }
 
@@ -676,7 +684,7 @@ async function createRequestedStudent(args: {
       label: "home",
     },
   });
-  await geocodeAndSaveAddress(home.id).catch(() => undefined);
+  after(() => geocodeAndSaveAddress(home.id).catch(() => undefined));
   const student = await prisma.student.create({
     data: {
       schoolId: args.schoolId,
@@ -795,14 +803,18 @@ export async function requestRoute(input: RouteRequestInput) {
           data: { line1: address },
         })
         .catch(() => undefined);
-      await ensureAddressGeoColumns();
-      await prisma.$executeRaw`
-        UPDATE "Address"
-        SET "latitude" = NULL, "longitude" = NULL
-        WHERE "id" = ${loaded.record.homeAddressId}
-      `.catch(() => undefined);
-      await geocodeAndSaveAddress(loaded.record.homeAddressId).catch(
-        () => undefined,
+      const homeAddressId = loaded.record.homeAddressId;
+      after(() =>
+        ensureAddressGeoColumns()
+          .then(() =>
+            prisma.$executeRaw`
+              UPDATE "Address"
+              SET "latitude" = NULL, "longitude" = NULL
+              WHERE "id" = ${homeAddressId}
+            `.catch(() => undefined),
+          )
+          .then(() => geocodeAndSaveAddress(homeAddressId))
+          .catch(() => undefined),
       );
     }
     if (teacherName) {

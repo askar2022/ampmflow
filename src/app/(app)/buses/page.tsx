@@ -2,7 +2,6 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getSchoolIdentityById } from "@/lib/school";
-import { ensureStudentContactColumns } from "@/lib/transportation";
 import { ImportForm } from "../students/import/ImportForm";
 import { ClearRoster } from "./ClearRoster";
 import { StudentArchive } from "./StudentArchive";
@@ -16,7 +15,6 @@ export default async function RosterPage() {
 
   const canUpload =
     session.role === "ADMINISTRATOR" || session.role === "COORDINATOR";
-  await ensureStudentContactColumns().catch(() => undefined);
   const [students, archived, school] = await Promise.all([
     prisma.student.count({
       where: { schoolId: session.schoolId, active: true },
