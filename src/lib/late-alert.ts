@@ -123,31 +123,28 @@ export async function loadLateRides(schoolId: string): Promise<LateRide[]> {
   }
   const locked = companyFleetForSchool(school?.name);
   if (locked?.locked) {
-    const rides: LateRide[] = [
-      ...locked.buses.map((number) => {
-        const label = /^3rd/i.test(number) ? "3rd bus" : busLabel(number);
-        return {
-          key: `bus:${label.toLowerCase()}`,
-          label,
-          kind: "bus" as const,
-          fill: number,
-        };
-      }),
-      ...locked.vans
-        .map((van) => {
-          const label = vanLabel(van.name);
-          const fill = label.replace(/^Van\s+/i, "");
-          if (!fill || fill === "0") return null;
-          return {
-            key: `van:${label.toLowerCase()}`,
-            label,
-            kind: "van" as const,
-            fill,
-          };
-        })
-        .filter((ride): ride is LateRide => Boolean(ride)),
-    ];
-    return rides.sort((a, b) => {
+    const busRides: LateRide[] = locked.buses.map((number) => {
+      const label = /^3rd/i.test(number) ? "3rd bus" : busLabel(number);
+      return {
+        key: `bus:${label.toLowerCase()}`,
+        label,
+        kind: "bus",
+        fill: number,
+      };
+    });
+    const vanRides: LateRide[] = [];
+    for (const van of locked.vans) {
+      const label = vanLabel(van.name);
+      const fill = label.replace(/^Van\s+/i, "");
+      if (!fill || fill === "0") continue;
+      vanRides.push({
+        key: `van:${label.toLowerCase()}`,
+        label,
+        kind: "van",
+        fill,
+      });
+    }
+    return [...busRides, ...vanRides].sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === "bus" ? -1 : 1;
       return a.label.localeCompare(b.label, undefined, { numeric: true });
     });
