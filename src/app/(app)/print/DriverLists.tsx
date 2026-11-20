@@ -139,11 +139,14 @@ export function DriverLists({
   function choose(next: Selected) {
     setSelected(next);
     setMessage("");
-    if (next?.kind === "bus") setQuery(`Bus ${next.id}`);
-    if (next?.kind === "van") {
-      const name = vans.find((van) => van.id === next.id)?.name || "Van";
-      setQuery(name);
-    }
+    // Keep search empty so every bus/van button stays visible.
+    setQuery("");
+  }
+
+  function backToAllVehicles() {
+    setSelected(null);
+    setQuery("");
+    setMessage("");
   }
 
   function vehicleButtonClass(on: boolean) {
@@ -157,22 +160,33 @@ export function DriverLists({
   return (
     <div className="space-y-5">
       <section className="no-print rounded-[12px] border border-line bg-card p-5 shadow-sm">
-        <label className="block text-xs font-semibold uppercase tracking-wider text-muted">
-          Select a Vehicle
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setSelected(null);
-              setMessage("");
-            }}
-            placeholder={
-              aimSchool ? "Bus 4, Bus 5, or 3rd bus" : "Bus 1 or Van 1"
-            }
-            className="mt-2 min-h-[44px] w-full rounded-[12px] border border-line bg-paper px-4 text-base font-medium text-navy outline-none focus:border-teal"
-          />
-        </label>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="block min-w-0 flex-1 text-xs font-semibold uppercase tracking-wider text-muted">
+            Select a Vehicle
+          </label>
+          {active ? (
+            <button
+              type="button"
+              onClick={backToAllVehicles}
+              className="min-h-[44px] rounded-[12px] bg-navy px-5 text-sm font-bold text-white shadow-sm"
+            >
+              ← Back to all buses & vans
+            </button>
+          ) : null}
+        </div>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setSelected(null);
+            setMessage("");
+          }}
+          placeholder={
+            aimSchool ? "Bus 4, Bus 5, or 3rd bus" : "Bus 1 or Van 1"
+          }
+          className="mt-2 min-h-[44px] w-full rounded-[12px] border border-line bg-paper px-4 text-base font-medium text-navy outline-none focus:border-teal"
+        />
         <div className="mt-4 flex flex-wrap gap-2">
           {visibleBuses.map((number) => (
             <button
@@ -210,6 +224,15 @@ export function DriverLists({
 
       {active ? (
         <section className="print-sheet rounded-[12px] border border-line bg-card p-5 shadow-sm sm:p-6">
+          <div className="no-print mb-4">
+            <button
+              type="button"
+              onClick={backToAllVehicles}
+              className="min-h-[48px] w-full rounded-[12px] bg-navy px-5 text-base font-bold text-white shadow-sm sm:w-auto"
+            >
+              ← Back to all buses & vans
+            </button>
+          </div>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="font-serif text-3xl text-navy">{title}</h2>
