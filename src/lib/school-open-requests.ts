@@ -58,11 +58,52 @@ function detailForStudent(student: EffectiveStudent) {
   return "—";
 }
 
-function kindFromChangeTitle(title: string): SchoolOpenRequestKind {
-  if (/request for route/i.test(title)) return "New route request";
-  if (/daycare/i.test(title)) return "New daycare change";
-  if (/address/i.test(title)) return "New address change";
+function kindFromChangeRequest(row: {
+  title: string;
+  details: string;
+  payload?: string | null;
+}): SchoolOpenRequestKind {
+  const blob = `${row.title} ${row.details} ${row.payload || ""}`;
+  if (/daycare/i.test(blob) || /"DAYCARE"/i.test(blob)) {
+    return "New daycare change";
+  }
+  if (
+    /address change/i.test(blob) ||
+    /new address/i.test(blob) ||
+    /"CUSTOM"/i.test(blob)
+  ) {
+    return "New address change";
+  }
+  if (/request for route/i.test(row.title) || /new route/i.test(blob)) {
+    return "New route request";
+  }
   return "Bus change";
+}
+
+function detailFromChangeRequest(row: {
+  details: string;
+  payload?: string | null;
+}) {
+  try {
+    const payload = row.payload ? JSON.parse(row.payload) : null;
+    if (payload?.daycareName) return String(payload.daycareName);
+    if (payload?.customAddress) return String(payload.customAddress);
+  } catch {
+    // ignore bad payload
+  }
+  return (
+    row.details
+      .split("·")
+      .map((part) => part.trim())
+      .find(
+        (part) =>
+          part &&
+          !/^grade\s+/i.test(part) &&
+          !/@/.test(part) &&
+          !/^waiting for/i.test(part) &&
+          !/^entered by/i.test(part),
+      ) || ""
+  );
 }
 
 /**
@@ -83,6 +124,7 @@ export async function loadSchoolOpenRequests(
         studentId: true,
         title: true,
         details: true,
+        payload: true,
         createdAt: true,
         busNumber: true,
       },
@@ -144,28 +186,36 @@ export async function loadSchoolOpenRequests(
     if (!studentId) continue;
     const loaded = await loadStudent(studentId);
     if (!loaded?.effective) continue;
-    const fromDetails =
-      row.details
-        .split("·")
-        .map((part) => part.trim())
-        .find((part) => part && !/^grade\s+/i.test(part) && !/@/.test(part)) ||
-      "";
     remember(
       loaded.effective,
       row.createdAt,
-      kindFromChangeTitle(row.title),
-      fromDetails || detailForStudent(loaded.effective),
+      kindFromChangeRequest(row),
+      detailFromChangeRequest(row) || detailForStudent(loaded.effective),
     );
   }
 
   for (const student of students) {
+    const daycareOrAddressWaiting =
+      isWaitingRide(student) &&
+      (student.am.destination === "DAYCARE" ||
+        student.pm.destination === "DAYCARE" ||
+        student.am.destination === "CUSTOM" ||
+        student.pm.destination === "CUSTOM");
     const needsCompany =
       isWaitingRide(student) ||
+      daycareOrAddressWaiting ||
       student.enrollmentSource === "ROUTE_REQUEST" ||
       student.enrollmentSource === "NEW_APPLICATION";
     if (!needsCompany) continue;
     const match = openRequests.find((row) => row.studentId === student.id);
-    remember(student, match?.createdAt || new Date());
+    remember(
+      student,
+      match?.createdAt || new Date(),
+      match ? kindFromChangeRequest(match) : kindForStudent(student),
+      match
+        ? detailFromChangeRequest(match) || detailForStudent(student)
+        : detailForStudent(student),
+    );
   }
 
   // Recent approved temp changes still waiting for a bus number.

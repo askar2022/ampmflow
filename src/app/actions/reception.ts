@@ -310,6 +310,20 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   const student = after?.effective ?? loaded.effective;
   student.parentPhone = parentPhone || student.parentPhone;
   student.parentPhone2 = parentPhone2;
+  const requestTitle =
+    destination === "DAYCARE"
+      ? `Daycare change — ${student.fullName}`
+      : destination === "CUSTOM"
+        ? `Address change — ${student.fullName}`
+        : `Transportation change — ${student.fullName}`;
+  const requestDetail =
+    destination === "DAYCARE"
+      ? input.daycareName?.trim() ||
+        student.daycareName ||
+        "Daycare"
+      : destination === "CUSTOM"
+        ? input.customAddress?.trim() || "New address"
+        : planLine(student, input.trips);
   await prisma.changeRequest
     .create({
       data: {
@@ -317,8 +331,9 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
         studentId: input.studentId,
         trip: input.trips.join("+"),
         source: user.role,
-        title: `Transportation change — ${student.fullName}`,
+        title: requestTitle,
         details: [
+          requestDetail,
           planLine(student, input.trips),
           when,
           note,
@@ -326,7 +341,7 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
           `Entered by ${user.name}.`,
         ]
           .filter(Boolean)
-          .join(" "),
+          .join(" · "),
         status: waiting ? "PENDING" : "COMPLETED",
         busNumber: busNumber || null,
         payload: JSON.stringify({
@@ -334,6 +349,8 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
           duration: input.duration,
           trips: input.trips,
           waiting,
+          daycareName: input.daycareName || student.daycareName || "",
+          customAddress: input.customAddress || "",
         }),
         createdById: user.id,
         reviewedById: waiting ? null : user.id,

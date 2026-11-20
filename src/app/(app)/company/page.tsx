@@ -7,7 +7,7 @@ import {
   isAimSchool,
 } from "@/lib/aim-fleet";
 import { loadVehicles } from "@/lib/gate";
-import { formatDateTime, schoolLocalTime, todayKey } from "@/lib/dates";
+import { formatDateTime } from "@/lib/dates";
 import {
   companySchoolGroupIds,
   loadCompanySchools,
@@ -141,29 +141,6 @@ async function loadSchoolDesk(
   const vehicles = vehicleLists.flat();
   const routes = routeLists.flat();
 
-  const studentIds = openRows.map((row) => row.student.id);
-  const completed = studentIds.length
-    ? await prisma.changeRequest.findMany({
-        where: {
-          schoolId: { in: schoolIds },
-          status: "COMPLETED",
-          studentId: { in: studentIds },
-          busNumber: { not: null },
-        },
-        select: { studentId: true, reviewedAt: true, updatedAt: true },
-      })
-    : [];
-  const day = todayKey();
-  const assignedIds = new Set(
-    completed
-      .filter(
-        (row) =>
-          schoolLocalTime(row.reviewedAt || row.updatedAt).dateKey === day,
-      )
-      .map((row) => row.studentId)
-      .filter(Boolean),
-  );
-
   const vans = aim
     ? []
     : vehicles
@@ -217,7 +194,9 @@ async function loadSchoolDesk(
       effectiveDate: companyEffectiveDate(student, used),
       email: companyEmail(student, trips),
       trips: used,
-      changed: assignedIds.has(student.id),
+      // Still waiting for a bus/van = open. Do not mark "Changed" from an
+      // older completed request when a new daycare/address request is pending.
+      changed: !isWaiting(student),
     };
   });
 

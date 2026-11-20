@@ -30,6 +30,14 @@ async function ensureWaitingAssignments(
 ) {
   const reason = "Waiting for bus company assignment.";
   for (const trip of ["AM", "PM"] as const) {
+    const existing = await prisma.transportationAssignment.findUnique({
+      where: { studentId_trip: { studentId, trip } },
+      select: {
+        destination: true,
+        daycareId: true,
+        customAddressId: true,
+      },
+    });
     await prisma.transportationAssignment.upsert({
       where: { studentId_trip: { studentId, trip } },
       create: {
@@ -44,8 +52,11 @@ async function ensureWaitingAssignments(
         updatedById,
       },
       update: {
+        // Keep daycare / new-address destination — never wipe them to HOME.
         type: "BUS",
-        destination: "HOME",
+        destination: existing?.destination || "HOME",
+        daycareId: existing?.daycareId ?? null,
+        customAddressId: existing?.customAddressId ?? null,
         busRouteId: null,
         waitingForAssignment: true,
         notes: reason,
