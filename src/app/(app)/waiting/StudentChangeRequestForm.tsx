@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveReceptionChange } from "@/app/actions/reception";
 import type { DurationType, Trip } from "@/lib/types";
@@ -51,6 +51,12 @@ function starterFromStudents(
   };
 }
 
+function fieldClass(bad: boolean) {
+  return `mt-1 w-full rounded-xl border px-3 py-2 font-normal ${
+    bad ? "border-red bg-red-50" : "border-line bg-paper"
+  }`;
+}
+
 export function StudentChangeRequestForm({
   kind,
   students,
@@ -69,6 +75,9 @@ export function StudentChangeRequestForm({
   canPermanent?: boolean;
 }) {
   const router = useRouter();
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const parentEmailRef = useRef<HTMLInputElement>(null);
   const starter = starterFromStudents(students, initialStudentId);
   const [query, setQuery] = useState(starter.query);
   const [selectedId, setSelectedId] = useState(starter.selectedId);
@@ -92,6 +101,7 @@ export function StudentChangeRequestForm({
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [tried, setTried] = useState(false);
   const [pending, start] = useTransition();
 
   const matches = useMemo(() => {
@@ -121,23 +131,11 @@ export function StudentChangeRequestForm({
     setError("");
     setMessage("");
     setConfirmReplace(false);
+    setTried(false);
+    window.setTimeout(() => {
+      if (kind === "address") addressRef.current?.focus();
+    }, 50);
   }
-
-  // One clear match → select them so Submit is not stuck disabled.
-  useEffect(() => {
-    if (selectedId) return;
-    if (matches.length !== 1) return;
-    const only = matches[0];
-    const q = query.trim().toLowerCase();
-    if (!q || q.length < 2) return;
-    if (
-      only.fullName.toLowerCase().includes(q) ||
-      only.parentPhone.replace(/\D/g, "").includes(q.replace(/\D/g, ""))
-    ) {
-      choose(only);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- choose is stable enough for this auto-pick
-  }, [matches, query, selectedId]);
 
   function toggleTrip(trip: Trip) {
     setTrips((current) => {
@@ -148,15 +146,123 @@ export function StudentChangeRequestForm({
     });
   }
 
+  function showError(text: string, focus?: HTMLInputElement | null) {
+    setError(text);
+    window.setTimeout(() => {
+      errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      focus?.focus();
+    }, 30);
+  }
+
+  function submitRequest() {
+    setTried(true);
+    setMessage("");
+
+    if (!selected) {
+      showError("Tap Select → next to the student name first.");
+      return;
+    }
+    if (!trips.length) {
+      showError("Choose morning, afternoon, or both.");
+      return;
+    }
+    if (kind === "address" && !customAddress.trim()) {
+      showError("Enter the new drop-off address.", addressRef.current);
+      return;
+    }
+    if (kind === "daycare" && !daycareName.trim()) {
+      showError("Enter the daycare name.");
+      return;
+    }
+    if (!parentPhone.trim()) {
+      showError("Primary 1 phone is required.");
+      return;
+    }
+    if (!parentEmail.trim()) {
+      showError("Parent email is required.", parentEmailRef.current);
+      return;
+    }
+    if (!teacherEmail.trim()) {
+      showError("Teacher email is required.");
+      return;
+    }
+    if (!companyEmail.trim()) {
+      showError("Bus company email is required.");
+      return;
+    }
+    if (!coordEmail.trim()) {
+      showError("Coordinator email is required.");
+      return;
+    }
+    if (!deskEmail.trim()) {
+      showError("Front Desk email is required.");
+      return;
+    }
+    if (duration === "DATE_RANGE" && (!startDate || !endDate)) {
+      showError("Choose a start and end date.");
+      return;
+    }
+    if (duration === "PERMANENT" && !confirmPermanent) {
+      showError("Check the box to confirm a permanent change.");
+      return;
+    }
+
+    setError("");
+    start(async () => {
+      try {
+        const result = await saveReceptionChange({
+          studentId: selected.id,
+          destination: kind === "daycare" ? "DAYCARE" : "CUSTOM",
+          trips,
+          duration,
+          startDate,
+          endDate,
+          customAddress: kind === "address" ? customAddress : "",
+          daycareName: kind === "daycare" ? daycareName : "",
+          daycareAddress: kind === "daycare" ? daycareAddress : "",
+          daycarePhone: kind === "daycare" ? daycarePhone : "",
+          parentPhone,
+          parentPhone2,
+          parentEmail,
+          teacherEmail,
+          busCompanyEmail: companyEmail,
+          coordinatorEmail: coordEmail,
+          frontDeskEmail: deskEmail,
+          note,
+          confirmPermanent,
+          confirmReplaceChange: confirmReplace,
+        });
+        if (!result.ok) {
+          if ("needsConfirm" in result && result.needsConfirm) {
+            setConfirmReplace(true);
+            showError(result.error);
+            return;
+          }
+          showError(result.error);
+          return;
+        }
+        setMessage(result.message);
+        setConfirmReplace(false);
+        setTried(false);
+        router.refresh();
+      } catch {
+        showError("Could not send the request. Try again.");
+      }
+    });
+  }
+
   const title =
     kind === "daycare" ? "Daycare add or change" : "New address";
   const blurb =
     kind === "daycare"
-      ? "Tap a student in the list, enter daycare details, then submit."
-      : "Tap a student in the list, enter the new drop-off address, then submit.";
+      ? "Select the student, enter daycare details, then tap Submit."
+      : "Select the student, enter the new drop-off address and parent email, then tap Submit.";
+
+  const missingAddress = tried && kind === "address" && !customAddress.trim();
+  const missingParentEmail = tried && !parentEmail.trim();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-28">
       <div>
         <Link
           href="/waiting"
@@ -168,99 +274,7 @@ export function StudentChangeRequestForm({
         <p className="mt-2 max-w-2xl text-muted">{blurb}</p>
       </div>
 
-      <form
-        noValidate
-        className="space-y-4 rounded-2xl border border-line bg-card p-5"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!selected) {
-            setError("Tap a student name in the list first.");
-            return;
-          }
-          if (!trips.length) {
-            setError("Choose morning, afternoon, or both.");
-            return;
-          }
-          if (kind === "address" && !customAddress.trim()) {
-            setError("Enter the new drop-off address.");
-            return;
-          }
-          if (kind === "daycare" && !daycareName.trim()) {
-            setError("Enter the daycare name.");
-            return;
-          }
-          if (!parentPhone.trim()) {
-            setError("Primary 1 phone is required.");
-            return;
-          }
-          if (!parentEmail.trim()) {
-            setError("Parent email is required.");
-            return;
-          }
-          if (!teacherEmail.trim()) {
-            setError("Teacher email is required.");
-            return;
-          }
-          if (!companyEmail.trim()) {
-            setError("Bus company email is required.");
-            return;
-          }
-          if (!coordEmail.trim()) {
-            setError("Coordinator email is required.");
-            return;
-          }
-          if (!deskEmail.trim()) {
-            setError("Front Desk email is required.");
-            return;
-          }
-          if (duration === "DATE_RANGE" && (!startDate || !endDate)) {
-            setError("Choose a start and end date.");
-            return;
-          }
-          if (duration === "PERMANENT" && !confirmPermanent) {
-            setError("Check the box to confirm a permanent change.");
-            return;
-          }
-          setError("");
-          setMessage("");
-          start(async () => {
-            const result = await saveReceptionChange({
-              studentId: selected.id,
-              destination: kind === "daycare" ? "DAYCARE" : "CUSTOM",
-              trips,
-              duration,
-              startDate,
-              endDate,
-              customAddress: kind === "address" ? customAddress : "",
-              daycareName: kind === "daycare" ? daycareName : "",
-              daycareAddress: kind === "daycare" ? daycareAddress : "",
-              daycarePhone: kind === "daycare" ? daycarePhone : "",
-              parentPhone,
-              parentPhone2,
-              parentEmail,
-              teacherEmail,
-              busCompanyEmail: companyEmail,
-              coordinatorEmail: coordEmail,
-              frontDeskEmail: deskEmail,
-              note,
-              confirmPermanent,
-              confirmReplaceChange: confirmReplace,
-            });
-            if (!result.ok) {
-              if ("needsConfirm" in result && result.needsConfirm) {
-                setConfirmReplace(true);
-                setError(result.error);
-                return;
-              }
-              setError(result.error);
-              return;
-            }
-            setMessage(result.message);
-            setConfirmReplace(false);
-            router.refresh();
-          });
-        }}
-      >
+      <div className="space-y-4 rounded-2xl border border-line bg-card p-5">
         <label className="block text-sm font-semibold">
           Find student
           <input
@@ -278,8 +292,7 @@ export function StudentChangeRequestForm({
         {!selectedId ? (
           <div className="space-y-2">
             <p className="text-sm font-semibold text-amber-900">
-              Tap a student below to select them — Submit stays off until you
-              do.
+              Tap Select → on a student name before Submit will work.
             </p>
             <ul className="max-h-56 overflow-auto rounded-xl border border-line">
               {matches.map((student) => (
@@ -298,7 +311,7 @@ export function StudentChangeRequestForm({
                         {student.homeAddress || "No address"}
                       </span>
                     </span>
-                    <span className="shrink-0 text-sm font-semibold text-navy">
+                    <span className="shrink-0 rounded-full bg-navy px-3 py-1.5 text-sm font-semibold text-white">
                       Select →
                     </span>
                   </button>
@@ -408,7 +421,7 @@ export function StudentChangeRequestForm({
               <input
                 value={daycareName}
                 onChange={(event) => setDaycareName(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+                className={fieldClass(tried && !daycareName.trim())}
               />
             </label>
             <label className="block text-sm font-semibold">
@@ -432,11 +445,17 @@ export function StudentChangeRequestForm({
           <label className="block text-sm font-semibold">
             New address
             <input
+              ref={addressRef}
               value={customAddress}
               onChange={(event) => setCustomAddress(event.target.value)}
               placeholder="Street, city, state, zip"
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+              className={fieldClass(missingAddress)}
             />
+            {missingAddress ? (
+              <span className="mt-1 block text-sm text-red">
+                Required — type the new drop-off address.
+              </span>
+            ) : null}
           </label>
         )}
 
@@ -446,17 +465,23 @@ export function StudentChangeRequestForm({
             <input
               value={parentPhone}
               onChange={(event) => setParentPhone(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+              className={fieldClass(tried && !parentPhone.trim())}
             />
           </label>
           <label className="block text-sm font-semibold">
             Parent email
             <input
+              ref={parentEmailRef}
               type="email"
               value={parentEmail}
               onChange={(event) => setParentEmail(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+              className={fieldClass(missingParentEmail)}
             />
+            {missingParentEmail ? (
+              <span className="mt-1 block text-sm text-red">
+                Required — enter parent email.
+              </span>
+            ) : null}
           </label>
           <label className="block text-sm font-semibold">
             Teacher email
@@ -464,7 +489,7 @@ export function StudentChangeRequestForm({
               type="email"
               value={teacherEmail}
               onChange={(event) => setTeacherEmail(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 font-normal"
+              className={fieldClass(tried && !teacherEmail.trim())}
             />
           </label>
           <label className="block text-sm font-semibold">
@@ -511,32 +536,50 @@ export function StudentChangeRequestForm({
           </p>
         ) : null}
         {error ? (
-          <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red">{error}</p>
+          <p
+            ref={errorRef}
+            className="rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red"
+          >
+            {error}
+          </p>
         ) : null}
         {message ? (
           <p className="rounded-xl bg-green-50 px-3 py-2 text-sm text-green-900">
             {message}
           </p>
         ) : null}
+      </div>
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {pending
-            ? "Sending…"
-            : confirmReplace
-              ? "Yes, replace change"
-              : "Submit request"}
-        </button>
-        {!selectedId ? (
-          <p className="text-sm text-muted">
-            Tip: tap <span className="font-semibold">Select →</span> next to the
-            student name first.
-          </p>
-        ) : null}
-      </form>
+      {/* Sticky bar so Submit is always tappable above the phone home area */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-card/95 px-4 py-3 backdrop-blur sm:px-6">
+        <div className="mx-auto flex max-w-[1100px] flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={submitRequest}
+            disabled={pending}
+            className="min-h-[48px] min-w-[160px] rounded-full bg-navy px-6 text-base font-semibold text-white disabled:opacity-60"
+          >
+            {pending
+              ? "Sending…"
+              : confirmReplace
+                ? "Yes, replace change"
+                : "Submit request"}
+          </button>
+          {!selectedId ? (
+            <span className="text-sm font-semibold text-amber-900">
+              Select a student first
+            </span>
+          ) : missingAddress || missingParentEmail ? (
+            <span className="text-sm font-semibold text-red">
+              Fill the red fields, then tap Submit again
+            </span>
+          ) : (
+            <span className="text-sm text-muted">
+              Ready for {selected?.fullName}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
