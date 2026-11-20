@@ -226,7 +226,6 @@ export async function loadPrintDriverLists(schoolId: string) {
             startDate: true,
             endDate: true,
             waitingForAssignment: true,
-            notes: true,
             busRoute: { select: { number: true } },
           },
         },
