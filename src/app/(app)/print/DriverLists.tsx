@@ -53,12 +53,15 @@ export function DriverLists({
   vans,
   busDrivers = {},
   aimSchool = false,
+  viewOnly = false,
 }: {
   riders: DriverRider[];
   buses: string[];
   vans: DriverVan[];
   busDrivers?: Record<string, string>;
   aimSchool?: boolean;
+  /** Bus company: view / print / PDF only — no email or updates. */
+  viewOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Selected>(null);
@@ -204,43 +207,54 @@ export function DriverLists({
               </p>
             </div>
             <div className="no-print flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
-              <label className="text-sm font-semibold text-navy">
-                Driver email
-                <input
-                  type="email"
-                  value={to}
-                  onChange={(event) => setTo(event.target.value)}
-                  placeholder="Driver email"
-                  className="mt-1 block min-h-[44px] w-full min-w-0 rounded-[12px] border border-line px-3 font-normal sm:w-64"
-                />
-              </label>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() =>
-                  start(async () => {
-                    const result = await emailDriverList({
-                      to,
-                      bus: active.kind === "bus" ? active.id : undefined,
-                      van: active.kind === "van" ? active.id : undefined,
-                    });
-                    setMessage(
-                      result.ok
-                        ? `Emailed ${title} to ${result.recipients.join(", ")}.`
-                        : result.error,
-                    );
-                  })
-                }
-                className="min-h-[44px] rounded-[12px] bg-teal px-5 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                {pending ? "Sending…" : "Email Driver"}
-              </button>
+              {viewOnly ? null : (
+                <>
+                  <label className="text-sm font-semibold text-navy">
+                    Driver email
+                    <input
+                      type="email"
+                      value={to}
+                      onChange={(event) => setTo(event.target.value)}
+                      placeholder="Driver email"
+                      className="mt-1 block min-h-[44px] w-full min-w-0 rounded-[12px] border border-line px-3 font-normal sm:w-64"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      start(async () => {
+                        const result = await emailDriverList({
+                          to,
+                          bus: active.kind === "bus" ? active.id : undefined,
+                          van: active.kind === "van" ? active.id : undefined,
+                        });
+                        setMessage(
+                          result.ok
+                            ? `Emailed ${title} to ${result.recipients.join(", ")}.`
+                            : result.error,
+                        );
+                      })
+                    }
+                    className="min-h-[44px] rounded-[12px] bg-teal px-5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {pending ? "Sending…" : "Email Driver"}
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => window.print()}
                 className="min-h-[44px] rounded-[12px] border border-navy/20 bg-white px-5 text-sm font-semibold text-navy"
               >
                 Print Roster
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="min-h-[44px] rounded-[12px] bg-teal px-5 text-sm font-semibold text-white"
+              >
+                Export PDF
               </button>
             </div>
           </div>
