@@ -556,7 +556,8 @@ export function ChangeRideAssign({
                         required
                         value={amPickup}
                         onChange={(event) => setAmPickup(event.target.value)}
-                        placeholder="7:15 AM"
+                        placeholder=""
+                        autoComplete="off"
                         className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                       />
                     </label>
@@ -569,7 +570,8 @@ export function ChangeRideAssign({
                         required
                         value={pmPickup}
                         onChange={(event) => setPmPickup(event.target.value)}
-                        placeholder="2:40 PM"
+                        placeholder=""
+                        autoComplete="off"
                         className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2.5 text-base font-medium text-navy"
                       />
                     </label>
