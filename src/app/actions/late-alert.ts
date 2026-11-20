@@ -5,7 +5,6 @@ import {
   canCompanyAccessSchool,
   loadCompanySchools,
 } from "@/lib/company-access";
-import { writeAudit } from "@/lib/audit";
 import {
   lateAlertSms,
   lateDelayOptions,
@@ -25,8 +24,10 @@ import {
   loadCompanySmsCostReport,
   SMS_COST_CENTS,
 } from "@/lib/sms-cost";
-import { sendSms, smsConfigured } from "@/lib/sms";
 import type { Trip } from "@/lib/types";
+
+const SMS_PAUSED_MESSAGE =
+  "Late Bus SMS is paused. Preview only — no texts send until the bus company agrees to pay for SMS.";
 
 function parseDelay(value: number): LateDelayMinutes | null {
   return (
@@ -81,123 +82,22 @@ export async function lateAlertPreview(input: {
     staffCount: staffPhones.length,
     studentCount: recipients.length,
     preview: lateAlertSms({ rideLabel: ride.label, minutes }),
-    smsReady: LATE_BUS_SMS_SENDING_ENABLED && smsConfigured(),
-    sendingEnabled: LATE_BUS_SMS_SENDING_ENABLED,
+    smsReady: false,
+    sendingEnabled: false,
     estimatedCents,
     estimatedCostLabel: formatSmsMoney(estimatedCents),
   };
 }
 
-/** Off until the bus company confirms they will pay for SMS. */
-export const LATE_BUS_SMS_SENDING_ENABLED = false;
-
-export async function sendLateBusAlert(input: {
+/** Never texts parents while SMS billing is not approved. */
+export async function sendLateBusAlert(_input: {
   schoolId: string;
   rideKey: string;
   minutes: number;
   trips?: Trip[];
 }) {
-  const user = await getSession();
-  if (!user || user.role !== "BUS_COMPANY") {
-    return { ok: false as const, error: "Only the bus company can send this alert." };
-  }
-  if (!LATE_BUS_SMS_SENDING_ENABLED) {
-    return {
-      ok: false as const,
-      error:
-        "Late Bus SMS is paused. Preview only — no texts send until the bus company agrees to pay for SMS.",
-    };
-  }
-  if (!(await canCompanyAccessSchool(user, input.schoolId))) {
-    return { ok: false as const, error: "That school is not on your list." };
-  }
-  if (!smsConfigured()) {
-    return {
-      ok: false as const,
-      error: "Texting is not set up yet. Parent texts cannot send.",
-    };
-  }
-
-  const minutes = parseDelay(input.minutes);
-  if (!minutes) {
-    return { ok: false as const, error: "Choose how late the bus or van is." };
-  }
-
-  const trips = (input.trips || ["PM"]).filter(
-    (trip): trip is Trip => trip === "AM" || trip === "PM",
-  );
-  const { ride, recipients } = await loadLateAlertRecipients({
-    schoolId: input.schoolId,
-    rideKey: input.rideKey,
-    trips,
-  });
-  if (!ride) {
-    return { ok: false as const, error: "Choose a bus or van." };
-  }
-
-  const familyPhones = uniqueFamilyPhones(recipients);
-  if (!familyPhones.length) {
-    return {
-      ok: false as const,
-      error: `No parent phones are on file for ${ride.label}.`,
-    };
-  }
-
-  const staff = await loadLateAlertStaffPhones(input.schoolId);
-  const staffPhones = lateAlertStaffSmsNumbers(staff).filter(
-    (phone) => !familyPhones.includes(phone),
-  );
-  const phones = [...familyPhones, ...staffPhones];
-
-  const body = lateAlertSms({ rideLabel: ride.label, minutes });
-  const texted = await sendSms({ to: phones, body });
-  const smsCount = texted.recipients.length;
-  const staffSent = texted.recipients.filter((phone) =>
-    staffPhones.includes(phone),
-  ).length;
-  await writeAudit({
-    user,
-    schoolId: input.schoolId,
-    action: "LATE_BUS_ALERT",
-    newPlan: {
-      schoolId: input.schoolId,
-      ride: ride.label,
-      minutes,
-      trips,
-      familyCount: familyPhones.length,
-      staffCount: staffPhones.length,
-      smsCount,
-      centsEach: SMS_COST_CENTS,
-      costCents: smsCount * SMS_COST_CENTS,
-      sent: texted.recipients,
-      errors: texted.errors,
-    },
-  }).catch(() => undefined);
-
-  if (!texted.sent) {
-    return {
-      ok: false as const,
-      error: texted.reason || "Could not send the late alert texts.",
-    };
-  }
-
-  const familyPart = `Texted ${familyPhones.length} famil${
-    familyPhones.length === 1 ? "y" : "ies"
-  }`;
-  const staffPart = staffSent
-    ? ` + ${staffSent} school staff`
-    : "";
-  return {
-    ok: true as const,
-    rideLabel: ride.label,
-    minutes,
-    sentCount: smsCount,
-    skippedCount: texted.errors.length,
-    costCents: smsCount * SMS_COST_CENTS,
-    message: `${familyPart}${staffPart} on ${ride.label} · ${formatSmsMoney(
-      smsCount * SMS_COST_CENTS,
-    )}.`,
-  };
+  void _input;
+  return { ok: false as const, error: SMS_PAUSED_MESSAGE };
 }
 
 export async function listLateRides(schoolId: string) {
