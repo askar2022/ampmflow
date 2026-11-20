@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveReceptionChange } from "@/app/actions/reception";
+import { bootstrapWaitingForm } from "@/app/actions/waiting-form";
 import type { DurationType, Trip } from "@/lib/types";
 
 export type RequestStudent = {
@@ -59,12 +60,13 @@ function fieldClass(bad: boolean) {
 
 export function StudentChangeRequestForm({
   kind,
-  students,
+  students: initialStudents,
   initialStudentId = "",
   busCompanyEmail = "",
   coordinatorEmail = "",
   frontDeskEmail = "",
   canPermanent = false,
+  loadRemote = false,
 }: {
   kind: "daycare" | "address";
   students: RequestStudent[];
@@ -73,12 +75,18 @@ export function StudentChangeRequestForm({
   coordinatorEmail?: string;
   frontDeskEmail?: string;
   canPermanent?: boolean;
+  /** When true, paint the form first and load roster/emails after. */
+  loadRemote?: boolean;
 }) {
   const router = useRouter();
   const errorRef = useRef<HTMLParagraphElement>(null);
   const addressRef = useRef<HTMLInputElement>(null);
   const parentEmailRef = useRef<HTMLInputElement>(null);
-  const starter = starterFromStudents(students, initialStudentId);
+  const starter = starterFromStudents(initialStudents, initialStudentId);
+  const [students, setStudents] = useState(initialStudents);
+  const [rosterLoading, setRosterLoading] = useState(
+    loadRemote && !initialStudents.length,
+  );
   const [query, setQuery] = useState(starter.query);
   const [selectedId, setSelectedId] = useState(starter.selectedId);
   const [trips, setTrips] = useState<Trip[]>(["PM"]);
@@ -103,6 +111,41 @@ export function StudentChangeRequestForm({
   const [error, setError] = useState("");
   const [tried, setTried] = useState(false);
   const [pending, start] = useTransition();
+
+  useEffect(() => {
+    if (!loadRemote) return;
+    let cancelled = false;
+    setRosterLoading(true);
+    bootstrapWaitingForm()
+      .then((data) => {
+        if (cancelled) return;
+        setStudents(data.students);
+        setCompanyEmail((current) => current || data.busCompanyEmail);
+        setCoordEmail((current) => current || data.coordinatorEmail);
+        setDeskEmail((current) => current || data.frontDeskEmail);
+        if (initialStudentId) {
+          const picked = data.students.find((row) => row.id === initialStudentId);
+          if (picked) {
+            setSelectedId(picked.id);
+            setQuery(picked.fullName);
+            setParentPhone(picked.parentPhone || "");
+            setParentPhone2(picked.parentPhone2 || "");
+            setParentEmail(picked.parentEmail || "");
+            setTeacherEmail(picked.teacherEmail || "");
+            setDaycareName(picked.daycareName || "");
+            setDaycareAddress(picked.daycareAddress || "");
+            setDaycarePhone(picked.daycarePhone || "");
+          }
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setRosterLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadRemote, initialStudentId]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -329,7 +372,11 @@ export function StudentChangeRequestForm({
                   </button>
                 </li>
               ))}
-              {!matches.length ? (
+              {rosterLoading ? (
+                <li className="px-4 py-3 text-sm text-muted">
+                  Loading roster…
+                </li>
+              ) : !matches.length ? (
                 <li className="px-4 py-3 text-sm text-muted">
                   No student matches. Check Front Desk roster.
                 </li>

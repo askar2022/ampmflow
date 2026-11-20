@@ -1,16 +1,6 @@
+import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import {
-  defaultBusCompanyEmail,
-  loadSchoolDeskNotifyEmails,
-} from "@/lib/ops-change-emails";
-import { formatAddress } from "@/lib/format";
-import { prisma } from "@/lib/prisma";
 import { RequestHub } from "./RequestHub";
-import { RouteRequestForm } from "./RouteRequestForm";
-import {
-  StudentChangeRequestForm,
-  type RequestStudent,
-} from "./StudentChangeRequestForm";
 
 export const dynamic = "force-dynamic";
 
@@ -21,81 +11,15 @@ export default async function WaitingPage({
 }) {
   const session = await getSession();
   if (!session) return null;
-  const { kind = "", student: startStudentId = "" } = await searchParams;
+  const { kind = "", student = "" } = await searchParams;
 
-  // Hub only — no roster or settings queries so the nav click feels instant.
-  if (!kind) {
-    return <RequestHub />;
+  // Old ?kind= links → dedicated routes (so loading UI + prefetch work).
+  if (kind === "route") redirect("/waiting/route");
+  if (kind === "daycare") {
+    redirect(student ? `/waiting/daycare?student=${encodeURIComponent(student)}` : "/waiting/daycare");
   }
-
-  const [busCompanyEmail, deskEmails] = await Promise.all([
-    defaultBusCompanyEmail(session.schoolId),
-    loadSchoolDeskNotifyEmails(session.schoolId),
-  ]);
-
-  if (kind === "route") {
-    return <RouteRequestForm busCompanyEmail={busCompanyEmail} />;
-  }
-
-  if (kind === "daycare" || kind === "address") {
-    const rows = await prisma.student.findMany({
-      where: { schoolId: session.schoolId, active: true },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        parentPhone: true,
-        parentPhone2: true,
-        parentEmail: true,
-        homeAddress: {
-          select: { line1: true, city: true, state: true, zip: true },
-        },
-        daycare: {
-          select: {
-            name: true,
-            phone: true,
-            address: {
-              select: { line1: true, city: true, state: true, zip: true },
-            },
-          },
-        },
-        classroom: {
-          select: {
-            teachers: { select: { email: true }, take: 1 },
-          },
-        },
-      },
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    });
-
-    const students: RequestStudent[] = rows.map((row) => ({
-      id: row.id,
-      fullName: `${row.firstName} ${row.lastName}`.trim(),
-      parentPhone: row.parentPhone || "",
-      parentPhone2: row.parentPhone2 || "",
-      parentEmail: row.parentEmail || "",
-      teacherEmail: row.classroom.teachers[0]?.email || "",
-      homeAddress: formatAddress(row.homeAddress),
-      daycareName: row.daycare?.name || "",
-      daycareAddress: row.daycare?.address
-        ? formatAddress(row.daycare.address)
-        : "",
-      daycarePhone: row.daycare?.phone || "",
-    }));
-
-    return (
-      <StudentChangeRequestForm
-        kind={kind}
-        students={students}
-        initialStudentId={startStudentId}
-        busCompanyEmail={busCompanyEmail}
-        coordinatorEmail={deskEmails.coordinatorEmail}
-        frontDeskEmail={deskEmails.frontDeskEmail}
-        canPermanent={
-          session.role === "ADMINISTRATOR" || session.role === "COORDINATOR"
-        }
-      />
-    );
+  if (kind === "address") {
+    redirect(student ? `/waiting/address?student=${encodeURIComponent(student)}` : "/waiting/address");
   }
 
   return <RequestHub />;

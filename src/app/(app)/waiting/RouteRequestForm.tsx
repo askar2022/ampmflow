@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { requestRoute } from "@/app/actions/reception";
+import { bootstrapRouteFormEmail } from "@/app/actions/waiting-form";
 
 const empty = {
   studentId: "",
@@ -28,6 +29,24 @@ export function RouteRequestForm({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
+
+  useEffect(() => {
+    if (busCompanyEmail) return;
+    let cancelled = false;
+    bootstrapRouteFormEmail()
+      .then((email) => {
+        if (cancelled || !email) return;
+        setForm((current) =>
+          current.busCompanyEmail
+            ? current
+            : { ...current, busCompanyEmail: email },
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [busCompanyEmail]);
 
   function setField(name: keyof typeof empty, value: string) {
     setForm((current) => ({ ...current, [name]: value }));
