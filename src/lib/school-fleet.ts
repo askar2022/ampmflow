@@ -10,6 +10,8 @@ export const NIA_VAN_LABELS = [
   "Van 5",
   "Van 6",
   "Van 7",
+  "Van 8",
+  "Van 9",
 ] as const;
 
 export function isNiaSchool(name?: string | null) {

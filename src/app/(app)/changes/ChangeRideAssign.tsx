@@ -176,7 +176,7 @@ export function ChangeRideAssign({
       return;
     }
     if (van && (/^0$|^van\s*0$/i.test(van) || van.replace(/^van\s+/i, "") === "0")) {
-      setError("Van 0 is not valid. Choose Van 1–Van 7.");
+      setError("Van 0 is not valid. Choose Van 1–Van 9.");
       return;
     }
     const trips: Trip[] = trip === "BOTH" ? ["AM", "PM"] : [trip];

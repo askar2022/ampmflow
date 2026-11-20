@@ -1072,7 +1072,7 @@ export async function assignRequestedBus(input: {
     if (!van) {
       return {
         ok: false as const,
-        error: "Type a real van number (Van 1–Van 7). Van 0 is not valid.",
+        error: "Type a real van number (Van 1–Van 9). Van 0 is not valid.",
       };
     }
     assignedLabel = van.name;
