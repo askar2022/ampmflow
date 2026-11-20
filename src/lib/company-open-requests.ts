@@ -9,15 +9,24 @@ type OpenRequestRow = {
   studentId: string | null;
   title: string;
   details: string;
+  payload: string | null;
+  status: string;
   createdAt: Date;
   createdById: string;
   busNumber: string | null;
 };
 
 export type CompanyOpenStudent = {
+  /** Change-request id (or temp- fallback). One row per request. */
+  id: string;
   student: EffectiveStudent;
   requestedAt: Date;
   changeRequestId: string | null;
+  status: string;
+  busNumber: string | null;
+  title: string;
+  details: string;
+  payload: string | null;
 };
 
 function nameFromRouteTitle(title: string) {
@@ -92,7 +101,8 @@ const studentInclude = {
 } as const;
 
 /**
- * Open company desk rows only — no full-roster scan, no mutate-on-read.
+ * Permanent company log — every school request stays, newest first.
+ * One row per ChangeRequest (not per student).
  */
 export async function loadCompanyOpenRequests(
   schoolIdOrIds: string | string[],
@@ -109,7 +119,8 @@ export async function loadCompanyOpenRequests(
   const openRequests = (await prisma.changeRequest.findMany({
     where: {
       schoolId: { in: schoolIds },
-      status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
+      status: { in: ["PENDING", "NEEDS_CLARIFICATION", "COMPLETED"] },
+      NOT: { source: "BUS_COMPANY", title: "Needs clarification" },
     },
     select: {
       id: true,
@@ -117,14 +128,15 @@ export async function loadCompanyOpenRequests(
       studentId: true,
       title: true,
       details: true,
+      payload: true,
+      status: true,
       createdAt: true,
       createdById: true,
       busNumber: true,
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
   })) as OpenRequestRow[];
 
-  // Link orphan route titles once (parallel), without blocking on mutations later.
   const unresolved = openRequests.filter((row) => !row.studentId);
   if (unresolved.length) {
     await Promise.all(
@@ -150,27 +162,36 @@ export async function loadCompanyOpenRequests(
     ),
   ];
 
-  const rows = await prisma.student.findMany({
+  const covered = new Set(linkedIds);
+  const waitingTemps = await prisma.temporaryChange.findMany({
     where: {
-      schoolId: { in: schoolIds },
-      active: true,
-      OR: [
-        ...(linkedIds.length ? [{ id: { in: linkedIds } }] : []),
-        { enrollmentSource: { in: ["ROUTE_REQUEST", "NEW_APPLICATION"] } },
-        { assignments: { some: { waitingForAssignment: true } } },
-        {
-          tempChanges: {
-            some: {
-              undone: false,
-              status: "APPROVED",
-              waitingForAssignment: true,
-            },
-          },
-        },
-      ],
+      undone: false,
+      status: "APPROVED",
+      waitingForAssignment: true,
+      student: { schoolId: { in: schoolIds }, active: true },
+      ...(covered.size ? { studentId: { notIn: [...covered] } } : {}),
     },
-    include: studentInclude,
+    select: { id: true, studentId: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
   });
+
+  const allStudentIds = [
+    ...new Set([
+      ...linkedIds,
+      ...waitingTemps.map((temp) => temp.studentId),
+    ]),
+  ];
+
+  const rows = allStudentIds.length
+    ? await prisma.student.findMany({
+        where: {
+          schoolId: { in: schoolIds },
+          active: true,
+          id: { in: allStudentIds },
+        },
+        include: studentInclude,
+      })
+    : [];
 
   const byStudentId = new Map<string, EffectiveStudent>();
   for (const row of rows) {
@@ -184,40 +205,42 @@ export async function loadCompanyOpenRequests(
     }
   }
 
-  const byId = new Map<string, CompanyOpenStudent>();
-
-  function remember(
-    student: EffectiveStudent,
-    requestedAt: Date,
-    changeRequestId: string | null,
-  ) {
-    const existing = byId.get(student.id);
-    if (!existing || requestedAt < existing.requestedAt) {
-      byId.set(student.id, { student, requestedAt, changeRequestId });
-      return;
-    }
-    if (!existing.changeRequestId && changeRequestId) {
-      existing.changeRequestId = changeRequestId;
-    }
-  }
+  const result: CompanyOpenStudent[] = [];
 
   for (const row of openRequests) {
     if (!row.studentId) continue;
     const student = byStudentId.get(row.studentId);
     if (!student) continue;
-    remember(student, row.createdAt, row.id);
+    result.push({
+      id: row.id,
+      student,
+      requestedAt: row.createdAt,
+      changeRequestId: row.id,
+      status: row.status,
+      busNumber: row.busNumber,
+      title: row.title,
+      details: row.details,
+      payload: row.payload,
+    });
   }
 
-  for (const student of byStudentId.values()) {
-    const isRouteEnrollment =
-      student.enrollmentSource === "ROUTE_REQUEST" ||
-      student.enrollmentSource === "NEW_APPLICATION";
-    if (!isWaitingRide(student) && !isRouteEnrollment) continue;
-    const match = openRequests.find((row) => row.studentId === student.id);
-    remember(student, match?.createdAt || new Date(), match?.id || null);
+  for (const temp of waitingTemps) {
+    const student = byStudentId.get(temp.studentId);
+    if (!student || !isWaitingRide(student)) continue;
+    result.push({
+      id: `temp-${temp.id}`,
+      student,
+      requestedAt: temp.createdAt,
+      changeRequestId: null,
+      status: "PENDING",
+      busNumber: null,
+      title: "Waiting for bus",
+      details: "",
+      payload: null,
+    });
   }
 
-  return [...byId.values()].sort(
-    (a, b) => a.requestedAt.getTime() - b.requestedAt.getTime(),
+  return result.sort(
+    (a, b) => b.requestedAt.getTime() - a.requestedAt.getTime(),
   );
 }

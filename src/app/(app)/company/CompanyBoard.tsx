@@ -6,6 +6,7 @@ import type { CompanySchool } from "@/lib/company-access";
 import type { Trip } from "@/lib/types";
 
 export type CompanyRequest = {
+  id?: string;
   studentId: string;
   name: string;
   grade: string;
@@ -130,9 +131,10 @@ export function CompanyBoard({
           <p className="mt-1 text-lg font-semibold text-navy">Open requests</p>
         </div>
         <p className="mt-2 max-w-2xl text-muted">
-          {desk.aimSchool
-            ? "Unfinished school requests stay here until you assign Bus 4, Bus 5, or the 3rd bus — including last week. Each row shows the request date and where the student sits for pickup."
-            : "Unfinished school requests stay here until you assign a bus — including older days. Each row shows the request date and stop address."}
+          Every school request stays here permanently. Newest on top. Yellow
+          still needs a bus
+          {desk.aimSchool ? " (Bus 4, Bus 5, or the 3rd bus)" : ""}
+          ; green already has your update.
         </p>
         <label className="mt-4 block max-w-md text-sm font-semibold text-navy">
           School
@@ -150,8 +152,8 @@ export function CompanyBoard({
         </label>
         <p className="mt-3 text-sm font-semibold text-navy">
           {desk.rows.length
-            ? `${openCount} open · ${desk.rows.length} student${desk.rows.length === 1 ? "" : "s"} at ${desk.schoolName}`
-            : `No open requests at ${desk.schoolName}`}
+            ? `${openCount} still open · ${desk.rows.length} request${desk.rows.length === 1 ? "" : "s"} at ${desk.schoolName}`
+            : `No requests yet at ${desk.schoolName}`}
         </p>
       </div>
 
@@ -174,8 +176,10 @@ export function CompanyBoard({
               <tbody>
                 {desk.rows.map((row) => (
                   <tr
-                    key={row.studentId}
-                    className="row-yellow border-t border-line"
+                    key={row.id || `${row.studentId}-${row.requestDate}`}
+                    className={`border-t border-line ${
+                      row.changed ? "row-green" : "row-yellow"
+                    }`}
                   >
                     <td className="px-4 py-3 font-normal">{row.name}</td>
                     <td className="font-normal">{row.grade}</td>
@@ -220,9 +224,8 @@ export function CompanyBoard({
         </div>
       ) : (
         <div className="rounded-2xl border border-line bg-card px-4 py-6 text-sm text-muted">
-          When {desk.schoolName} sends a Request for Route, daycare, new
-          address, or new student, they stay here with the request date until
-          you assign the bus — even if the request was last week.
+          When {desk.schoolName} sends a route, daycare, or new address request,
+          it stays on this list permanently — newest on top.
         </div>
       )}
     </div>

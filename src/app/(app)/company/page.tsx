@@ -57,6 +57,36 @@ function requestFor(student: EffectiveStudent) {
   return "Needs bus";
 }
 
+function requestFromChange(row: {
+  title: string;
+  details: string;
+  payload: string | null;
+  student: EffectiveStudent;
+}) {
+  const blob = `${row.title} ${row.details} ${row.payload || ""}`;
+  try {
+    const payload = row.payload ? JSON.parse(row.payload) : null;
+    if (payload?.daycareName) return `Daycare · ${payload.daycareName}`;
+    if (payload?.customAddress) return `New address · ${payload.customAddress}`;
+  } catch {
+    // ignore
+  }
+  if (/daycare/i.test(blob)) {
+    return row.student.daycareName
+      ? `Daycare · ${row.student.daycareName}`
+      : "Daycare";
+  }
+  if (/address|CUSTOM/i.test(blob)) {
+    return requestFor(row.student);
+  }
+  if (/request for route|new route|new student/i.test(blob)) {
+    return row.student.homeAddress && row.student.homeAddress !== "—"
+      ? `New student · ${row.student.homeAddress}`
+      : "New student";
+  }
+  return requestFor(row.student);
+}
+
 function sittingWhere(student: EffectiveStudent) {
   for (const plan of [student.pm, student.am]) {
     if (plan.destination === "DAYCARE") {
@@ -150,14 +180,20 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
     ]),
   ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-  const rows: CompanyRequest[] = openRows.map(({ student, requestedAt }) => {
-    const request = requestFor(student);
-    const trips: Trip[] = [
-      ...(isPlanWaiting(student.am) ? (["AM"] as const) : []),
-      ...(isPlanWaiting(student.pm) ? (["PM"] as const) : []),
-    ];
+  const rows: CompanyRequest[] = openRows.map((row) => {
+    const { student, requestedAt, status, busNumber } = row;
+    const request = requestFromChange(row);
+    const stillOpen =
+      status === "PENDING" || status === "NEEDS_CLARIFICATION";
+    const trips: Trip[] = stillOpen
+      ? [
+          ...(isPlanWaiting(student.am) ? (["AM"] as const) : []),
+          ...(isPlanWaiting(student.pm) ? (["PM"] as const) : []),
+        ]
+      : (["AM", "PM"] as Trip[]);
     const used = trips.length ? trips : (["AM", "PM"] as Trip[]);
     return {
+      id: row.id,
       studentId: student.id,
       name: student.fullName,
       grade: gradeOnly(student.grade),
@@ -173,9 +209,8 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       effectiveDate: companyEffectiveDate(student, used),
       email: companyEmail(student, trips),
       trips: used,
-      // Still waiting for a bus/van = open. Do not mark "Changed" from an
-      // older completed request when a new daycare/address request is pending.
-      changed: !isWaiting(student),
+      // Permanent log: completed stays green; unfinished stay yellow.
+      changed: !stillOpen,
     };
   });
 
