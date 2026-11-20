@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
-import { loadStudent, loadStudents } from "./transportation";
 import { isWaitingRide } from "./format";
+import { toEffective } from "./transportation";
 import type { EffectiveStudent } from "./types";
 
 type OpenRequestRow = {
@@ -24,48 +24,6 @@ function nameFromRouteTitle(title: string) {
   return title.replace(/^Request for route\s*[—\-]\s*/i, "").trim();
 }
 
-async function ensureWaitingAssignments(
-  studentId: string,
-  updatedById: string,
-) {
-  const reason = "Waiting for bus company assignment.";
-  for (const trip of ["AM", "PM"] as const) {
-    const existing = await prisma.transportationAssignment.findUnique({
-      where: { studentId_trip: { studentId, trip } },
-      select: {
-        destination: true,
-        daycareId: true,
-        customAddressId: true,
-      },
-    });
-    await prisma.transportationAssignment.upsert({
-      where: { studentId_trip: { studentId, trip } },
-      create: {
-        studentId,
-        trip,
-        type: "BUS",
-        destination: "HOME",
-        busRouteId: null,
-        waitingForAssignment: true,
-        notes: reason,
-        effectiveStart: new Date(),
-        updatedById,
-      },
-      update: {
-        // Keep daycare / new-address destination — never wipe them to HOME.
-        type: "BUS",
-        destination: existing?.destination || "HOME",
-        daycareId: existing?.daycareId ?? null,
-        customAddressId: existing?.customAddressId ?? null,
-        busRouteId: null,
-        waitingForAssignment: true,
-        notes: reason,
-        updatedById,
-      },
-    });
-  }
-}
-
 async function findStudentByName(schoolIds: string[], title: string) {
   const full = nameFromRouteTitle(title);
   const parts = full.split(/\s+/).filter(Boolean);
@@ -83,7 +41,6 @@ async function findStudentByName(schoolIds: string[], title: string) {
   });
   if (exact) return exact;
 
-  // Soft match for typos like "askat" vs "Askar".
   const prefix = lastName.slice(0, Math.min(4, lastName.length));
   if (prefix.length < 2) return null;
   return prisma.student.findFirst({
@@ -97,10 +54,45 @@ async function findStudentByName(schoolIds: string[], title: string) {
   });
 }
 
+const studentInclude = {
+  classroom: {
+    include: {
+      teachers: { select: { id: true, name: true, email: true }, take: 1 },
+    },
+  },
+  homeAddress: {
+    select: { line1: true, city: true, state: true, zip: true },
+  },
+  daycare: {
+    select: {
+      name: true,
+      phone: true,
+      address: { select: { line1: true, city: true, state: true, zip: true } },
+    },
+  },
+  assignments: {
+    include: {
+      busRoute: { select: { number: true, loadingLocation: true } },
+      daycare: { select: { name: true } },
+      customAddress: {
+        select: { line1: true, city: true, state: true, zip: true },
+      },
+    },
+  },
+  tempChanges: {
+    where: { undone: false, status: "APPROVED" },
+    include: {
+      busRoute: { select: { number: true, loadingLocation: true } },
+      daycare: { select: { name: true } },
+      customAddress: {
+        select: { line1: true, city: true, state: true, zip: true },
+      },
+    },
+  },
+} as const;
+
 /**
- * Every unfinished school request for this campus — including last week,
- * duplicate school rows with the same name, and requests saved without a
- * studentId link.
+ * Open company desk rows only — no full-roster scan, no mutate-on-read.
  */
 export async function loadCompanyOpenRequests(
   schoolIdOrIds: string | string[],
@@ -114,27 +106,83 @@ export async function loadCompanyOpenRequests(
   ];
   if (!schoolIds.length) return [];
 
-  const [waitingLists, openRequests] = await Promise.all([
-    Promise.all(schoolIds.map((schoolId) => loadStudents(schoolId))),
-    prisma.changeRequest.findMany({
-      where: {
-        schoolId: { in: schoolIds },
-        status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
-      },
-      select: {
-        id: true,
-        schoolId: true,
-        studentId: true,
-        title: true,
-        details: true,
-        createdAt: true,
-        createdById: true,
-        busNumber: true,
-      },
-      orderBy: { createdAt: "asc" },
-    }) as Promise<OpenRequestRow[]>,
-  ]);
-  const waitingAll = waitingLists.flat();
+  const openRequests = (await prisma.changeRequest.findMany({
+    where: {
+      schoolId: { in: schoolIds },
+      status: { in: ["PENDING", "NEEDS_CLARIFICATION"] },
+    },
+    select: {
+      id: true,
+      schoolId: true,
+      studentId: true,
+      title: true,
+      details: true,
+      createdAt: true,
+      createdById: true,
+      busNumber: true,
+    },
+    orderBy: { createdAt: "asc" },
+  })) as OpenRequestRow[];
+
+  // Link orphan route titles once (parallel), without blocking on mutations later.
+  const unresolved = openRequests.filter((row) => !row.studentId);
+  if (unresolved.length) {
+    await Promise.all(
+      unresolved.map(async (row) => {
+        const match = await findStudentByName(schoolIds, row.title);
+        if (!match) return;
+        row.studentId = match.id;
+        await prisma.changeRequest
+          .update({
+            where: { id: row.id },
+            data: { studentId: match.id },
+          })
+          .catch(() => undefined);
+      }),
+    );
+  }
+
+  const linkedIds = [
+    ...new Set(
+      openRequests
+        .map((row) => row.studentId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const rows = await prisma.student.findMany({
+    where: {
+      schoolId: { in: schoolIds },
+      active: true,
+      OR: [
+        ...(linkedIds.length ? [{ id: { in: linkedIds } }] : []),
+        { enrollmentSource: { in: ["ROUTE_REQUEST", "NEW_APPLICATION"] } },
+        { assignments: { some: { waitingForAssignment: true } } },
+        {
+          tempChanges: {
+            some: {
+              undone: false,
+              status: "APPROVED",
+              waitingForAssignment: true,
+            },
+          },
+        },
+      ],
+    },
+    include: studentInclude,
+  });
+
+  const byStudentId = new Map<string, EffectiveStudent>();
+  for (const row of rows) {
+    try {
+      byStudentId.set(
+        row.id,
+        toEffective(row as unknown as Parameters<typeof toEffective>[0]),
+      );
+    } catch {
+      // skip bad row
+    }
+  }
 
   const byId = new Map<string, CompanyOpenStudent>();
 
@@ -154,39 +202,13 @@ export async function loadCompanyOpenRequests(
   }
 
   for (const row of openRequests) {
-    let studentId = row.studentId;
-
-    if (!studentId) {
-      const match = await findStudentByName(schoolIds, row.title);
-      if (match) {
-        studentId = match.id;
-        await prisma.changeRequest
-          .update({
-            where: { id: row.id },
-            data: { studentId: match.id },
-          })
-          .catch(() => undefined);
-      }
-    }
-
-    if (!studentId) continue;
-
-    let loaded = await loadStudent(studentId);
-    if (!loaded?.effective) continue;
-
-    // Pending request means company still owes a bus — keep waiting flags on.
-    if (!isWaitingRide(loaded.effective) && !row.busNumber) {
-      await ensureWaitingAssignments(studentId, row.createdById).catch(
-        () => undefined,
-      );
-      loaded = await loadStudent(studentId);
-      if (!loaded?.effective) continue;
-    }
-
-    remember(loaded.effective, row.createdAt, row.id);
+    if (!row.studentId) continue;
+    const student = byStudentId.get(row.studentId);
+    if (!student) continue;
+    remember(student, row.createdAt, row.id);
   }
 
-  for (const student of waitingAll) {
+  for (const student of byStudentId.values()) {
     const isRouteEnrollment =
       student.enrollmentSource === "ROUTE_REQUEST" ||
       student.enrollmentSource === "NEW_APPLICATION";

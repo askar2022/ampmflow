@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { getSession, isPlatformAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { getSchoolIdentityById } from "@/lib/school";
 import { AppShell } from "@/components/AppShell";
 
@@ -14,20 +13,14 @@ export default async function AppLayout({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [school, platformAdmin, companyName] = await Promise.all([
+  // Skip platform-admin DB lookup for non-admins — login stays snappy.
+  const [school, platformAdmin] = await Promise.all([
     getSchoolIdentityById(session.schoolId),
-    isPlatformAdmin(session),
-    session.role === "BUS_COMPANY"
-      ? prisma.user
-          .findUnique({
-            where: { id: session.id },
-            select: { name: true },
-          })
-          .then((row) => row?.name || session.name)
-          .catch(() => session.name)
-      : Promise.resolve(session.name),
+    session.role === "ADMINISTRATOR"
+      ? isPlatformAdmin(session)
+      : Promise.resolve(false),
   ]);
-  const headerName = companyName;
+  const headerName = session.name;
 
   // Sankofa is no longer the platform hub — hide Add schools on that desk.
   const sankofaDesk = /sankofa/i.test(school?.name || "");

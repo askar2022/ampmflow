@@ -65,19 +65,18 @@ export async function loginAction(formData: FormData) {
     redirect(`${fail}?error=staff`);
   }
 
+  const remember = formData.get("remember") === "1";
+
+  // Fast path for normal school + bus company logins — avoid extra DB checks.
   if (goToSchools || isPlatformAdminEmail(result.user.email)) {
     if (!(await isPlatformAdmin(result.user))) {
       redirect(goToSchools ? "/?error=admin" : `${fail}?error=1`);
     }
-    await createSession(result.user, {
-      remember: formData.get("remember") === "1",
-    });
+    await createSession(result.user, { remember });
     redirect("/platform");
   }
 
-  await createSession(result.user, {
-    remember: formData.get("remember") === "1",
-  });
+  await createSession(result.user, { remember });
   redirect(homePath(result.user.role));
 }
 

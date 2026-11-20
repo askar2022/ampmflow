@@ -1,11 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  AIM_FLEET_LABELS,
-  ensureAimFleetVehicles,
-  isAimSchool,
-} from "@/lib/aim-fleet";
+import { AIM_FLEET_LABELS, isAimSchool } from "@/lib/aim-fleet";
 import { loadVehicles } from "@/lib/gate";
 import { formatDateTime, schoolLocalTime } from "@/lib/dates";
 import {
@@ -23,7 +19,6 @@ import {
 } from "@/lib/change-notify";
 import { loadCompanyOpenRequests } from "@/lib/company-open-requests";
 import { changeRequestLabel, isPlanWaiting, isWaitingRide } from "@/lib/format";
-import { saveSchoolBusCompanyEmail, usableOpsEmail } from "@/lib/ops-change-emails";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import {
   CompanyBoard,
@@ -103,30 +98,14 @@ function companyEmail(student: EffectiveStudent, trips: Trip[]) {
   return { subject: mail.subject, body: mail.text };
 }
 
-async function loadSchoolDesk(
-  school: CompanySchool,
-  companyLoginEmail = "",
-): Promise<CompanyDesk> {
+async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
   const aim = isAimSchool(school.name);
   const schoolIds = await companySchoolGroupIds(school);
-  // Keep every Aim/campus row linked so future requests land on the desk.
-  const linkedEmail = usableOpsEmail(companyLoginEmail);
-  if (linkedEmail) {
-    await Promise.all(
-      schoolIds.map((schoolId) =>
-        saveSchoolBusCompanyEmail(schoolId, linkedEmail).catch(() => undefined),
-      ),
-    );
-  }
+  // Read-only on open — no fleet rewrite or settings write during login.
   const [openRows, vehicleLists, routeLists] = await Promise.all([
     loadCompanyOpenRequests(schoolIds),
     Promise.all(
-      schoolIds.map((schoolId) =>
-        (aim
-          ? ensureAimFleetVehicles(schoolId)
-          : loadVehicles(schoolId)
-        ).catch(() => []),
-      ),
+      schoolIds.map((schoolId) => loadVehicles(schoolId).catch(() => [])),
     ),
     Promise.all(
       schoolIds.map((schoolId) =>
@@ -219,16 +198,11 @@ export default async function CompanyPage({
   if (!session) return null;
   if (session.role !== "BUS_COMPANY") redirect("/changes");
 
-  const liveName = await prisma.user
-    .findUnique({
-      where: { id: session.id },
-      select: { name: true },
-    })
-    .then((row) => row?.name || session.name || "Bus company")
-    .catch(() => session.name || "Bus company");
-
   const { school: wanted } = await searchParams;
-  const schools = await loadCompanySchools(session);
+  const [schools, liveName] = await Promise.all([
+    loadCompanySchools(session),
+    Promise.resolve(session.name || "Bus company"),
+  ]);
   const selected =
     schools.find((school) => school.id === wanted || school.slug === wanted) ||
     schools[0];
@@ -245,7 +219,7 @@ export default async function CompanyPage({
     );
   }
 
-  const desk = await loadSchoolDesk(selected, session.email);
+  const desk = await loadSchoolDesk(selected);
 
   return (
     <CompanyBoard

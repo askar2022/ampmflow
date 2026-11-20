@@ -16,12 +16,27 @@ function nameKey(name: string) {
   return name.trim().toLowerCase();
 }
 
+let companyColumnsReady: Promise<void> | null = null;
+
 export async function ensureCompanyColumns() {
-  await prisma
-    .$executeRawUnsafe(
-      `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
-    )
-    .catch(() => undefined);
+  if (!companyColumnsReady) {
+    companyColumnsReady = (async () => {
+      try {
+        await prisma.$queryRawUnsafe(
+          `SELECT "busCompanyEmail" FROM "SchoolSettings" LIMIT 0`,
+        );
+        return;
+      } catch {
+        // Fall through once.
+      }
+      await prisma
+        .$executeRawUnsafe(
+          `ALTER TABLE "SchoolSettings" ADD COLUMN IF NOT EXISTS "busCompanyEmail" TEXT NOT NULL DEFAULT ''`,
+        )
+        .catch(() => undefined);
+    })();
+  }
+  await companyColumnsReady;
 }
 
 export async function loadSchoolsByCompanyEmail(email: string) {
