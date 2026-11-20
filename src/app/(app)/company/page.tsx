@@ -7,7 +7,7 @@ import {
   isAimSchool,
 } from "@/lib/aim-fleet";
 import { loadVehicles } from "@/lib/gate";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, schoolLocalTime } from "@/lib/dates";
 import {
   companySchoolGroupIds,
   loadCompanySchools,
