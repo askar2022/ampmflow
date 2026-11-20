@@ -210,28 +210,36 @@ export function StudentChangeRequestForm({
     setError("");
     start(async () => {
       try {
-        const result = await saveReceptionChange({
-          studentId: selected.id,
-          destination: kind === "daycare" ? "DAYCARE" : "CUSTOM",
-          trips,
-          duration,
-          startDate,
-          endDate,
-          customAddress: kind === "address" ? customAddress : "",
-          daycareName: kind === "daycare" ? daycareName : "",
-          daycareAddress: kind === "daycare" ? daycareAddress : "",
-          daycarePhone: kind === "daycare" ? daycarePhone : "",
-          parentPhone,
-          parentPhone2,
-          parentEmail,
-          teacherEmail,
-          busCompanyEmail: companyEmail,
-          coordinatorEmail: coordEmail,
-          frontDeskEmail: deskEmail,
-          note,
-          confirmPermanent,
-          confirmReplaceChange: confirmReplace,
-        });
+        const result = await Promise.race([
+          saveReceptionChange({
+            studentId: selected.id,
+            destination: kind === "daycare" ? "DAYCARE" : "CUSTOM",
+            trips,
+            duration,
+            startDate,
+            endDate,
+            customAddress: kind === "address" ? customAddress : "",
+            daycareName: kind === "daycare" ? daycareName : "",
+            daycareAddress: kind === "daycare" ? daycareAddress : "",
+            daycarePhone: kind === "daycare" ? daycarePhone : "",
+            parentPhone,
+            parentPhone2,
+            parentEmail,
+            teacherEmail,
+            busCompanyEmail: companyEmail,
+            coordinatorEmail: coordEmail,
+            frontDeskEmail: deskEmail,
+            note,
+            confirmPermanent,
+            confirmReplaceChange: confirmReplace,
+          }),
+          new Promise<never>((_, reject) =>
+            window.setTimeout(
+              () => reject(new Error("timeout")),
+              20000,
+            ),
+          ),
+        ]);
         if (!result.ok) {
           if ("needsConfirm" in result && result.needsConfirm) {
             setConfirmReplace(true);
@@ -245,8 +253,12 @@ export function StudentChangeRequestForm({
         setConfirmReplace(false);
         setTried(false);
         router.refresh();
-      } catch {
-        showError("Could not send the request. Try again.");
+      } catch (err) {
+        showError(
+          err instanceof Error && err.message === "timeout"
+            ? "That took too long. Check Open requests — it may still have saved — then try again if needed."
+            : "Could not send the request. Try again.",
+        );
       }
     });
   }

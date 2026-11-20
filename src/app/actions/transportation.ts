@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
@@ -123,7 +124,8 @@ export async function updateTransportation(
       },
     });
     customAddressId = created.id;
-    await geocodeAndSaveAddress(created.id).catch(() => undefined);
+    // Do not block Submit on census/Nominatim geocode.
+    after(() => geocodeAndSaveAddress(created.id).catch(() => undefined));
   }
 
   const startDate =
@@ -200,92 +202,115 @@ export async function updateTransportation(
       });
     }
 
-    const refreshed = await loadStudent(input.studentId, day);
-    const newPlan = refreshed ? resolveTrip(refreshed.record, trip, day) : null;
+    const newPlan = {
+      ...oldPlan,
+      type: input.type,
+      destination: input.destination,
+      busNumber: busNumber || "",
+      waitingForAssignment: Boolean(
+        input.type === "BUS" && input.waitingForAssignment,
+      ),
+      customAddress:
+        input.destination === "CUSTOM"
+          ? input.customAddress?.trim() || oldPlan.customAddress
+          : oldPlan.customAddress,
+      daycareName:
+        input.destination === "DAYCARE"
+          ? loaded.effective.daycareName || oldPlan.daycareName
+          : oldPlan.daycareName,
+      source:
+        input.duration === "PERMANENT"
+          ? ("PERMANENT" as const)
+          : input.duration === "TODAY"
+            ? ("TODAY" as const)
+            : ("DATE_RANGE" as const),
+    };
     const unchanged =
-      oldPlan &&
-      newPlan &&
       oldPlan.type === newPlan.type &&
       oldPlan.destination === newPlan.destination &&
       (oldPlan.busNumber || "") === (newPlan.busNumber || "") &&
       Boolean(oldPlan.waitingForAssignment) ===
-        Boolean(newPlan.waitingForAssignment);
+        Boolean(newPlan.waitingForAssignment) &&
+      (oldPlan.customAddress || "") === (newPlan.customAddress || "");
     if (unchanged) {
       continue;
     }
 
-    await writeAudit({
-      user,
-      studentId: input.studentId,
-      action:
-        input.duration === "PERMANENT"
-          ? "UPDATE_PERMANENT"
-          : "CREATE_TEMPORARY",
-      trip,
-      durationType: input.duration,
-      oldPlan,
-      newPlan,
-      approvedById: user.id,
-    });
-
     const late = isAfterDeadline();
     const urgent = isAfterSnapshot();
-    try {
-      const event = await prisma.changeEvent.create({
-        data: {
-          schoolId: user.schoolId,
+    const teacherId = loaded.record.classroom.teachers[0]?.id || null;
+    const studentName = loaded.effective.fullName;
+    // Audit + desk notifications run after response so Submit returns quickly.
+    after(() =>
+      Promise.all([
+        writeAudit({
+          user,
           studentId: input.studentId,
+          action:
+            input.duration === "PERMANENT"
+              ? "UPDATE_PERMANENT"
+              : "CREATE_TEMPORARY",
           trip,
-          previousPlan: JSON.stringify(oldPlan),
-          newPlan: JSON.stringify(newPlan),
           durationType: input.duration,
-          late,
-          urgent,
-          waitingForRoute: Boolean(input.waitingForAssignment),
-          createdById: user.id,
-        },
-      });
-      const teacherUser = loaded.record.classroom.teachers[0]
-        ? await prisma.user.findFirst({
-            where: { teacherId: loaded.record.classroom.teachers[0].id },
-          })
-        : null;
-      if (teacherUser) {
-        await prisma.teacherAcknowledgment.create({
-          data: { changeEventId: event.id, userId: teacherUser.id },
-        });
-        await prisma.notification.create({
-          data: {
-            schoolId: user.schoolId,
-            userId: teacherUser.id,
-            title: urgent
-              ? "Urgent last-minute transportation change"
-              : "Transportation change",
-            body: `${loaded.effective.fullName}: ${planSummary(oldPlan, trip)} → ${newPlan ? planSummary(newPlan, trip) : "updated"} by ${user.name} at ${formatTime(new Date())}.`,
-          },
-        });
-      }
-      await notifyCoordinators(
-        user.schoolId,
-        urgent ? "Last-minute change needs acknowledgment" : "Transportation change recorded",
-        `${user.name} updated ${loaded.effective.fullName}.`,
-      );
-    } catch {
-      // Tables may not exist until live-ops.sql is run.
-    }
+          oldPlan,
+          newPlan,
+          approvedById: user.id,
+        }).catch(() => undefined),
+        (async () => {
+          try {
+            const event = await prisma.changeEvent.create({
+              data: {
+                schoolId: user.schoolId,
+                studentId: input.studentId,
+                trip,
+                previousPlan: JSON.stringify(oldPlan),
+                newPlan: JSON.stringify(newPlan),
+                durationType: input.duration,
+                late,
+                urgent,
+                waitingForRoute: Boolean(input.waitingForAssignment),
+                createdById: user.id,
+              },
+            });
+            const teacherUser = teacherId
+              ? await prisma.user.findFirst({
+                  where: { teacherId },
+                })
+              : null;
+            if (teacherUser) {
+              await prisma.teacherAcknowledgment.create({
+                data: { changeEventId: event.id, userId: teacherUser.id },
+              });
+              await prisma.notification.create({
+                data: {
+                  schoolId: user.schoolId,
+                  userId: teacherUser.id,
+                  title: urgent
+                    ? "Urgent last-minute transportation change"
+                    : "Transportation change",
+                  body: `${studentName}: ${planSummary(oldPlan, trip)} → ${planSummary(newPlan, trip)} by ${user.name} at ${formatTime(new Date())}.`,
+                },
+              });
+            }
+            await notifyCoordinators(
+              user.schoolId,
+              urgent
+                ? "Last-minute change needs acknowledgment"
+                : "Transportation change recorded",
+              `${user.name} updated ${studentName}.`,
+            );
+          } catch {
+            // Tables may not exist until live-ops.sql is run.
+          }
+        })(),
+      ]).then(() => undefined, () => undefined),
+    );
   }
 
   revalidatePath("/dashboard");
   revalidatePath("/changes");
-  revalidatePath("/students");
-  revalidatePath(`/students/${input.studentId}`);
-  revalidatePath("/teacher");
-  revalidatePath("/buses");
-  revalidatePath("/pickup");
-  revalidatePath("/activity");
-  revalidatePath("/acknowledgments");
   revalidatePath("/waiting");
-  revalidatePath("/leadership");
+  revalidatePath("/company");
   return { ok: true, ...(warnings.length ? { warnings } : {}) } as UpdateResult;
 }
 

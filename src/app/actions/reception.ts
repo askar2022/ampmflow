@@ -228,30 +228,32 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
   if (!frontDeskEmail) {
     return { ok: false as const, error: "Front Desk email is required." };
   }
-  await saveSchoolBusCompanyEmail(user.schoolId, busCompanyEmail).catch(
-    () => undefined,
-  );
-  await saveSchoolDeskNotifyEmails(user.schoolId, {
-    coordinatorEmail,
-    frontDeskEmail,
-  }).catch(() => undefined);
-
-  await prisma.$executeRaw`
-    UPDATE "Student"
-    SET "parentEmail" = ${parentEmail},
-        "parentPhone" = ${parentPhone || loaded.effective.parentPhone},
-        "parentPhone2" = ${parentPhone2}
-    WHERE "id" = ${input.studentId}
-  `.catch(() => undefined);
+  // Save contact prefs in parallel — do not stall Submit on one after another.
+  await Promise.all([
+    saveSchoolBusCompanyEmail(user.schoolId, busCompanyEmail).catch(
+      () => undefined,
+    ),
+    saveSchoolDeskNotifyEmails(user.schoolId, {
+      coordinatorEmail,
+      frontDeskEmail,
+    }).catch(() => undefined),
+    prisma.$executeRaw`
+      UPDATE "Student"
+      SET "parentEmail" = ${parentEmail},
+          "parentPhone" = ${parentPhone || loaded.effective.parentPhone},
+          "parentPhone2" = ${parentPhone2}
+      WHERE "id" = ${input.studentId}
+    `.catch(() => undefined),
+    prisma.teacher
+      .updateMany({
+        where: { classroomId: loaded.effective.classroomId },
+        data: { email: teacherEmail },
+      })
+      .catch(() => undefined),
+  ]);
   loaded.effective.parentEmail = parentEmail;
   loaded.effective.parentPhone = parentPhone || loaded.effective.parentPhone;
   loaded.effective.parentPhone2 = parentPhone2;
-  await prisma.teacher
-    .updateMany({
-      where: { classroomId: loaded.effective.classroomId },
-      data: { email: teacherEmail },
-    })
-    .catch(() => undefined);
   loaded.effective.teacherEmail = teacherEmail;
 
   if (destination === "CUSTOM" && !input.customAddress?.trim()) {
@@ -306,10 +308,43 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
     if (!result.ok) return result;
   }
 
-  const after = await loadStudent(input.studentId);
-  const student = after?.effective ?? loaded.effective;
+  // Avoid a second full roster load — use the student we already have.
+  const student = loaded.effective;
   student.parentPhone = parentPhone || student.parentPhone;
   student.parentPhone2 = parentPhone2;
+  student.parentEmail = parentEmail;
+  student.teacherEmail = teacherEmail;
+  if (destination === "CUSTOM" && input.customAddress?.trim()) {
+    for (const trip of input.trips) {
+      const plan = trip === "AM" ? student.am : student.pm;
+      plan.destination = "CUSTOM";
+      plan.customAddress = input.customAddress.trim();
+      plan.waitingForAssignment = true;
+      plan.busNumber = "";
+      plan.source =
+        input.duration === "PERMANENT"
+          ? "PERMANENT"
+          : input.duration === "DATE_RANGE"
+            ? "DATE_RANGE"
+            : "TODAY";
+    }
+  }
+  if (destination === "DAYCARE") {
+    for (const trip of input.trips) {
+      const plan = trip === "AM" ? student.am : student.pm;
+      plan.destination = "DAYCARE";
+      plan.daycareName =
+        input.daycareName?.trim() || student.daycareName || plan.daycareName;
+      plan.waitingForAssignment = true;
+      plan.busNumber = "";
+      plan.source =
+        input.duration === "PERMANENT"
+          ? "PERMANENT"
+          : input.duration === "DATE_RANGE"
+            ? "DATE_RANGE"
+            : "TODAY";
+    }
+  }
   const requestTitle =
     destination === "DAYCARE"
       ? `Daycare change — ${student.fullName}`
