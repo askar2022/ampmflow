@@ -82,7 +82,11 @@ export function ChangeRideAssign({
   companyAssigned = false,
   parentEmail = "",
   parentPhone = "",
+  parentPhone2 = "",
   teacherEmail = "",
+  busCompanyEmail = "",
+  coordinatorEmail = "",
+  frontDeskEmail = "",
   nearbyEnabled = false,
 }: {
   requestId?: string;
@@ -99,7 +103,11 @@ export function ChangeRideAssign({
   companyAssigned?: boolean;
   parentEmail?: string;
   parentPhone?: string;
+  parentPhone2?: string;
   teacherEmail?: string;
+  busCompanyEmail?: string;
+  coordinatorEmail?: string;
+  frontDeskEmail?: string;
   nearbyEnabled?: boolean;
 }) {
   const router = useRouter();
@@ -115,12 +123,13 @@ export function ChangeRideAssign({
   const [pmPickup, setPmPickup] = useState("");
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
+  const [assignSaving, setAssignSaving] = useState(false);
   const [nearbyStatus, setNearbyStatus] = useState<NearbyStatus>("idle");
   const [nearby, setNearby] = useState<NearbyAssignment | null>(null);
   const nearbyDismissed = useRef(false);
 
   function close() {
-    if (pending) return;
+    if (pending || assignSaving) return;
     setOpen(false);
     setReview(false);
     setDraft(null);
@@ -128,6 +137,7 @@ export function ChangeRideAssign({
     setNearbyStatus("idle");
     setNearby(null);
     nearbyDismissed.current = false;
+    void Promise.resolve().then(() => router.refresh());
   }
 
   function patchDraft(patch: Partial<NotifyDraft>) {
@@ -220,7 +230,51 @@ export function ChangeRideAssign({
       setError("Type the PM pickup time.");
       return;
     }
+    const assignedNow = van && !bus ? van : `Bus ${bus}`;
+    const whenNow = van && !bus ? "Assigned van" : "Assigned bus";
+    const noteNow = [
+      `Bus company assigned ${assignedNow}.`,
+      trips.includes("AM") && amPickup.trim()
+        ? `AM pickup ${amPickup.trim()}.`
+        : "",
+      trips.includes("PM") && pmPickup.trim()
+        ? `PM pickup ${pmPickup.trim()}.`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    // Show review immediately — don't wait on the server round-trip.
     setError("");
+    setReceipt(null);
+    setDraft({
+      assigned: assignedNow,
+      trips,
+      previous: "",
+      next: assignedNow,
+      when: whenNow,
+      note: noteNow,
+      amPickup: trips.includes("AM") ? amPickup.trim() : "",
+      pmPickup: trips.includes("PM") ? pmPickup.trim() : "",
+      parentEmail: parentEmail || "",
+      parentPhone: parentPhone || "",
+      parentPhone2: parentPhone2 || "",
+      teacherEmail: teacherEmail || "",
+      busCompanyEmail: busCompanyEmail || "",
+      coordinatorEmail: coordinatorEmail || "",
+      frontDeskEmail: frontDeskEmail || "",
+      sendParentSms: Boolean(
+        (parentPhone || "").trim() || (parentPhone2 || "").trim(),
+      ),
+    });
+    setDone(true);
+    setReview(true);
+    setAssignSaving(true);
+    setBusNumber("");
+    setVanNumber("");
+    setAmPickup("");
+    setPmPickup("");
+
     start(async () => {
       const result = await assignRequestedBus({
         requestId,
@@ -231,11 +285,14 @@ export function ChangeRideAssign({
         amPickupTime: amPickup.trim(),
         pmPickupTime: pmPickup.trim(),
       });
+      setAssignSaving(false);
       if (!result.ok) {
+        setDraft(null);
+        setReview(false);
+        setDone(companyAssigned);
         setError(result.error);
         return;
       }
-      // Only the emails from this school request (empty = school left it blank).
       setDraft({
         assigned: result.assigned,
         trips: result.trips,
@@ -245,25 +302,18 @@ export function ChangeRideAssign({
         note: result.note,
         amPickup: result.amPickup,
         pmPickup: result.pmPickup,
-        parentEmail: result.parentEmail || "",
-        parentPhone: result.parentPhone || "",
-        parentPhone2: result.parentPhone2 || "",
-        teacherEmail: result.teacherEmail || "",
-        busCompanyEmail: result.busCompanyEmail || "",
-        coordinatorEmail: result.coordinatorEmail || "",
-        frontDeskEmail: result.frontDeskEmail || "",
+        parentEmail: result.parentEmail || parentEmail || "",
+        parentPhone: result.parentPhone || parentPhone || "",
+        parentPhone2: result.parentPhone2 || parentPhone2 || "",
+        teacherEmail: result.teacherEmail || teacherEmail || "",
+        busCompanyEmail: result.busCompanyEmail || busCompanyEmail || "",
+        coordinatorEmail: result.coordinatorEmail || coordinatorEmail || "",
+        frontDeskEmail: result.frontDeskEmail || frontDeskEmail || "",
         sendParentSms: Boolean(
-          (result.parentPhone || "").trim() || (result.parentPhone2 || "").trim(),
+          (result.parentPhone || parentPhone || "").trim() ||
+            (result.parentPhone2 || parentPhone2 || "").trim(),
         ),
       });
-      setReceipt(null);
-      setBusNumber("");
-      setVanNumber("");
-      setAmPickup("");
-      setPmPickup("");
-      setDone(true);
-      setReview(true);
-      void Promise.resolve().then(() => router.refresh());
     });
   }
 
@@ -465,11 +515,16 @@ export function ChangeRideAssign({
                     Also send parent text
                   </label>
                 </div>
+                {assignSaving ? (
+                  <p className="text-sm font-semibold text-navy">
+                    Saving assignment…
+                  </p>
+                ) : null}
                 {error ? <p className="text-sm text-red">{error}</p> : null}
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={pending}
+                    disabled={pending || assignSaving}
                     onClick={sendNotice}
                     className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                   >
@@ -477,7 +532,7 @@ export function ChangeRideAssign({
                   </button>
                   <button
                     type="button"
-                    disabled={pending}
+                    disabled={pending || assignSaving}
                     onClick={skipNotice}
                     className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
                   >

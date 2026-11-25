@@ -227,6 +227,10 @@ export function CompanyBoard({
                           parentEmail={row.notifyEmails?.parentEmail}
                           parentPhone={row.notifyEmails?.parentPhone}
                           teacherEmail={row.notifyEmails?.teacherEmail}
+                          busCompanyEmail={row.notifyEmails?.busCompanyEmail}
+                          coordinatorEmail={row.notifyEmails?.coordinatorEmail}
+                          frontDeskEmail={row.notifyEmails?.frontDeskEmail}
+                          parentPhone2={row.notifyEmails?.parentPhone2}
                           nearbyEnabled
                         />
                       </div>
