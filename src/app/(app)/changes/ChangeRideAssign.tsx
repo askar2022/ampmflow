@@ -4,11 +4,33 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { nearbyAssignmentSuggestion } from "@/app/actions/nearby-assignment";
-import { assignRequestedBus } from "@/app/actions/reception";
+import {
+  assignRequestedBus,
+  sendAssignedBusNotice,
+} from "@/app/actions/reception";
 import type { NearbyAssignment } from "@/lib/nearby-assignment";
 import type { Trip } from "@/lib/types";
 
 type TripChoice = "AM" | "PM" | "BOTH";
+
+type NotifyDraft = {
+  assigned: string;
+  trips: Trip[];
+  previous: string;
+  next: string;
+  when: string;
+  note: string;
+  amPickup: string;
+  pmPickup: string;
+  parentEmail: string;
+  parentPhone: string;
+  parentPhone2: string;
+  teacherEmail: string;
+  busCompanyEmail: string;
+  coordinatorEmail: string;
+  frontDeskEmail: string;
+  sendParentSms: boolean;
+};
 
 type Receipt = {
   assigned: string;
@@ -19,6 +41,8 @@ type Receipt = {
   parentPhone2?: string;
   teacherEmail: string;
   busCompanyEmail: string;
+  coordinatorEmail?: string;
+  frontDeskEmail?: string;
 };
 
 type NearbyStatus = "idle" | "loading" | "found" | "none" | "dismissed";
@@ -81,6 +105,7 @@ export function ChangeRideAssign({
   const [review, setReview] = useState(false);
   const [done, setDone] = useState(companyAssigned);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [draft, setDraft] = useState<NotifyDraft | null>(null);
   const [trip, setTrip] = useState<TripChoice>(startingTrip(defaultTrips));
   const [busNumber, setBusNumber] = useState("");
   const [vanNumber, setVanNumber] = useState("");
@@ -96,10 +121,15 @@ export function ChangeRideAssign({
     if (pending) return;
     setOpen(false);
     setReview(false);
+    setDraft(null);
     setError("");
     setNearbyStatus("idle");
     setNearby(null);
     nearbyDismissed.current = false;
+  }
+
+  function patchDraft(patch: Partial<NotifyDraft>) {
+    setDraft((current) => (current ? { ...current, ...patch } : current));
   }
 
   useEffect(() => {
@@ -202,25 +232,104 @@ export function ChangeRideAssign({
         setError(result.error);
         return;
       }
-      setReceipt({
+      setDraft({
         assigned: result.assigned,
-        sent: result.sent,
-        skipped: result.skipped,
-        parentEmail: result.parentEmail || parentEmail,
-        parentPhone: result.parentPhone || parentPhone,
-        parentPhone2: result.parentPhone2,
-        teacherEmail: result.teacherEmail || teacherEmail,
+        trips: result.trips,
+        previous: result.previous,
+        next: result.next,
+        when: result.when,
+        note: result.note,
+        amPickup: result.amPickup,
+        pmPickup: result.pmPickup,
+        parentEmail: result.parentEmail || parentEmail || "",
+        parentPhone: result.parentPhone || parentPhone || "",
+        parentPhone2: result.parentPhone2 || "",
+        teacherEmail: result.teacherEmail || teacherEmail || "",
         busCompanyEmail: result.busCompanyEmail || "",
+        coordinatorEmail: result.coordinatorEmail || "",
+        frontDeskEmail: result.frontDeskEmail || "",
+        sendParentSms: Boolean(
+          (result.parentPhone || parentPhone || "").trim() ||
+            (result.parentPhone2 || "").trim(),
+        ),
       });
+      setReceipt(null);
       setBusNumber("");
       setVanNumber("");
       setAmPickup("");
       setPmPickup("");
       setDone(true);
       setReview(true);
-      // Refresh after the button unlocks so Saving does not stay stuck.
       void Promise.resolve().then(() => router.refresh());
     });
+  }
+
+  function sendNotice() {
+    if (!draft) return;
+    setError("");
+    start(async () => {
+      const result = await sendAssignedBusNotice({
+        studentId,
+        trips: draft.trips,
+        previous: draft.previous,
+        next: draft.next,
+        when: draft.when,
+        note: draft.note,
+        amPickup: draft.amPickup,
+        pmPickup: draft.pmPickup,
+        parentEmail: draft.parentEmail,
+        parentPhone: draft.parentPhone,
+        parentPhone2: draft.parentPhone2,
+        teacherEmail: draft.teacherEmail,
+        busCompanyEmail: draft.busCompanyEmail,
+        coordinatorEmail: draft.coordinatorEmail,
+        frontDeskEmail: draft.frontDeskEmail,
+        sendParentSms: draft.sendParentSms,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setReceipt({
+        assigned: draft.assigned,
+        sent: result.sent,
+        skipped: result.skipped,
+        parentEmail: result.parentEmail,
+        parentPhone: result.parentPhone,
+        parentPhone2: result.parentPhone2,
+        teacherEmail: result.teacherEmail,
+        busCompanyEmail: result.busCompanyEmail,
+        coordinatorEmail: result.coordinatorEmail,
+        frontDeskEmail: result.frontDeskEmail,
+      });
+      setDraft(null);
+    });
+  }
+
+  function skipNotice() {
+    if (!draft) {
+      close();
+      return;
+    }
+    setReceipt({
+      assigned: draft.assigned,
+      sent: [],
+      skipped: [
+        "parent (not sent — skipped)",
+        "teacher (not sent — skipped)",
+        "bus company (not sent — skipped)",
+        "school (not sent — skipped)",
+        "parent text (not sent — skipped)",
+      ],
+      parentEmail: draft.parentEmail,
+      parentPhone: draft.parentPhone,
+      parentPhone2: draft.parentPhone2,
+      teacherEmail: draft.teacherEmail,
+      busCompanyEmail: draft.busCompanyEmail,
+      coordinatorEmail: draft.coordinatorEmail,
+      frontDeskEmail: draft.frontDeskEmail,
+    });
+    setDraft(null);
   }
 
   const changed = done || companyAssigned;
@@ -231,7 +340,7 @@ export function ChangeRideAssign({
         type="button"
         onClick={() => {
           setOpen(true);
-          setReview(changed && Boolean(receipt));
+          setReview(changed && Boolean(receipt || draft));
           setError("");
         }}
         className={`rounded-full px-4 py-2 text-sm font-semibold ${
@@ -250,7 +359,7 @@ export function ChangeRideAssign({
           onClick={close}
         >
           <div
-            className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-card p-5 shadow-lg"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-card p-5 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
             <h3
@@ -272,7 +381,106 @@ export function ChangeRideAssign({
               <p className="mt-0.5 text-sm text-muted">Effective {effectiveDate}</p>
             ) : null}
 
-            {review && receipt ? (
+            {review && draft ? (
+              <div className="mt-5 space-y-4">
+                <p className="font-semibold text-navy">
+                  {draft.assigned} saved — review who gets the update
+                </p>
+                <p className="text-sm text-muted">
+                  These are the school emails on file for this student. Clear a
+                  row to skip it, or edit before you send.
+                </p>
+                <div className="space-y-3">
+                  {(
+                    [
+                      ["parentEmail", "Parent email"],
+                      ["teacherEmail", "Teacher email"],
+                      ["busCompanyEmail", "Bus company email"],
+                      ["coordinatorEmail", "Bus coordinator email"],
+                      ["frontDeskEmail", "Front desk email"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="block text-sm font-semibold">
+                      {label}
+                      <div className="mt-1 flex gap-2">
+                        <input
+                          type="email"
+                          value={draft[key]}
+                          onChange={(event) =>
+                            patchDraft({ [key]: event.target.value })
+                          }
+                          placeholder="Leave blank to skip"
+                          className="min-w-0 flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-base font-medium text-navy"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => patchDraft({ [key]: "" })}
+                          className="shrink-0 rounded-xl border border-line px-3 py-2 text-sm font-semibold"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </label>
+                  ))}
+                  <label className="block text-sm font-semibold">
+                    Parent text phone
+                    <div className="mt-1 flex gap-2">
+                      <input
+                        type="text"
+                        value={draft.parentPhone}
+                        onChange={(event) =>
+                          patchDraft({ parentPhone: event.target.value })
+                        }
+                        placeholder="Leave blank to skip text"
+                        className="min-w-0 flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-base font-medium text-navy"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patchDraft({
+                            parentPhone: "",
+                            parentPhone2: "",
+                            sendParentSms: false,
+                          })
+                        }
+                        className="shrink-0 rounded-xl border border-line px-3 py-2 text-sm font-semibold"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={draft.sendParentSms}
+                      onChange={(event) =>
+                        patchDraft({ sendParentSms: event.target.checked })
+                      }
+                    />
+                    Also send parent text
+                  </label>
+                </div>
+                {error ? <p className="text-sm text-red">{error}</p> : null}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={sendNotice}
+                    className="rounded-full bg-navy px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {pending ? "Sending…" : "Send update"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={skipNotice}
+                    className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
+                  >
+                    Done without sending
+                  </button>
+                </div>
+              </div>
+            ) : review && receipt ? (
               <div className="mt-5 space-y-4">
                 <p className="font-semibold text-navy">
                   {receipt.assigned} assigned
@@ -307,7 +515,17 @@ export function ChangeRideAssign({
                       </span>
                     </li>
                     <li className="flex flex-wrap justify-between gap-2 rounded-xl border border-line bg-paper px-3 py-2">
-                      <span>Coordinator and Front Desk</span>
+                      <span>
+                        Coordinator · {receipt.coordinatorEmail || "—"}
+                      </span>
+                      <span className="font-semibold">
+                        {statusFor(receipt, "school")}
+                      </span>
+                    </li>
+                    <li className="flex flex-wrap justify-between gap-2 rounded-xl border border-line bg-paper px-3 py-2">
+                      <span>
+                        Front desk · {receipt.frontDeskEmail || "—"}
+                      </span>
                       <span className="font-semibold">
                         {statusFor(receipt, "school")}
                       </span>
@@ -328,7 +546,11 @@ export function ChangeRideAssign({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setReview(false)}
+                    onClick={() => {
+                      setReview(false);
+                      setDraft(null);
+                      setReceipt(null);
+                    }}
                     className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold"
                   >
                     Update again

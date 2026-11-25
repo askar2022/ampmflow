@@ -529,17 +529,31 @@ export async function notifyTransportationChange(args: {
   waiting: boolean;
   destination?: Destination;
   parentSms?: ParentSmsKind;
+  /** When false, skip parent SMS entirely. */
+  sendParentSms?: boolean;
+  parentEmail?: string;
   teacherEmail?: string;
+  /** When set, use only these teacher emails (no classroom lookup). */
+  teacherEmails?: string[];
   busCompanyEmail?: string;
   notifySchool?: boolean;
   schoolId?: string;
+  /** When set, use these instead of saved school desk/user emails. */
+  schoolEmails?: string[];
   amPickup?: string;
   pmPickup?: string;
 }): Promise<ChangeNotice> {
   const sent: string[] = [];
   const skipped: string[] = [];
+  const student: EffectiveStudent = {
+    ...args.student,
+    parentEmail:
+      args.parentEmail !== undefined
+        ? args.parentEmail
+        : args.student.parentEmail,
+  };
   const text = changeNoticeText({
-    student: args.student,
+    student,
     trips: args.trips,
     previous: args.previous,
     next: args.next,
@@ -553,45 +567,50 @@ export async function notifyTransportationChange(args: {
   const html = changeNoticeHtml(text);
   const kind = companyRequestKind({
     destination:
-      args.destination || destinationFromStudent(args.student),
+      args.destination || destinationFromStudent(student),
     waiting: args.waiting,
-    enrollmentSource: args.student.enrollmentSource,
+    enrollmentSource: student.enrollmentSource,
   });
   const companyMail = companyChangeEmail({
-    studentName: args.student.fullName,
-    grade: args.student.grade,
+    studentName: student.fullName,
+    grade: student.grade,
     trips: args.trips,
     previous: args.previous,
     next: args.next,
     when: args.when,
     kind,
-    address: companyAddressFor({ kind, student: args.student }),
+    address: companyAddressFor({ kind, student }),
     amPickup: args.amPickup,
     pmPickup: args.pmPickup,
   });
   const teacherMail = teacherChangeEmail({
-    student: args.student,
+    student,
     trips: args.trips,
     previous: args.previous,
     next: args.next,
     when: args.when,
   });
 
-  const parent = uniqueEmails([args.student.parentEmail]);
+  const parent = uniqueEmails([student.parentEmail]);
   const company = uniqueEmails([args.busCompanyEmail]);
-  const teachers = await teacherEmails(
-    args.student.classroomId,
-    args.teacherEmail,
-  );
+  const teachers =
+    args.teacherEmails !== undefined
+      ? uniqueEmails(args.teacherEmails)
+      : await teacherEmails(student.classroomId, args.teacherEmail);
   const schoolDesk =
-    args.notifySchool && args.schoolId
-      ? await schoolStaffEmails(args.schoolId)
-      : [];
+    args.schoolEmails !== undefined
+      ? uniqueEmails(args.schoolEmails)
+      : args.notifySchool && args.schoolId
+        ? await schoolStaffEmails(args.schoolId)
+        : [];
 
   if (!parent.length) skipped.push("parent (required)");
   if (!teachers.length) skipped.push("teacher (required)");
   if (!company.length) skipped.push("bus company (required)");
-  if (args.notifySchool && !schoolDesk.length) {
+  if (
+    (args.notifySchool || args.schoolEmails !== undefined) &&
+    !schoolDesk.length
+  ) {
     skipped.push("school (coordinator or front desk email needed)");
   }
 
@@ -605,7 +624,7 @@ export async function notifyTransportationChange(args: {
           ? "ride-request"
           : "assigned");
   const smsBody = parentChangeSms({
-    student: args.student,
+    student,
     next: args.next,
     note: args.note,
     when: args.when,
@@ -614,7 +633,7 @@ export async function notifyTransportationChange(args: {
     pmPickup: args.pmPickup,
   });
   const parentMail = parentChangeEmail({
-    student: args.student,
+    student,
     trips: args.trips,
     previous: args.previous,
     next: args.next,
@@ -624,10 +643,10 @@ export async function notifyTransportationChange(args: {
     amPickup: args.amPickup,
     pmPickup: args.pmPickup,
   });
-  const parentPhones = parentSmsNumbers(
-    args.student.parentPhone,
-    args.student.parentPhone2,
-  );
+  const parentPhones =
+    args.sendParentSms === false
+      ? []
+      : parentSmsNumbers(student.parentPhone, student.parentPhone2);
 
   const jobs: Array<Promise<void>> = [];
   if (!smtpConfigured()) {
@@ -682,7 +701,9 @@ export async function notifyTransportationChange(args: {
     }
   }
 
-  if (!parentPhones.length) {
+  if (args.sendParentSms === false) {
+    skipped.push("parent text (cleared before send)");
+  } else if (!parentPhones.length) {
     skipped.push("parent text (phone required)");
   } else if (!smsConfigured()) {
     skipped.push("parent text (Twilio is not set)");
@@ -708,7 +729,7 @@ export async function notifyTransportationChange(args: {
 
   await writeAudit({
     user: args.user,
-    studentId: args.student.id,
+    studentId: student.id,
     action: "EMAIL_CHANGE_NOW",
     trip: args.trips.join("+"),
     newPlan: {

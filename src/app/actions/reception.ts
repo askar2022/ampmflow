@@ -24,6 +24,7 @@ import {
 } from "@/lib/change-notify";
 import {
   defaultBusCompanyEmail,
+  loadSchoolDeskNotifyEmails,
   saveSchoolBusCompanyEmail,
   saveSchoolDeskNotifyEmails,
   usableOpsEmail,
@@ -1188,42 +1189,130 @@ export async function assignRequestedBus(input: {
     .filter(Boolean)
     .join(" ");
 
-  // Emails/SMS in the background — never hold the Assign button.
-  scheduleChangeNotify(() =>
-    notifyTransportationChange({
-      user,
-      student,
-      trips,
-      previous,
-      next: nextLabel,
-      when: vehicle === "van" ? "Assigned van" : "Assigned bus",
-      note,
-      waiting: false,
-      amPickup: trips.includes("AM") ? amPickup : "",
-      pmPickup: trips.includes("PM") ? pmPickup : "",
-      parentSms: "assigned",
-      teacherEmail: student.teacherEmail,
-      busCompanyEmail: user.email,
-      notifySchool: true,
-      schoolId,
-    }),
-  );
+  // Do not auto-send — company reviews/edits emails first, then confirms.
+  const desk = await loadSchoolDeskNotifyEmails(schoolId);
+  const when = vehicle === "van" ? "Assigned van" : "Assigned bus";
 
   revalidatePath("/company");
 
   return {
     ok: true as const,
     assigned: assignedLabel,
+    notifyPending: true as const,
     sent: [] as string[],
     skipped: [] as string[],
-    parentEmail: student.parentEmail,
+    parentEmail: student.parentEmail || "",
+    parentPhone: student.parentPhone || "",
+    parentPhone2: student.parentPhone2 || "",
+    teacherEmail: student.teacherEmail || "",
+    busCompanyEmail: user.email || "",
+    coordinatorEmail: desk.coordinatorEmail || "",
+    frontDeskEmail: desk.frontDeskEmail || "",
+    trips,
+    amPickup: trips.includes("AM") ? amPickup : "",
+    pmPickup: trips.includes("PM") ? pmPickup : "",
+    previous,
+    next: nextLabel,
+    when,
+    note,
+    message: `${assignedLabel} is saved for ${student.fullName}. Review who gets the update, then send.`,
+  };
+}
+
+/** After Assign: send only the emails/phones the company kept on the review screen. */
+export async function sendAssignedBusNotice(input: {
+  studentId: string;
+  trips: Trip[];
+  previous: string;
+  next: string;
+  when: string;
+  note: string;
+  amPickup?: string;
+  pmPickup?: string;
+  parentEmail?: string;
+  parentPhone?: string;
+  parentPhone2?: string;
+  teacherEmail?: string;
+  busCompanyEmail?: string;
+  coordinatorEmail?: string;
+  frontDeskEmail?: string;
+  sendParentSms?: boolean;
+}) {
+  const user = await getSession();
+  if (!user) return { ok: false as const, error: "Please sign in." };
+  if (user.role !== "BUS_COMPANY") {
+    return {
+      ok: false as const,
+      error: "The bus company sends this update.",
+    };
+  }
+
+  const loaded = await loadStudent(input.studentId);
+  if (!loaded) {
+    return { ok: false as const, error: "Student not found." };
+  }
+  const schoolId = loaded.record.schoolId;
+  if (!(await canCompanyAccessSchool(user, schoolId))) {
+    return { ok: false as const, error: "That school is not on your list." };
+  }
+
+  const trips = (input.trips || []).filter(
+    (trip): trip is Trip => trip === "AM" || trip === "PM",
+  );
+  if (!trips.length) {
+    return { ok: false as const, error: "Missing trip for this update." };
+  }
+
+  const parentEmail = usableOpsEmail(input.parentEmail || "");
+  const teacherEmail = usableTeacherEmail(input.teacherEmail || "");
+  const busCompanyEmail = usableOpsEmail(input.busCompanyEmail || "");
+  const coordinatorEmail = usableOpsEmail(input.coordinatorEmail || "");
+  const frontDeskEmail = usableOpsEmail(input.frontDeskEmail || "");
+  const schoolEmails = [coordinatorEmail, frontDeskEmail].filter(Boolean);
+
+  const student = {
+    ...loaded.effective,
+    parentEmail,
+    parentPhone: (input.parentPhone || "").trim(),
+    parentPhone2: (input.parentPhone2 || "").trim(),
+    teacherEmail,
+  };
+
+  const notice = await notifyTransportationChange({
+    user,
+    student,
+    trips,
+    previous: input.previous || "",
+    next: input.next || planLine(student, trips),
+    when: input.when || "Assigned bus",
+    note: input.note || "",
+    waiting: false,
+    amPickup: input.amPickup || "",
+    pmPickup: input.pmPickup || "",
+    parentSms: "assigned",
+    sendParentSms: input.sendParentSms !== false,
+    parentEmail,
+    teacherEmail,
+    teacherEmails: teacherEmail ? [teacherEmail] : [],
+    busCompanyEmail,
+    notifySchool: true,
+    schoolId,
+    schoolEmails,
+  });
+
+  revalidatePath("/company");
+
+  return {
+    ok: true as const,
+    sent: notice.sent,
+    skipped: notice.skipped,
+    parentEmail,
     parentPhone: student.parentPhone,
     parentPhone2: student.parentPhone2,
-    teacherEmail: student.teacherEmail,
-    busCompanyEmail: user.email,
-    message: queuedNoticeMessage(
-      false,
-      `${assignedLabel} is now assigned to ${student.fullName}.`,
-    ),
+    teacherEmail,
+    busCompanyEmail,
+    coordinatorEmail,
+    frontDeskEmail,
+    message: "Update sent.",
   };
 }
