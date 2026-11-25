@@ -20,6 +20,16 @@ export type CompanyRequest = {
   email: { subject: string; body: string };
   trips: Trip[];
   changed: boolean;
+  /** Exact emails the school typed on this request (when stored). */
+  notifyEmails?: {
+    parentEmail: string;
+    parentPhone: string;
+    parentPhone2: string;
+    teacherEmail: string;
+    busCompanyEmail: string;
+    coordinatorEmail: string;
+    frontDeskEmail: string;
+  };
 };
 
 function ReadEmailButton({
@@ -202,6 +212,7 @@ export function CompanyBoard({
                           email={row.email}
                         />
                         <ChangeRideAssign
+                          requestId={row.id}
                           studentId={row.studentId}
                           studentName={row.name}
                           grade={row.grade}
@@ -213,6 +224,9 @@ export function CompanyBoard({
                           hideVan={desk.hideVan ?? desk.aimSchool}
                           companyAssigned={row.changed}
                           defaultTrips={row.trips}
+                          parentEmail={row.notifyEmails?.parentEmail}
+                          parentPhone={row.notifyEmails?.parentPhone}
+                          teacherEmail={row.notifyEmails?.teacherEmail}
                           nearbyEnabled
                         />
                       </div>

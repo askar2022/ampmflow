@@ -24,7 +24,6 @@ import {
 } from "@/lib/change-notify";
 import {
   defaultBusCompanyEmail,
-  loadSchoolDeskNotifyEmails,
   saveSchoolBusCompanyEmail,
   saveSchoolDeskNotifyEmails,
   usableOpsEmail,
@@ -35,6 +34,11 @@ import {
   normalizeBusNumber,
   normalizeVanLabel,
 } from "@/lib/school-fleet";
+import {
+  parseRequestNotifyEmails,
+  requestHasNotifyEmails,
+  requestNotifyEmailsPayload,
+} from "@/lib/request-notify-emails";
 import { parentSmsNumbers } from "@/lib/sms";
 import { usableTeacherEmail } from "@/lib/teacher-snapshot";
 import type { Destination, DurationType, Trip } from "@/lib/types";
@@ -399,6 +403,15 @@ export async function saveReceptionChange(input: ReceptionChangeInput) {
           waiting,
           daycareName: input.daycareName || student.daycareName || "",
           customAddress: input.customAddress || "",
+          emails: requestNotifyEmailsPayload({
+            parentEmail,
+            parentPhone,
+            parentPhone2,
+            teacherEmail,
+            busCompanyEmail,
+            coordinatorEmail,
+            frontDeskEmail,
+          }),
         }),
         createdById: user.id,
         reviewedById: waiting ? null : user.id,
@@ -946,7 +959,17 @@ export async function requestRoute(input: RouteRequestInput) {
           .join(" · "),
         status: "PENDING",
         busNumber: null,
-        payload: JSON.stringify({ kind: "ROUTE_REQUEST" }),
+        payload: JSON.stringify({
+          kind: "ROUTE_REQUEST",
+          emails: requestNotifyEmailsPayload({
+            parentEmail,
+            parentPhone,
+            teacherEmail: "",
+            busCompanyEmail,
+            coordinatorEmail: "",
+            frontDeskEmail: "",
+          }),
+        }),
         createdById: user.id,
       },
     });
@@ -1189,8 +1212,20 @@ export async function assignRequestedBus(input: {
     .filter(Boolean)
     .join(" ");
 
-  // Do not auto-send — company reviews/edits emails first, then confirms.
-  const desk = await loadSchoolDeskNotifyEmails(schoolId);
+  // Prefer the exact emails the school typed on THIS request — not later
+  // school-wide defaults or the logged-in company user’s email.
+  const linkedRequest =
+    request ||
+    (await prisma.changeRequest.findFirst({
+      where: {
+        schoolId,
+        studentId,
+        status: { in: ["PENDING", "NEEDS_CLARIFICATION", "COMPLETED"] },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, payload: true },
+    }));
+  const fromRequest = parseRequestNotifyEmails(linkedRequest?.payload);
   const when = vehicle === "van" ? "Assigned van" : "Assigned bus";
 
   revalidatePath("/company");
@@ -1199,15 +1234,17 @@ export async function assignRequestedBus(input: {
     ok: true as const,
     assigned: assignedLabel,
     notifyPending: true as const,
+    emailsFromRequest: requestHasNotifyEmails(fromRequest),
     sent: [] as string[],
     skipped: [] as string[],
-    parentEmail: student.parentEmail || "",
-    parentPhone: student.parentPhone || "",
-    parentPhone2: student.parentPhone2 || "",
-    teacherEmail: student.teacherEmail || "",
-    busCompanyEmail: user.email || "",
-    coordinatorEmail: desk.coordinatorEmail || "",
-    frontDeskEmail: desk.frontDeskEmail || "",
+    // Never substitute school-wide defaults or the login email — only this request.
+    parentEmail: fromRequest.parentEmail,
+    parentPhone: fromRequest.parentPhone,
+    parentPhone2: fromRequest.parentPhone2,
+    teacherEmail: fromRequest.teacherEmail,
+    busCompanyEmail: fromRequest.busCompanyEmail,
+    coordinatorEmail: fromRequest.coordinatorEmail,
+    frontDeskEmail: fromRequest.frontDeskEmail,
     trips,
     amPickup: trips.includes("AM") ? amPickup : "",
     pmPickup: trips.includes("PM") ? pmPickup : "",

@@ -20,6 +20,10 @@ import {
 } from "@/lib/change-notify";
 import { loadCompanyOpenRequests } from "@/lib/company-open-requests";
 import { changeRequestLabel, isPlanWaiting, isWaitingRide } from "@/lib/format";
+import {
+  parseRequestNotifyEmails,
+  requestHasNotifyEmails,
+} from "@/lib/request-notify-emails";
 import type { EffectiveStudent, Trip } from "@/lib/types";
 import {
   CompanyBoard,
@@ -199,6 +203,7 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
         ]
       : (["AM", "PM"] as Trip[]);
     const used = trips.length ? trips : (["AM", "PM"] as Trip[]);
+    const notifyEmails = parseRequestNotifyEmails(row.payload);
     return {
       id: row.id,
       studentId: student.id,
@@ -218,6 +223,9 @@ async function loadSchoolDesk(school: CompanySchool): Promise<CompanyDesk> {
       trips: used,
       // Permanent log: completed stays green; unfinished stay yellow.
       changed: !stillOpen,
+      notifyEmails: requestHasNotifyEmails(notifyEmails)
+        ? notifyEmails
+        : undefined,
     };
   });
 

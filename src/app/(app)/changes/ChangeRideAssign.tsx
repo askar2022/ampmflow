@@ -68,6 +68,7 @@ function statusFor(receipt: Receipt, label: string) {
 }
 
 export function ChangeRideAssign({
+  requestId,
   studentId,
   studentName,
   grade,
@@ -84,6 +85,7 @@ export function ChangeRideAssign({
   teacherEmail = "",
   nearbyEnabled = false,
 }: {
+  requestId?: string;
   studentId: string;
   studentName: string;
   grade: string;
@@ -221,6 +223,7 @@ export function ChangeRideAssign({
     setError("");
     start(async () => {
       const result = await assignRequestedBus({
+        requestId,
         studentId,
         busNumber: bus || van,
         vehicle: van && !bus ? "van" : "bus",
@@ -232,6 +235,7 @@ export function ChangeRideAssign({
         setError(result.error);
         return;
       }
+      // Only the emails from this school request (empty = school left it blank).
       setDraft({
         assigned: result.assigned,
         trips: result.trips,
@@ -241,16 +245,15 @@ export function ChangeRideAssign({
         note: result.note,
         amPickup: result.amPickup,
         pmPickup: result.pmPickup,
-        parentEmail: result.parentEmail || parentEmail || "",
-        parentPhone: result.parentPhone || parentPhone || "",
+        parentEmail: result.parentEmail || "",
+        parentPhone: result.parentPhone || "",
         parentPhone2: result.parentPhone2 || "",
-        teacherEmail: result.teacherEmail || teacherEmail || "",
+        teacherEmail: result.teacherEmail || "",
         busCompanyEmail: result.busCompanyEmail || "",
         coordinatorEmail: result.coordinatorEmail || "",
         frontDeskEmail: result.frontDeskEmail || "",
         sendParentSms: Boolean(
-          (result.parentPhone || parentPhone || "").trim() ||
-            (result.parentPhone2 || "").trim(),
+          (result.parentPhone || "").trim() || (result.parentPhone2 || "").trim(),
         ),
       });
       setReceipt(null);
@@ -387,8 +390,10 @@ export function ChangeRideAssign({
                   {draft.assigned} saved — review who gets the update
                 </p>
                 <p className="text-sm text-muted">
-                  These are the school emails on file for this student. Clear a
-                  row to skip it, or edit before you send.
+                  These are the emails the school typed on this request — not
+                  other saved school emails. Clear a row to skip it, or edit
+                  before you send. Blank means the school did not include that
+                  contact.
                 </p>
                 <div className="space-y-3">
                   {(
