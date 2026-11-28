@@ -10,9 +10,9 @@ import {
   todayKey,
 } from "./dates";
 import { sendMail, smtpConfigured } from "./email";
+import { isAimSchool } from "./aim-fleet";
 import {
   loadLeadershipEmails,
-  saveLeadershipEmails,
   usableOpsEmail,
 } from "./ops-change-emails";
 import { prisma } from "./prisma";
@@ -67,11 +67,14 @@ export function isFridayLeadershipWindow() {
   );
 }
 
-const METRO_FRIDAY_EMAILS = [
-  "ahelmi@metroschoolsmn.org",
-  "mahmed@metroschoolsmn.org",
-  "askar@automationllc.org",
-];
+export function isMetroSchool(name?: string | null) {
+  return Boolean(name && /metro/i.test(name));
+}
+
+/** Aim Academy and Metro: Friday leadership emails are paused. */
+export function leadershipEmailPausedForSchool(name?: string | null) {
+  return isAimSchool(name) || isMetroSchool(name);
+}
 
 export async function leadershipReportEmails(schoolId: string) {
   const [saved, school] = await Promise.all([
@@ -81,11 +84,10 @@ export async function leadershipReportEmails(schoolId: string) {
       select: { name: true },
     }),
   ]);
-  const metro = /metro/i.test(school?.name || "") ? METRO_FRIDAY_EMAILS : [];
-  if (metro.some((email) => !saved.includes(email))) {
-    await saveLeadershipEmails(schoolId, [...saved, ...metro]).catch(() => undefined);
+  if (leadershipEmailPausedForSchool(school?.name)) {
+    return [];
   }
-  return [...new Set([...saved, ...metro].filter(Boolean))];
+  return [...new Set(saved.filter(Boolean))];
 }
 
 function barWidth(part: number, whole: number) {
@@ -420,8 +422,18 @@ export async function sendFridayLeadershipReport(args: {
     select: { name: true },
   });
   const schoolName = school?.name || "School";
-  const data = await loadCoordinatorAnalytics(args.schoolId);
   const testTo = usableOpsEmail(args.testTo || "");
+  // Pause live Friday leadership mail for Aim Academy and Metro (tests still OK).
+  if (!testTo && leadershipEmailPausedForSchool(schoolName)) {
+    return {
+      ok: true as const,
+      sent: 0,
+      alreadySent: true,
+      recipients: [] as string[],
+      paused: true as const,
+    };
+  }
+  const data = await loadCoordinatorAnalytics(args.schoolId);
   const recipients = testTo
     ? [testTo]
     : await leadershipReportEmails(args.schoolId);
@@ -485,10 +497,21 @@ export async function runScheduledFridayLeadershipReports() {
     return { ran: false as const, reason: "outside-friday-noon", schools: 0 };
   }
 
-  const schools = await prisma.school.findMany({ select: { id: true } });
-  const results: Array<{ schoolId: string; sent: number; skipped?: string }> = [];
+  const schools = await prisma.school.findMany({
+    select: { id: true, name: true },
+  });
+  const results: Array<{ schoolId: string; sent: number; skipped?: string }> =
+    [];
 
   for (const school of schools) {
+    if (leadershipEmailPausedForSchool(school.name)) {
+      results.push({
+        schoolId: school.id,
+        sent: 0,
+        skipped: "paused-aim-or-metro",
+      });
+      continue;
+    }
     const actor = await prisma.user.findFirst({
       where: {
         schoolId: school.id,
@@ -510,9 +533,11 @@ export async function runScheduledFridayLeadershipReports() {
       schoolId: school.id,
       sent: result.sent,
       skipped: result.ok
-        ? result.alreadySent
-          ? "already-sent"
-          : undefined
+        ? "paused" in result && result.paused
+          ? "paused-aim-or-metro"
+          : result.alreadySent
+            ? "already-sent"
+            : undefined
         : result.error,
     });
   }
